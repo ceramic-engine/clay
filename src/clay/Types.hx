@@ -207,6 +207,9 @@ enum abstract WindowEventType(Int) from Int to Int {
 
 enum abstract AppEventType(Int) from Int to Int {
 
+    /** An unknown app event */
+    var UNKNOWN                = 0;
+
     /** An system terminating event, called by the OS (mobile specific) */
     var TERMINATING            = 11;
 
@@ -227,6 +230,7 @@ enum abstract AppEventType(Int) from Int to Int {
 
     inline function toString() {
         return switch(this) {
+            case UNKNOWN:               'UNKNOWN';
             case TERMINATING:           'TERMINATING';
             case LOW_MEMORY:            'LOW_MEMORY';
             case WILL_ENTER_BACKGROUND: 'WILL_ENTER_BACKGROUND';
