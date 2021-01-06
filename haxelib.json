@@ -1,0 +1,12 @@
+{
+    "name": "clay",
+    "url" : "https://github.com/ceramic-engine/clay/",
+    "license": "MIT",
+    "tags": [],
+    "description": "",
+    "version": "0.0.1",
+    "classPath": "src/",
+    "releasenote": "",
+    "contributors": ["jeremyfa"],
+    "dependencies": {}
+  }
