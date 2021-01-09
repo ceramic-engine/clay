@@ -1,5 +1,7 @@
 package clay.web;
 
-typedef WebConfig = {
+@:structInit
+@:publicFields
+class WebConfig {
     
 }

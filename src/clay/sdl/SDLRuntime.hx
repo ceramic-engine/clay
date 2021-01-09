@@ -1,5 +1,6 @@
 package clay.sdl;
 
+import clay.opengl.GLGraphics;
 import clay.Config;
 import clay.Types;
 
@@ -19,6 +20,7 @@ import opengl.WebGL as GL;
  */
 @:access(clay.Clay)
 @:access(clay.Input)
+@:access(clay.Screen)
 class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Properties
@@ -34,11 +36,6 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public var window:sdl.Window;
 
     /**
-     * Toggle auto window swap
-     */
-    public var autoSwap:Bool = true;
-
-    /**
      * Current SDL event being handled, if any
      */
     public var currentSdlEvent:sdl.Event = null;
@@ -47,9 +44,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     var timestampStart:Float;
 
-    var windowWidth:Int;
+    var windowW:Int;
 
-    var windowHeight:Int;
+    var windowH:Int;
 
     var windowDpr:Float = 1.0;
 
@@ -74,7 +71,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    override function handleReady() {
+    override function ready() {
 
         createWindow();
 
@@ -195,8 +192,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         applyGLAttributes(config.render);
 
-        windowWidth = windowConfig.width;
-        windowHeight = windowConfig.height;
+        windowW = windowConfig.width;
+        windowH = windowConfig.height;
 
         // Init SDL video subsystem
         var status = SDL.initSubSystem(SDL_INIT_VIDEO);
@@ -306,6 +303,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         flags |= SDL_WINDOW_OPENGL;
         flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 
+        trace('RESIZABLE: ' + config.resizable);
         if (config.resizable)  flags |= SDL_WINDOW_RESIZABLE;
         if (config.borderless) flags |= SDL_WINDOW_BORDERLESS;
 
@@ -365,6 +363,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         windowSwap();
         GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT | GL.STENCIL_BUFFER_BIT);
 
+        GLGraphics.setup();
+
         #end
 
     }
@@ -384,8 +384,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         config.x = pos.x;
         config.y = pos.y;
-        config.width = windowWidth = size.w;
-        config.height = windowHeight = size.h;
+        config.width = windowW = size.w;
+        config.height = windowH = size.h;
 
         windowDpr = windowDevicePixelRatio();
         Log.debug('SDL / window / x=${config.x} y=${config.y} w=${config.width} h=${config.height} scale=$windowDpr');
@@ -441,6 +441,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    override inline public function windowWidth():Int {
+
+        return windowW;
+
+    }
+
+    override inline public function windowHeight():Int {
+
+        return windowH;
+
+    }
+
     public function windowSwap() {
 
         SDL.GL_SwapWindow(window);
@@ -472,7 +484,21 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             app.emitTick();
 
-            if (autoSwap && !app.hasShutdown) {
+            if (app.config.runtime.autoSwap && !app.hasShutdown) {
+
+                #if !clay_native_no_tick_sleep
+        
+                #if mac
+                // Prevent the app from using 100% CPU for nothing because vsync
+                // Doesn't work properly on mojave
+                // TODO fix the actual vsync issue
+                Sys.sleep(0.001);
+                #else
+                Sys.sleep(0);
+                #end
+        
+                #end
+
                 windowSwap();
             }
 
@@ -823,14 +849,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 case SDL_WINDOWEVENT_RESIZED:
                     type = RESIZED;
                     windowDpr = windowDevicePixelRatio();
-                    windowWidth = data1 = toPixels(data1);
-                    windowHeight = data2 = toPixels(data2);
+                    windowW = data1 = toPixels(data1);
+                    windowH = data2 = toPixels(data2);
 
                 case SDL_WINDOWEVENT_SIZE_CHANGED:
                     type = SIZE_CHANGED;
                     windowDpr = windowDevicePixelRatio();
-                    windowWidth = data1 = toPixels(data1);
-                    windowHeight = data2 = toPixels(data2);
+                    windowW = data1 = toPixels(data1);
+                    windowH = data2 = toPixels(data2);
 
                 case SDL_WINDOWEVENT_NONE:
 

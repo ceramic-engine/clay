@@ -19,7 +19,7 @@ class BaseRuntime {
 
     public function shutdown(immediate:Bool = false):Void {}
 
-    public function handleReady():Void {}
+    public function ready():Void {}
 
     public function run():Bool {
 
@@ -30,6 +30,18 @@ class BaseRuntime {
     public function windowDevicePixelRatio():Float {
 
         return 1.0;
+
+    }
+
+    public function windowWidth():Int {
+
+        return 0;
+
+    }
+
+    public function windowHeight():Int {
+
+        return 0;
 
     }
 

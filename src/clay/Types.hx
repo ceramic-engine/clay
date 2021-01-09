@@ -1,5 +1,9 @@
 package clay;
 
+import clay.opengl.GL;
+import clay.opengl.GLGraphics;
+import clay.opengl.GL.GLTexture;
+
 /** A gamepad device event type */
 enum abstract GamepadDeviceEventType(Int) from Int to Int {
 
@@ -240,5 +244,67 @@ enum abstract AppEventType(Int) from Int to Int {
             case _:                     '$this';
         }
     }
+
+}
+
+// For now, all targets are using GL api
+
+typedef TextureId = GLTexture;
+typedef RenderTarget = GLGraphics_RenderTarget;
+typedef GpuShader = GLGraphics_GpuShader;
+
+enum abstract TextureFormat(Int) from Int to Int {
+
+    var RGB = GL.RGB;
+
+    var RGBA = GL.RGBA;
+
+}
+
+// Only 2D textures are supported at the moment
+enum abstract TextureType(Int) from Int to Int {
+
+    var TEXTURE_2D = GL.TEXTURE_2D;
+
+}
+
+enum abstract TextureDataType(Int) from Int to Int {
+
+    var UNSIGNED_BYTE = GL.UNSIGNED_BYTE;
+
+}
+
+enum abstract TextureFilter(Int) from Int to Int {
+
+    var NEAREST = GL.NEAREST;
+    var LINEAR = GL.LINEAR;
+    var NEAREST_MIPMAP_NEAREST = GL.NEAREST_MIPMAP_NEAREST;
+    var LINEAR_MIPMAP_NEAREST = GL.LINEAR_MIPMAP_NEAREST;
+    var NEAREST_MIPMAP_LINEAR = GL.NEAREST_MIPMAP_LINEAR;
+    var LINEAR_MIPMAP_LINEAR = GL.LINEAR_MIPMAP_LINEAR;
+
+}
+
+enum abstract TextureWrap(Int) from Int to Int {
+
+    var CLAMP_TO_EDGE = GL.CLAMP_TO_EDGE;
+    var REPEAT = GL.REPEAT;
+    var MIRRORED_REPEAT = GL.MIRRORED_REPEAT;
+
+}
+
+enum abstract BlendMode(Int) from Int to Int {
+
+    var ZERO                    = GL.ZERO;
+    var ONE                     = GL.ONE;
+    var SRC_COLOR               = GL.SRC_COLOR;
+    var ONE_MINUS_SRC_COLOR     = GL.ONE_MINUS_SRC_COLOR;
+    var SRC_ALPHA               = GL.SRC_ALPHA;
+    var ONE_MINUS_SRC_ALPHA     = GL.ONE_MINUS_SRC_ALPHA;
+    var DST_ALPHA               = GL.DST_ALPHA;
+    var ONE_MINUS_DST_ALPHA     = GL.ONE_MINUS_DST_ALPHA;
+    var DST_COLOR               = GL.DST_COLOR;
+    var ONE_MINUS_DST_COLOR     = GL.ONE_MINUS_DST_COLOR;
+    var SRC_ALPHA_SATURATE      = GL.SRC_ALPHA_SATURATE;
 
 }

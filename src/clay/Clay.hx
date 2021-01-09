@@ -33,7 +33,6 @@ class Clay {
 
     /**
      * Clay input
-     * (implementation varies depending on the target)
      */
     public var input(default, null):Input;
 
@@ -48,6 +47,24 @@ class Clay {
 
     /** `true` if shut down has completed  */
     public var hasShutdown:Bool = false;
+
+    /** The last known timestamp in seconds, or `-1` if not defined yet */
+    public var timestamp:Float = -1;
+
+    /**
+     * Main window screen width
+     */
+    public var screenWidth(default, null):Int;
+
+    /**
+     * Main window screen height
+     */
+    public var screenHeight(default, null):Int;
+
+    /**
+     * Main window screen density (device pixel ratio)
+     */
+    public var screenDensity(default, null):Float;
 
     public var immediateShutdown:Bool = false;
 
@@ -91,7 +108,7 @@ class Clay {
 
         @:privateAccess runtime = new Runtime(this);
         Immediate.flush();
-
+        
         init();
 
     }
@@ -110,8 +127,17 @@ class Clay {
         Immediate.flush();
 
         Log.debug('Clay / ready');
-        runtime.handleReady();
+        runtime.ready();
         Immediate.flush();
+
+        timestamp = Runtime.timestamp();
+        ready = true;
+
+        screenDensity = app.runtime.windowDevicePixelRatio();
+        screenWidth = Math.round(app.runtime.windowWidth() / screenDensity);
+        screenHeight = Math.round(app.runtime.windowHeight() / screenDensity);
+
+        events.ready();
 
         var shouldExit = runtime.run();
         if (shouldExit && !(hasShutdown || shuttingDown)) {
@@ -166,7 +192,11 @@ class Clay {
         Immediate.flush();
 
         if (!shuttingDown && ready) {
-            events.tick();
+            var newTimestamp = Runtime.timestamp();
+            var delta = newTimestamp - timestamp;
+            timestamp = newTimestamp;
+
+            events.tick(delta);
         }
 
     }

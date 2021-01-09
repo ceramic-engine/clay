@@ -4,7 +4,9 @@ import clay.Types;
 
 class Events {
 
-    public function tick():Void {}
+    public function ready():Void {}
+
+    public function tick(delta:Float):Void {}
 
     public function freeze():Void {}
 
