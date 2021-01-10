@@ -18,6 +18,12 @@ class BaseIO {
     public function init():Void {}
 
     public function shutdown():Void {}
+
+    public function isSynchronous():Bool {
+
+        return false;
+
+    }
     
     public function appPath():String {
 
@@ -25,11 +31,14 @@ class BaseIO {
 
     }
     
-    public function loadData(path:String, ?options:Dynamic, callback:(err:Dynamic, data:Uint8Array)->Void):Void {
+    public function loadData(path:String, ?options:Dynamic, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
-        Immediate.push(() -> {
-            callback('Not implemented', null);
-        });
+        if (callback != null) {
+            Immediate.push(() -> {
+                callback(null);
+            });
+        }
+        return null;
 
     }
 

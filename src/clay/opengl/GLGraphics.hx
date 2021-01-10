@@ -18,17 +18,17 @@ class GLGraphics {
 
     inline static final TEXTURE_2D_MULTISAMPLE = 0x9100;
 
-    inline public static var NO_TEXTURE:TextureId = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_TEXTURE:TextureId = #if clay_web null #else 0 #end;
 
-    inline public static var NO_FRAMEBUFFER:GLFramebuffer = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_FRAMEBUFFER:GLFramebuffer = #if clay_web null #else 0 #end;
 
-    inline public static var NO_RENDERBUFFER:GLRenderbuffer = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_RENDERBUFFER:GLRenderbuffer = #if clay_web null #else 0 #end;
 
-    inline public static var NO_SHADER:GLShader = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_SHADER:GLShader = #if clay_web null #else 0 #end;
 
-    inline public static var NO_PROGRAM:GLProgram = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_PROGRAM:GLProgram = #if clay_web null #else 0 #end;
 
-    inline public static var NO_LOCATION:GLUniformLocation = #if clay_web null #else 0 #end;
+    #if !debug inline #end public static final NO_LOCATION:GLUniformLocation = #if clay_web null #else 0 #end;
 
     static var _boundTexture2D:Array<TextureId> = [];
 
@@ -459,16 +459,21 @@ class GLGraphics {
 
     public static function createShader(vertSource:String, fragSource:String, ?attributes:Array<String>, ?textures:Array<String>):GpuShader {
 
+        if (vertSource == null)
+            throw 'Cannot create shader: vertSource is null!';
+        if (fragSource == null)
+            throw 'Cannot create shader: fragSource is null!';
+
         var shader = new GLGraphics_GpuShader();
 
         shader.vertShader = compileGLShader(GL.VERTEX_SHADER, vertSource);
-        if (shader.vertShader == null) {
+        if (shader.vertShader == NO_SHADER) {
             deleteShader(shader);
             return null;
         }
 
         shader.fragShader = compileGLShader(GL.FRAGMENT_SHADER, fragSource);
-        if (shader.fragShader == null) {
+        if (shader.fragShader == NO_SHADER) {
             deleteShader(shader);
             return null;
         }

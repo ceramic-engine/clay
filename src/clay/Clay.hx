@@ -32,6 +32,11 @@ class Clay {
     public var io(default, null):IO;
 
     /**
+     * Clay assets
+     */
+    public var assets(default, null):Assets;
+
+    /**
      * Clay input
      */
     public var input(default, null):Input;
@@ -101,6 +106,9 @@ class Clay {
         this.events = events;
 
         @:privateAccess io = new IO(this);
+        Immediate.flush();
+
+        @:privateAccess assets = new Assets(this);
         Immediate.flush();
 
         @:privateAccess input = new Input(this);

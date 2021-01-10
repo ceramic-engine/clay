@@ -15,11 +15,6 @@ class Texture extends Resource {
     public var textureId(default, null):TextureId = Graphics.NO_TEXTURE;
 
     /**
-     * If set to `true`, the pixels will be premultiplied by their alpha before submit
-     */
-    public var loadPremultiplyAlpha:Bool = false;
-
-    /**
      * If `true`, the pixels buffer should store compressed image data that the GPU understands
      */
     public var compressed:Bool = false;
@@ -119,6 +114,24 @@ class Texture extends Resource {
 
     }
 
+    public static function fromImage(image:Image):Texture {
+
+        var texture = new Texture();
+
+        // This could be improved, if needed
+        if (image.bitsPerPixel != 4)
+            throw 'Image must have 4 bits per pixels (RGBA format)';
+
+        texture.width = image.width;
+        texture.height = image.height;
+        texture.widthActual = image.widthActual;
+        texture.heightActual = image.heightActual;
+        texture.pixels = image.pixels;
+
+        return texture;
+
+    }
+
     /**
      * Initialize this texture. Must be called before using the actual texture.
      * When calling init(), properties should be defined accordingly.
@@ -163,7 +176,7 @@ class Texture extends Resource {
     /** Bind this texture to its active texture slot,
         and it's texture id to the texture type. Calling this
         repeatedly is fine, as the state is tracked by `Graphics`. */
-    public function bind(slot:Int = -1) {
+    public function bind(slot:Int = 0) {
 
         if (slot != -1)
             Graphics.setActiveTexture(slot);

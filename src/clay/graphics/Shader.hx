@@ -54,6 +54,8 @@ class Shader extends Resource {
             throw 'Failed to create shader (id=$id)';
         }
 
+        uniforms = new Uniforms(gpuShader);
+
     }
 
     public function activate():Void {

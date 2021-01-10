@@ -2,35 +2,35 @@ package clay;
 
 class Log {
 
-    public static function debug(message:String):Void {
+    public static function debug(message:String, ?pos:haxe.PosInfos):Void {
 
         #if clay_debug
-        trace('[debug] ' + message);
+        haxe.Log.trace('[debug] ' + message, pos);
         #end
 
     }
 
-    public static function info(message:String):Void {
+    public static function info(message:String, ?pos:haxe.PosInfos):Void {
 
-        trace('[info] ' + message);
-
-    }
-
-    public static function warning(message:String):Void {
-
-        trace('[warning] ' + message);
+        haxe.Log.trace('[info] ' + message, pos);
 
     }
 
-    public static function error(message:String):Void {
+    public static function warning(message:String, ?pos:haxe.PosInfos):Void {
 
-        trace('[error] ' + message);
+        haxe.Log.trace('[warning] ' + message, pos);
 
     }
 
-    public static function success(message:String):Void {
+    public static function error(message:String, ?pos:haxe.PosInfos):Void {
 
-        trace('[success] ' + message);
+        haxe.Log.trace('[error] ' + message, pos);
+
+    }
+
+    public static function success(message:String, ?pos:haxe.PosInfos):Void {
+
+        haxe.Log.trace('[success] ' + message, pos);
 
     }
 

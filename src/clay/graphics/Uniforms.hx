@@ -400,4 +400,11 @@ class Uniforms {
 
     }
 
+    public function clone():Uniforms {
+
+        var uniforms = new Uniforms(gpuShader);
+        return uniforms;
+
+    }
+
 }
