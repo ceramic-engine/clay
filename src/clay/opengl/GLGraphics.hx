@@ -30,6 +30,8 @@ class GLGraphics {
 
     #if !debug inline #end public static final NO_LOCATION:GLUniformLocation = #if clay_web null #else 0 #end;
 
+    #if !debug inline #end public static final NO_BUFFER:GLBuffer = #if clay_web null #else 0 #end;
+
     static var _boundTexture2D:Array<TextureId> = [];
 
     static var _boundProgram:GLProgram = NO_PROGRAM;
