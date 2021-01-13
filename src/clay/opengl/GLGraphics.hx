@@ -693,6 +693,15 @@ class GLGraphics {
 
     }
 
+    inline public static function ensureNoError():Void {
+
+        var error = GL.getError();
+        if (error != GL.NO_ERROR) {
+            throw 'Failed with GL error: $error';
+        }
+
+    }
+
 }
 
 @:allow(clay.opengl.GLGraphics)
