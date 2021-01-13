@@ -669,7 +669,7 @@ class GLGraphics {
     inline public static function setMatrix4Uniform(shader:GpuShader, location:GLUniformLocation, value:Float32Array):Void {
 
         useShader(shader);
-        GL.uniform4fv(location, value);
+        GL.uniformMatrix4fv(location, false, value);
 
     }
 
