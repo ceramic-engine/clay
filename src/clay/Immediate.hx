@@ -1,8 +1,8 @@
 package clay;
 
-import ceramic.ArrayPool;
+import clay.ArrayPool;
 
-using ceramic.Extensions;
+using clay.Extensions;
 
 class Immediate {
 
