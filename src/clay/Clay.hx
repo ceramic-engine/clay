@@ -141,9 +141,7 @@ class Clay {
         timestamp = Runtime.timestamp();
         ready = true;
 
-        screenDensity = app.runtime.windowDevicePixelRatio();
-        screenWidth = Math.round(app.runtime.windowWidth() / screenDensity);
-        screenHeight = Math.round(app.runtime.windowHeight() / screenDensity);
+        updateScreen();
 
         events.ready();
 
@@ -198,6 +196,8 @@ class Clay {
         #end
 
         Immediate.flush();
+
+        updateScreen();
 
         if (!shuttingDown && ready) {
             var newTimestamp = Runtime.timestamp();
@@ -357,6 +357,14 @@ class Clay {
             }
             #end
         }
+
+    }
+
+    function updateScreen():Void {
+
+        screenDensity = app.runtime.windowDevicePixelRatio();
+        screenWidth = Math.round(app.runtime.windowWidth() / screenDensity);
+        screenHeight = Math.round(app.runtime.windowHeight() / screenDensity);
 
     }
 
