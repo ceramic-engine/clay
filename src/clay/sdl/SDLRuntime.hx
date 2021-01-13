@@ -303,7 +303,6 @@ class SDLRuntime extends clay.base.BaseRuntime {
         flags |= SDL_WINDOW_OPENGL;
         flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 
-        trace('RESIZABLE: ' + config.resizable);
         if (config.resizable)  flags |= SDL_WINDOW_RESIZABLE;
         if (config.borderless) flags |= SDL_WINDOW_BORDERLESS;
 
