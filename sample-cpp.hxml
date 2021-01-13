@@ -1,0 +1,16 @@
+-cp src
+-cp sample/src
+--main sample.SampleIndices
+--cpp out/cpp
+-D clay
+-D clay_native
+-D clay_sdl
+-D clay_use_glew
+-D hxcpp_static_std
+-lib hxcpp
+-lib linc_opengl
+-lib linc_sdl
+-lib linc_ogg
+-lib linc_stb
+-lib linc_timestamp
+-lib linc_openal
