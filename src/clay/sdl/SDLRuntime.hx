@@ -15,6 +15,8 @@ import glew.GLEW;
 import opengl.WebGL as GL;
 #end
 
+typedef WindowHandle = sdl.Window;
+
 /**
  * Native runtime, using SDL to operate
  */
@@ -33,7 +35,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /**
      * The SDL window handle
      */
-    public var window:sdl.Window;
+    public var window:WindowHandle;
 
     /**
      * Current SDL event being handled, if any
@@ -42,7 +44,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Internal
 
-    var timestampStart:Float;
+    static var timestampStart:Float = 0.0;
 
     var windowW:Int;
 
@@ -351,7 +353,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         #end
 
         // Also clear the garbage in both front/back buffer
-        #if (!clay_no_initial_glclear && linc_opengl)
+        #if (!clay_no_initial_gl_clear && linc_opengl)
 
         var color = app.config.render.defaultClear;
 
@@ -901,7 +903,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     inline public static function timestamp():Float {
 
-        return haxe.Timer.stamp();
+        return Timestamp.now() - timestampStart;
+
+    }
+
+    public static function defaultConfig():RuntimeConfig {
+
+        return {
+            uncaughtErrorHandler: null
+        };
 
     }
 

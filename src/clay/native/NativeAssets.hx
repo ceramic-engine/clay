@@ -13,7 +13,7 @@ class NativeAssets extends BaseAssets {
 
     }
 
-    public function loadImage(path:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    override function loadImage(path:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
 
         if (path == null)
             throw 'Image path is null!';

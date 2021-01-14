@@ -19,4 +19,15 @@ class BaseAssets {
 
     }
 
+    public function loadImage(path:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+
+        if (callback != null) {
+            Immediate.push(() -> {
+                callback(null);
+            });
+        }
+        return null;
+
+    }
+
 }

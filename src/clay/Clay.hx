@@ -236,7 +236,7 @@ class Clay {
     function defaultConfig():Config {
 
         return {
-            runtime: defaultRuntimeConfig(),
+            runtime: Runtime.defaultConfig(),
             window: defaultWindowConfig(),
             render: defaultRenderConfig()
         };

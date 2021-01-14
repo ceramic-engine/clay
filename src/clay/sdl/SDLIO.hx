@@ -33,6 +33,9 @@ class SDLIO extends NativeIO {
 
     override function loadData(path:String, ?options:Dynamic, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
+        if (path == null)
+            throw 'Path is null!';
+
         var binary:Bool = options != null ? options.binary : false;
         var file = SDL.RWFromFile(path, binary ? 'rb' : 'r');
 

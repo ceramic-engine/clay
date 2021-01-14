@@ -24,15 +24,15 @@ class Input {
 
     public function shutdown():Void {}
 
-    inline public function emitKeyDown(keycode:Int, scancode:Int, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
+    inline public function emitKeyDown(keyCode:KeyCode, scanCode:ScanCode, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
 
-        app.events.keyDown(keycode, scancode, repeat, mod, timestamp, windowId);
+        app.events.keyDown(keyCode, scanCode, repeat, mod, timestamp, windowId);
 
     }
 
-    inline public function emitKeyUp(keycode:Int, scancode:Int, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
+    inline public function emitKeyUp(keyCode:KeyCode, scanCode:ScanCode, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
 
-        app.events.keyUp(keycode, scancode, repeat, mod, timestamp, windowId);
+        app.events.keyUp(keyCode, scanCode, repeat, mod, timestamp, windowId);
 
     }
 

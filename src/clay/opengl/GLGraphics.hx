@@ -428,7 +428,7 @@ class GLGraphics {
         }
 
         if (renderTarget.renderbuffer != NO_RENDERBUFFER) {
-            GL.deleteFramebuffer(renderTarget.renderbuffer);
+            GL.deleteRenderbuffer(renderTarget.renderbuffer);
             renderTarget.renderbuffer = NO_RENDERBUFFER;
         }
 
@@ -566,9 +566,9 @@ class GLGraphics {
             shader.fragShader = GLGraphics.NO_SHADER;
         }
 
-        if (shader.program != GLGraphics.NO_SHADER) {
-            GL.deleteShader(shader.fragShader);
-            shader.fragShader = GLGraphics.NO_SHADER;
+        if (shader.program != GLGraphics.NO_PROGRAM) {
+            GL.deleteProgram(shader.program);
+            shader.program = GLGraphics.NO_PROGRAM;
         }
 
     }
