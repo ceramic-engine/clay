@@ -365,18 +365,19 @@ class WebRuntime extends clay.base.BaseRuntime {
                 touchInfo = { x: x, y: y};
                 touches.set(touch.identifier, touchInfo);
             }
+            else {
+                touchInfo.x = x;
+                touchInfo.y = y;
+            }
 
             app.input.emitTouchDown(
                 x,
                 y,
-                x - touchInfo.x,
-                y - touchInfo.y,
+                0,
+                0,
                 touch.identifier,
                 timestamp()
             );
-
-            touchInfo.x = x;
-            touchInfo.y = y;
         
         }
 
