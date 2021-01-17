@@ -96,7 +96,7 @@ void main() {
 
     static function draw():Void {
 
-        Graphics.clear(0.25, 0.25, 0.25, 1);
+        Graphics.clear(0.5, 0.25, 0.25, 1);
         Graphics.setViewport(
             0, 0,
             Std.int(Clay.app.screenWidth * Clay.app.screenDensity),

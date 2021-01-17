@@ -136,6 +136,8 @@ void main() {
         GL.disableVertexAttribArray(0);
         GL.disableVertexAttribArray(1);
 
+        Graphics.ensureNoError();
+
     }
 
 }

@@ -1,13 +1,10 @@
 -cp src
 -cp sample/src
 --main sample.SampleVertex
---cpp out/cpp
+--js project/web/app.js
 -D clay
--D clay_native
--D clay_sdl
--D clay_use_glew
--D hxcpp_static_std
--lib hxcpp
+-D clay_web
+-D web
 -lib linc_opengl
 -lib linc_sdl
 -lib linc_ogg
