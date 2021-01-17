@@ -582,7 +582,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 app.input.emitMouseDown(
                     toPixels(e.button.x),
                     toPixels(e.button.y),
-                    e.button.button,
+                    e.button.button - 1,
                     e.button.timestamp / 1000.0,
                     Std.int(e.button.windowID)
                 );
@@ -590,15 +590,21 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 app.input.emitMouseUp(
                     toPixels(e.button.x),
                     toPixels(e.button.y),
-                    e.button.button,
+                    e.button.button - 1,
                     e.button.timestamp / 1000.0,
                     Std.int(e.button.windowID)
                 );
 
             case SDL_MOUSEWHEEL:
+                final wheelFactor = -5.0; // Try to have consistent behavior between web and native platforms
                 app.input.emitMouseWheel(
-                    e.wheel.x,
-                    e.wheel.y,
+                    #if !clay_no_wheel_round
+                    Math.round(e.wheel.x * wheelFactor),
+                    Math.round(e.wheel.y * wheelFactor),
+                    #else
+                    e.wheel.x * wheelFactor,
+                    e.wheel.y * wheelFactor,
+                    #end
                     e.wheel.timestamp / 1000.0,
                     Std.int(e.wheel.windowID)
                 );

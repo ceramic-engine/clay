@@ -30,6 +30,16 @@ class SDLIO extends NativeIO {
         return path;
 
     }
+    
+    override function appPathPrefs():String {
+
+        var parts = Clay.app.appId.split('.');
+        var appName = parts.pop();
+        var org = parts.join('.');
+
+        return SDL.getPrefPath(org, appName);
+
+    }
 
     override function loadData(path:String, ?options:Dynamic, ?callback:(data:Uint8Array)->Void):Uint8Array {
 

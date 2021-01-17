@@ -102,9 +102,9 @@ class Input {
 
     }
 
-    inline public function emitGamepadDevice(gamepad:Int, id:String, type:GamepadDeviceEventType, timestamp:Float) {
+    inline public function emitGamepadDevice(gamepad:Int, name:String, type:GamepadDeviceEventType, timestamp:Float) {
 
-        app.events.gamepadDevice(gamepad, id, type, timestamp);
+        app.events.gamepadDevice(gamepad, name, type, timestamp);
 
     }
 

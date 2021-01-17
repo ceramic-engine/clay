@@ -31,6 +31,12 @@ class BaseIO {
 
     }
     
+    public function appPathPrefs():String {
+
+        return null;
+
+    }
+    
     public function loadData(path:String, ?options:Dynamic, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
         if (callback != null) {

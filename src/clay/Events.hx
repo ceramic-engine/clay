@@ -52,7 +52,7 @@ class Events {
 
     public function gamepadUp(gamepad:Int, button:Int, value:Float, timestamp:Float) {}
 
-    public function gamepadDevice(gamepad:Int, id:String, type:GamepadDeviceEventType, timestamp:Float) {}
+    public function gamepadDevice(gamepad:Int, name:String, type:GamepadDeviceEventType, timestamp:Float) {}
 
     public function windowEvent(type:WindowEventType, timestamp:Float, windowId:Int, x:Int, y:Int):Void {}
 

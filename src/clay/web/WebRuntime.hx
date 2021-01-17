@@ -333,7 +333,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         app.input.emitMouseDown(
             translateMouseX(ev),
             translateMouseY(ev),
-            ev.button + 1,
+            ev.button,
             timestamp(),
             webWindowId
         );
@@ -345,7 +345,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         app.input.emitMouseUp(
             translateMouseX(ev),
             translateMouseY(ev),
-            ev.button + 1,
+            ev.button,
             timestamp(),
             webWindowId
         );
@@ -376,9 +376,15 @@ class WebRuntime extends clay.base.BaseRuntime {
             ev.preventDefault();
         }
 
+        final wheelFactor = 0.1; // Try to have consistent behavior between web and native platforms
         app.input.emitMouseWheel(
-            ev.deltaX,
-            ev.deltaY,
+            #if !clay_no_wheel_round
+            Math.round(ev.deltaX * wheelFactor),
+            Math.round(ev.deltaY * wheelFactor),
+            #else
+            ev.deltaX * wheelFactor,
+            ev.deltaY * wheelFactor,
+            #end
             timestamp(),
             webWindowId
         );

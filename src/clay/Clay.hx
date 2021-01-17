@@ -1,7 +1,11 @@
 package clay;
 
+import haxe.Json;
+
 import clay.Config;
 import clay.Types;
+
+using StringTools;
 
 /**
  * Clay app
@@ -57,6 +61,11 @@ class Clay {
     public var timestamp:Float = -1;
 
     /**
+     * App identifier
+     */
+    public var appId(default, null):String;
+
+    /**
      * Main window screen width
      */
     public var screenWidth(default, null):Int;
@@ -99,6 +108,8 @@ class Clay {
     function new(configure:(config:Config)->Void, events:Events) {
 
         Clay.app = this;
+
+        extractAppId();
 
         this.config = defaultConfig();
         configure(this.config);
@@ -232,6 +243,18 @@ class Clay {
 /// Internal
 
     var windowInBackground = false;
+
+    function extractAppId():Void {
+
+        var rawAppId = Macros.definedValue('clay_app_id');
+        if (rawAppId.startsWith('"')) {
+            this.appId = Json.parse(rawAppId);
+        }
+        else {
+            this.appId = rawAppId;
+        }
+
+    }
 
     function defaultConfig():Config {
 
