@@ -206,7 +206,7 @@ class Uniforms {
         for (i in 0...16) {
             existing[i] = value[i];
         }
-        dirtyVector4s.push(name);
+        dirtyMatrix4s.push(name);
         #else
         var existing = matrix4s.get(location);
         if (existing == null) {

@@ -42,7 +42,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var touches:IntMap<{x:Float, y:Float}> = new IntMap();
 
-    var gamepadButtonsCache:Array<Array<Float>>;
+    var gamepadButtonCache:Array<Array<Float>>;
+
+    var gamepadAxisCache:Array<Array<Float>>;
 
 /// Lifecycle
 
@@ -61,6 +63,43 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         Log.debug('Web / ready');
         
+    }
+
+    override function run():Bool {
+
+        Log.debug('Web / run');
+
+        loop(0);
+
+        return false;
+
+    }
+
+    /**
+     * Runtime loop, run at every frame
+     */
+    function loop(t:Float = 0.016):Bool {
+
+        if (app.hasShutdown)
+            return false;
+
+        if (app.ready) {
+
+            if (gamepadsSupported)
+                pollGamepads();
+
+            updateWindowBounds();
+
+        }
+
+        app.emitTick();
+
+        if (!app.shuttingDown) {
+            js.Browser.window.requestAnimationFrame(loop);
+        }
+
+        return true;
+
     }
 
 /// Internal
@@ -518,6 +557,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         Log.debug('Gamepad connected at index ${ev.gamepad.index}: ${ev.gamepad.id}. ${ev.gamepad.buttons.length} buttons, ${ev.gamepad.axes.length} axes');
 
+        initGamepadCacheIfNeeded(ev.gamepad);
+
         app.input.emitGamepadDevice(
             ev.gamepad.index,
             ev.gamepad.id,
@@ -530,6 +571,8 @@ class WebRuntime extends clay.base.BaseRuntime {
     function handleGamepadDisconnected(ev:js.html.GamepadEvent) {
 
         Log.debug('Gamepad disconnected at index ${ev.gamepad.index}: ${ev.gamepad.id}');
+
+        deleteGamepadCache(ev.gamepad);
 
         app.input.emitGamepadDevice(
             ev.gamepad.index,
@@ -601,6 +644,34 @@ class WebRuntime extends clay.base.BaseRuntime {
         return Math.floor(windowDpr * (ev.pageY - windowY));
     }
 
+    function updateWindowBounds() {
+
+        var dpr = windowDpr;
+        windowDpr = windowDevicePixelRatio();
+
+        var bounds = window.getBoundingClientRect();
+
+        var x = getWindowX(bounds);
+        var y = getWindowY(bounds);
+        var w = Math.round(bounds.width);
+        var h = Math.round(bounds.height);
+
+        if (x != windowX || y != windowY) {
+            windowX = x;
+            windowY = y;
+            app.emitWindowEvent(MOVED, timestamp(), webWindowId, windowX, windowY);
+        }
+
+        if (w != windowW || h != windowH || dpr != windowDpr) {
+            windowW = w;
+            windowH = h;
+            window.width = Math.floor(windowW * windowDpr);
+            window.height = Math.floor(windowH * windowDpr);
+            app.emitWindowEvent(SIZE_CHANGED, timestamp(), webWindowId, window.width, window.height);
+        }
+
+    }
+
 /// Gamepads
 
     function initGamepads() {
@@ -610,10 +681,11 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (list != null) {
             gamepadsSupported = true;
 
-            gamepadButtonsCache = [];
+            gamepadButtonCache = [];
+            gamepadAxisCache = [];
             for (gamepad in list) {
                 if (gamepad != null) {
-                    initGamepadCache(gamepad);
+                    initGamepadCacheIfNeeded(gamepad);
                 }
             }
         }
@@ -637,12 +709,94 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
-    inline function initGamepadCache(gamepad:js.html.Gamepad) {
+    inline function initGamepadCacheIfNeeded(gamepad:js.html.Gamepad) {
 
-        gamepadButtonsCache[gamepad.index] = [];
+        if (gamepadButtonCache[gamepad.index] == null) {
 
-        for (i in 0...gamepad.buttons.length) {
-            gamepadButtonsCache[gamepad.index].push(0);
+            gamepadButtonCache[gamepad.index] = [];
+            for (i in 0...gamepad.buttons.length) {
+                gamepadButtonCache[gamepad.index].push(0);
+            }
+
+            gamepadAxisCache[gamepad.index] = [];
+            for (i in 0...gamepad.axes.length) {
+                gamepadAxisCache[gamepad.index].push(0);
+            }
+        }
+
+    }
+
+    inline function deleteGamepadCache(gamepad:js.html.Gamepad) {
+
+        gamepadButtonCache[gamepad.index] = null;
+        gamepadAxisCache[gamepad.index] = null;
+
+    }
+
+    function pollGamepads() {
+
+        var list = getGamepadList();
+
+        if (list != null) {
+
+            var len = list.length;
+            var index = 0;
+
+            while (index < len) {
+
+                var gamepad = list[index];
+                if (gamepad == null) {
+                    index++;
+                    continue;
+                }
+                
+                initGamepadCacheIfNeeded(gamepad);
+
+                var axisCache = gamepadAxisCache[gamepad.index];
+                for (axisIndex in 0...gamepad.axes.length) {
+
+                    var axis = gamepad.axes[axisIndex];
+                    if (axis != axisCache[axisIndex]) {
+                        axisCache[axisIndex] = axis;
+                        app.input.emitGamepadAxis(
+                            gamepad.index,
+                            axisIndex,
+                            axis,
+                            timestamp()
+                        );
+                    }
+                }
+
+                var buttonCache = gamepadButtonCache[gamepad.index];
+                for (buttonIndex in 0...gamepad.buttons.length) {
+
+                    var button = gamepad.buttons[buttonIndex];
+
+                    if (button.value != buttonCache[buttonIndex]) {
+                        buttonCache[buttonIndex] = button.value;
+
+                        if (button.pressed) {
+                            app.input.emitGamepadDown(
+                                gamepad.index,
+                                buttonIndex,
+                                button.value,
+                                timestamp()
+                            );
+                        }
+                        else {
+                            app.input.emitGamepadUp(
+                                gamepad.index,
+                                buttonIndex,
+                                button.value,
+                                timestamp()
+                            );
+                        }
+                    }
+                }
+
+                index++;
+            }
+
         }
 
     }
@@ -652,6 +806,18 @@ class WebRuntime extends clay.base.BaseRuntime {
     override function windowDevicePixelRatio():Float {
 
         return js.Browser.window.devicePixelRatio == null ? 1.0 : js.Browser.window.devicePixelRatio;
+
+    }
+
+    override inline public function windowWidth():Int {
+
+        return Math.round(windowW * windowDevicePixelRatio());
+
+    }
+
+    override inline public function windowHeight():Int {
+
+        return Math.round(windowH * windowDevicePixelRatio());
 
     }
 

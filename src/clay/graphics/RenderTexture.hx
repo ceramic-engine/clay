@@ -31,8 +31,19 @@ class RenderTexture extends Texture {
 
         super.init();
 
+        var max = Graphics.maxTextureSize();
+        
+        if (widthActual > max)
+            throw 'RenderTexture actual width bigger than maximum hardware size (width=$widthActual max=$max)';
+        if (heightActual > max)
+            throw 'RenderTexture actual height bigger than maximum hardware size (height=$heightActual max=$max)';
+
         // Create render target
-        renderTarget = Graphics.createRenderTarget(textureId, width, height, stencil, antialiasing);
+        bind();
+        renderTarget = Graphics.createRenderTarget(
+            textureId, width, height, stencil, antialiasing,
+            0, format, dataType
+        );
 
     }
 

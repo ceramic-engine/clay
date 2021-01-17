@@ -397,15 +397,24 @@ class GLGraphics {
 
     /**
      * Create a render target from the given settings
-     * @param textureId 
-     * @param width 
-     * @param height 
-     * @param stencil 
-     * @param antialiasing 
+     * @param textureId
+     * @param width
+     * @param height
+     * @param stencil
+     * @param antialiasing
+     * @param level The level of detail. Level 0 is the base image level. Level n is the nth mipmap reduction image.
+     * @param format The texture format (RGBA)
+     * @param dataType The data type of the pixel data (UNSIGNED_BYTE)
      */
-    public static function createRenderTarget(textureId:TextureId, width:Int, height:Int, stencil:Bool, antialiasing:Int):RenderTarget {
+    public static function createRenderTarget(
+        textureId:TextureId, width:Int, height:Int, stencil:Bool, antialiasing:Int,
+        level:Int, format:TextureFormat, dataType:TextureDataType
+        ):RenderTarget {
 
         var renderTarget = new GLGraphics_RenderTarget();
+
+        // Create actual texture gpu storage
+        GL.texImage2D(GL.TEXTURE_2D, level, format, width, height, 0, format, dataType, null);
 
         // Create the framebuffer
         renderTarget.framebuffer = createFramebuffer();

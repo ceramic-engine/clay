@@ -77,8 +77,8 @@ package clay.buffers;
             return ArrayBufferView.fromView(Uint16, _view);
         }
 
-        static public inline function fromBuffer(_buffer:ArrayBuffer, _byteOffset:Int, _byteLength:Int) : Uint16Array {
-            return ArrayBufferView.fromBuffer(Uint16, _buffer, _byteOffset, _byteLength);
+        static public inline function fromBuffer(_buffer:ArrayBuffer, _byteOffset:Int, _byteLength:Int, ?_view:ArrayBufferView) : Uint16Array {
+            return ArrayBufferView.fromBuffer(Uint16, _buffer, _byteOffset, _byteLength, _view);
         }
 
     //Public API
