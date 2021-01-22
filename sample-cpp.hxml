@@ -6,6 +6,7 @@
 -D clay_native
 -D clay_sdl
 -D clay_use_glew
+-D clay_app_id=claysample
 -D hxcpp_static_std
 -lib hxcpp
 -lib linc_opengl

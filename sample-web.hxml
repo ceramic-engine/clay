@@ -5,6 +5,7 @@
 -D clay
 -D clay_web
 -D web
+-D clay_app_id=claysample
 -lib linc_opengl
 -lib linc_sdl
 -lib linc_ogg

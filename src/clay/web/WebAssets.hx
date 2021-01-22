@@ -12,8 +12,6 @@ import clay.base.BaseAssets;
 
 class WebAssets extends BaseAssets {
 
-    static var _binaryTrue = { binary: true };
-
     #if clay_web_use_electron_pngjs
     var testedElectronPngjsAvailability:Bool = false;
     var electron:Dynamic = null;
@@ -39,7 +37,7 @@ class WebAssets extends BaseAssets {
         if (pngjs != null && ext == 'png') {
             
             if (app.io.isSynchronous()) {
-                var bytes = app.io.loadData(path, _binaryTrue);
+                var bytes = app.io.loadData(path, true);
                 if (bytes == null) {
                     if (callback != null) {
                         Immediate.push(() -> {
@@ -57,7 +55,7 @@ class WebAssets extends BaseAssets {
                 return image;
             }
             else {
-                app.io.loadData(path, _binaryTrue, function(bytes) {
+                app.io.loadData(path, true, function(bytes) {
                     if (bytes == null) {
                         if (callback != null) {
                             Immediate.push(() -> {
@@ -80,7 +78,7 @@ class WebAssets extends BaseAssets {
 
         #end
 
-        app.io.loadData(path, _binaryTrue, function(bytes) {
+        app.io.loadData(path, true, function(bytes) {
 
             if (bytes == null) {
                 if (callback != null) {

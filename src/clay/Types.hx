@@ -308,3 +308,8 @@ enum abstract BlendMode(Int) from Int to Int {
     var SRC_ALPHA_SATURATE      = GL.SRC_ALPHA_SATURATE;
 
 }
+
+#if clay_sdl
+typedef FileHandle = clay.sdl.SDLIO.FileHandle;
+typedef FileSeek = clay.sdl.SDLIO.FileSeek;
+#end

@@ -26,12 +26,10 @@ class WebIO extends BaseIO {
 
     }
 
-    override function loadData(path:String, ?options:Dynamic, ?callback:(data:Uint8Array)->Void):Uint8Array {
+    override function loadData(path:String, binary:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
         if (path == null)
             throw 'Path is null!';
-
-        var binary:Bool = options != null ? options.binary : false;
 
         #if clay_web_use_electron_fs
 

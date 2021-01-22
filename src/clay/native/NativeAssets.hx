@@ -5,8 +5,6 @@ import clay.base.BaseAssets;
 
 class NativeAssets extends BaseAssets {
 
-    static var _binaryTrue = { binary: true };
-
     override function isSynchronous():Bool {
 
         return true;
@@ -20,7 +18,7 @@ class NativeAssets extends BaseAssets {
 
         // Get binary data
         var bytes:Uint8Array = null;
-        bytes = app.io.loadData(path, _binaryTrue);
+        bytes = app.io.loadData(path, true);
         if (bytes == null) {
             if (callback != null) {
                 Immediate.push(() -> {

@@ -1,5 +1,8 @@
 package clay;
 
+import clay.audio.AudioEvent;
+import clay.audio.AudioHandle;
+
 import clay.Types;
 
 class Events {
@@ -57,5 +60,7 @@ class Events {
     public function windowEvent(type:WindowEventType, timestamp:Float, windowId:Int, x:Int, y:Int):Void {}
 
     public function appEvent(type:AppEventType):Void {}
+
+    public function audioEvent(event:AudioEvent, handle:AudioHandle):Void {}
 
 }

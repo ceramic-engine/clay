@@ -41,6 +41,11 @@ class Clay {
     public var assets(default, null):Assets;
 
     /**
+     * Clay audio
+     */
+    public var audio(default, null):Audio;
+
+    /**
      * Clay input
      */
     public var input(default, null):Input;
@@ -122,6 +127,9 @@ class Clay {
         @:privateAccess assets = new Assets(this);
         Immediate.flush();
 
+        @:privateAccess audio = new Audio(this);
+        Immediate.flush();
+
         @:privateAccess input = new Input(this);
         Immediate.flush();
 
@@ -139,6 +147,9 @@ class Clay {
         io.init();
         Immediate.flush();
 
+        audio.init();
+        Immediate.flush();
+
         input.init();
         Immediate.flush();
 
@@ -147,6 +158,9 @@ class Clay {
 
         Log.debug('Clay / ready');
         runtime.ready();
+        Immediate.flush();
+
+        audio.ready();
         Immediate.flush();
 
         timestamp = Runtime.timestamp();
@@ -177,6 +191,7 @@ class Clay {
         shuttingDown = true;
 
         io.shutdown();
+        audio.shutdown();
         input.shutdown();
 
         runtime.shutdown(immediateShutdown);
@@ -215,6 +230,7 @@ class Clay {
             var delta = newTimestamp - timestamp;
             timestamp = newTimestamp;
 
+            audio.tick(delta);
             events.tick(delta);
         }
 
@@ -246,7 +262,7 @@ class Clay {
 
     function extractAppId():Void {
 
-        var rawAppId = Macros.definedValue('clay_app_id');
+        var rawAppId:String = Macros.definedValue('clay_app_id');
         if (rawAppId.startsWith('"')) {
             this.appId = Json.parse(rawAppId);
         }
