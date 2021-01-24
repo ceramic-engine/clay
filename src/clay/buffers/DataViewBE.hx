@@ -8,14 +8,14 @@ import clay.buffers.DataView;
 #if js
 
     @:forward
-    abstract DataViewBE(js.html.DataView)
-        from js.html.DataView
-        to js.html.DataView {
+    abstract DataViewBE(js.lib.DataView)
+        from js.lib.DataView
+        to js.lib.DataView {
 
         public inline function new( buffer:ArrayBuffer, byteOffset:Null<Int> = null, byteLength:Null<Int> = null ) {
-            if(byteOffset != null && byteLength == null) this = new js.html.DataView( buffer, byteOffset );
-            else if(byteOffset != null && byteLength != null) this = new js.html.DataView( buffer, byteOffset, byteLength);
-            else this = new js.html.DataView( buffer );
+            if(byteOffset != null && byteLength == null) this = new js.lib.DataView( buffer, byteOffset );
+            else if(byteOffset != null && byteLength != null) this = new js.lib.DataView( buffer, byteOffset, byteLength);
+            else this = new js.lib.DataView( buffer );
         }
 
         #if !clay_no_inline_buffers inline #end

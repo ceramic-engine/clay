@@ -6,26 +6,26 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Int8Array(js.html.Int8Array)
-        from js.html.Int8Array
-        to js.html.Int8Array {
+    abstract Int8Array(js.lib.Int8Array)
+        from js.lib.Int8Array
+        to js.lib.Int8Array {
 
         public inline static var BYTES_PER_ELEMENT : Int = 1;
 
         inline public function new(_elements:Int) {
-            this = new js.html.Int8Array(_elements);
+            this = new js.lib.Int8Array(_elements);
         }
         
         inline static public function fromArray<T>(_array:Array<T>) : Int8Array {
-            return new js.html.Int8Array(untyped _array);
+            return new js.lib.Int8Array(untyped _array);
         }
         
         inline static public function fromView(_view:ArrayBufferView) : Int8Array {
-            return new js.html.Int8Array(untyped _view);
+            return new js.lib.Int8Array(untyped _view);
         }
         
         inline static public function fromBuffer(_buffer:ArrayBuffer, _byteOffset:Int, _byteLength:Int) : Int8Array {
-            return new js.html.Int8Array(_buffer, _byteOffset, _byteLength);
+            return new js.lib.Int8Array(_buffer, _byteOffset, _byteLength);
         }
 
 
@@ -35,7 +35,7 @@ package clay.buffers;
 
             //non spec haxe conversions
         inline public static function fromBytes( bytes:haxe.io.Bytes, ?byteOffset:Int=0, ?len:Int ) : Int8Array {
-            return new js.html.Int8Array(cast bytes.getData(), byteOffset, len);
+            return new js.lib.Int8Array(cast bytes.getData(), byteOffset, len);
         }
 
         inline public function toBytes() : haxe.io.Bytes {

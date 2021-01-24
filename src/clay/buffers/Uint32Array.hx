@@ -6,26 +6,26 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Uint32Array(js.html.Uint32Array)
-        from js.html.Uint32Array
-        to js.html.Uint32Array {
+    abstract Uint32Array(js.lib.Uint32Array)
+        from js.lib.Uint32Array
+        to js.lib.Uint32Array {
 
         public inline static var BYTES_PER_ELEMENT : Int = 4;
 
         inline public function new(_elements:Int) {
-            this = new js.html.Uint32Array(_elements);
+            this = new js.lib.Uint32Array(_elements);
         }
         
         inline static public function fromArray<T>(_array:Array<T>) : Uint32Array {
-            return new js.html.Uint32Array(untyped _array);
+            return new js.lib.Uint32Array(untyped _array);
         }
         
         inline static public function fromView(_view:ArrayBufferView) : Uint32Array {
-            return new js.html.Uint32Array(untyped _view);
+            return new js.lib.Uint32Array(untyped _view);
         }
         
         inline static public function fromBuffer(_buffer:ArrayBuffer, _byteOffset:Int, _byteLength:Int) : Uint32Array {
-            return new js.html.Uint32Array(_buffer, _byteOffset, Std.int(_byteLength/BYTES_PER_ELEMENT));
+            return new js.lib.Uint32Array(_buffer, _byteOffset, Std.int(_byteLength/BYTES_PER_ELEMENT));
         }
 
         @:arrayAccess @:extern inline function __set(idx:Int, val:UInt) : Void this[idx] = val;
@@ -34,9 +34,9 @@ package clay.buffers;
 
             //non spec haxe conversions
         inline public static function fromBytes( bytes:haxe.io.Bytes, ?byteOffset:Int=0, ?len:Int ) : Uint32Array {
-            if(byteOffset == null) return new js.html.Uint32Array(cast bytes.getData());
-            if(len == null) return new js.html.Uint32Array(cast bytes.getData(), byteOffset);
-            return new js.html.Uint32Array(cast bytes.getData(), byteOffset, len);
+            if(byteOffset == null) return new js.lib.Uint32Array(cast bytes.getData());
+            if(len == null) return new js.lib.Uint32Array(cast bytes.getData(), byteOffset);
+            return new js.lib.Uint32Array(cast bytes.getData(), byteOffset, len);
         }
 
         inline public function toBytes() : haxe.io.Bytes {

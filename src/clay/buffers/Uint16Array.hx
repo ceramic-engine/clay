@@ -6,26 +6,26 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Uint16Array(js.html.Uint16Array)
-        from js.html.Uint16Array
-        to js.html.Uint16Array {
+    abstract Uint16Array(js.lib.Uint16Array)
+        from js.lib.Uint16Array
+        to js.lib.Uint16Array {
 
         public inline static var BYTES_PER_ELEMENT : Int = 2;
 
         inline public function new(_elements:Int) {
-            this = new js.html.Uint16Array(_elements);
+            this = new js.lib.Uint16Array(_elements);
         }
         
         inline static public function fromArray<T>(_array:Array<T>) : Uint16Array {
-            return new js.html.Uint16Array(untyped _array);
+            return new js.lib.Uint16Array(untyped _array);
         }
         
         inline static public function fromView(_view:ArrayBufferView) : Uint16Array {
-            return new js.html.Uint16Array(untyped _view);
+            return new js.lib.Uint16Array(untyped _view);
         }
         
         inline static public function fromBuffer(_buffer:ArrayBuffer, _byteOffset:Int, _byteLength:Int) : Uint16Array {
-            return new js.html.Uint16Array(_buffer, _byteOffset, Std.int(_byteLength/BYTES_PER_ELEMENT));
+            return new js.lib.Uint16Array(_buffer, _byteOffset, Std.int(_byteLength/BYTES_PER_ELEMENT));
         }
 
 
@@ -35,9 +35,9 @@ package clay.buffers;
 
             //non spec haxe conversions
         inline public static function fromBytes( bytes:haxe.io.Bytes, ?byteOffset:Int=0, ?len:Int ) : Uint16Array {
-            if(byteOffset == null) return new js.html.Uint16Array(cast bytes.getData());
-            if(len == null) return new js.html.Uint16Array(cast bytes.getData(), byteOffset);
-            return new js.html.Uint16Array(cast bytes.getData(), byteOffset, len);
+            if(byteOffset == null) return new js.lib.Uint16Array(cast bytes.getData());
+            if(len == null) return new js.lib.Uint16Array(cast bytes.getData(), byteOffset);
+            return new js.lib.Uint16Array(cast bytes.getData(), byteOffset, len);
         }
 
         inline public function toBytes() : haxe.io.Bytes {
