@@ -26,7 +26,8 @@ private typedef WebSound = {
     state: AudioState,
     loop: Bool,
     pan: Float,
-    timeStart: Float,
+    timeResume: Float,
+    timeResumeAppTime: Float,
     ?timePause: Float,
 }
 
@@ -91,8 +92,7 @@ class WebAudio extends clay.base.BaseAudio {
 
     override function shutdown():Void {
 
-        // TODO haxe js.html.audio.AudioContext api lacks suspend property
-        untyped context.close();
+        context.close();
 
     }
 
@@ -169,9 +169,12 @@ class WebAudio extends clay.base.BaseAudio {
             panNode    : pan,
 
             state      : PLAYING,
-            timeStart  : app.timestamp,
             loop       : loop,
-            pan        : 0
+            pan        : 0,
+
+            timeResumeAppTime : app.timestamp,
+            timeResume        : 0.0,
+            timePause         : null
         };
 
         instances.set(handle, sound);
@@ -254,7 +257,17 @@ class WebAudio extends clay.base.BaseAudio {
 
         Log.debug('Audio / pause handle=$handle, ' + sound.source.data.id);
 
-        sound.timePause = app.timestamp - sound.timeStart;
+        var timePause = sound.timeResume + app.timestamp - sound.timeResumeAppTime;
+        var duration = sound.source.getDuration();
+        if (duration > 0) {
+            if (sound.loop) {
+                timePause = timePause % duration;
+            }
+            else if (timePause > duration) {
+                timePause = duration;
+            }
+        }
+        sound.timePause = timePause;
         sound.state = PAUSED;
 
         if (sound.bufferNode != null) {
@@ -273,6 +286,9 @@ class WebAudio extends clay.base.BaseAudio {
         if (sound.state != PAUSED) return;
 
         Log.debug('Audio / unpause handle=$handle, ' + sound.source.data.id);
+
+        sound.timeResume = sound.timePause != null ? sound.timePause : 0;
+        sound.timeResumeAppTime = app.timestamp;
 
         if (sound.mediaNode == null) {
             playBufferAgain(handle, sound, sound.timePause);
@@ -434,7 +450,26 @@ class WebAudio extends clay.base.BaseAudio {
         if (sound == null) return 0.0;
 
         if (sound.bufferNode != null) {
-            // TODO
+            switch sound.state {
+                case INVALID | STOPPED:
+                    return 0.0;
+                case PLAYING | PAUSED:
+                    var time = switch sound.state {
+                        case PAUSED: sound.timePause;
+                        case PLAYING: sound.timeResume + (app.timestamp - sound.timeResumeAppTime);
+                        default: 0.0;
+                    }
+                    var duration = sound.source.getDuration();
+                    if (duration > 0) {
+                        if (sound.loop) {
+                            time = time % duration;
+                        }
+                        else if (time > duration) {
+                            time = duration;
+                        }
+                    }
+                    return time;
+            }
         }
         else {
             return sound.mediaElem.currentTime;
@@ -474,15 +509,13 @@ class WebAudio extends clay.base.BaseAudio {
 
     public function suspend():Void {
 
-        // TODO haxe js.html.audio.AudioContext api lacks suspend property
-        untyped context.suspend();
+        context.suspend();
 
     }
 
     public function resume():Void {
 
-        // TODO haxe js.html.audio.AudioContext api lacks resume property
-        untyped context.resume();
+        context.resume();
 
     }
 
