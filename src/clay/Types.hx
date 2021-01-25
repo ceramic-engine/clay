@@ -186,23 +186,31 @@ enum abstract WindowEventType(Int) from Int to Int {
     /** The window is being closed/hidden */
     var CLOSE            = 14;
 
+    /** The window entered fullscreen */
+    var ENTER_FULLSCREEN = 15;
+
+    /** The window exited fullscreen */
+    var EXIT_FULLSCREEN  = 16;
+
     inline function toString() {
         return switch(this) {
-            case UNKNOWN:       'UNKNOWN';
-            case SHOWN:         'SHOWN';
-            case HIDDEN:        'HIDDEN';
-            case EXPOSED:       'EXPOSED';
-            case MOVED:         'MOVED';
-            case RESIZED:       'RESIZED';
-            case SIZE_CHANGED:  'SIZE_CHANGED';
-            case MINIMIZED:     'MINIMIZED';
-            case MAXIMIZED:     'MAXIMIZED';
-            case RESTORED:      'RESTORED';
-            case ENTER:         'ENTER';
-            case LEAVE:         'LEAVE';
-            case FOCUS_GAINED:  'FOCUS_GAINED';
-            case FOCUS_LOST:    'FOCUS_LOST';
-            case CLOSE:         'CLOSE';
+            case UNKNOWN:          'UNKNOWN';
+            case SHOWN:            'SHOWN';
+            case HIDDEN:           'HIDDEN';
+            case EXPOSED:          'EXPOSED';
+            case MOVED:            'MOVED';
+            case RESIZED:          'RESIZED';
+            case SIZE_CHANGED:     'SIZE_CHANGED';
+            case MINIMIZED:        'MINIMIZED';
+            case MAXIMIZED:        'MAXIMIZED';
+            case RESTORED:         'RESTORED';
+            case ENTER:            'ENTER';
+            case LEAVE:            'LEAVE';
+            case FOCUS_GAINED:     'FOCUS_GAINED';
+            case FOCUS_LOST:       'FOCUS_LOST';
+            case CLOSE:            'CLOSE';
+            case ENTER_FULLSCREEN: 'ENTER_FULLSCREEN';
+            case EXIT_FULLSCREEN:  'EXIT_FULLSCREEN';
             case _:             '$this';
         }
     }

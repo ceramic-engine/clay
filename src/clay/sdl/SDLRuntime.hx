@@ -58,6 +58,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /** Map of joystick index to SDL joystick instance */
     var joysticks:IntMap<sdl.Joystick>;
 
+    /** A flag to know if we SDL-triggered fullscreen is currently active or not */
+    var isSdlFullscreen:Bool = false;
+
 /// Lifecycle
 
     override function init() {
@@ -309,6 +312,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         if (config.borderless) flags |= SDL_WINDOW_BORDERLESS;
 
         if (config.fullscreen) {
+            isSdlFullscreen = true;
             if (!config.trueFullscreen) {
                 flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
             } else {
@@ -451,6 +455,51 @@ class SDLRuntime extends clay.base.BaseRuntime {
     override inline public function windowHeight():Int {
 
         return windowH;
+
+    }
+
+    public function setWindowTitle(title:String):Void {
+
+        app.config.window.title = title;
+
+        SDL.setWindowTitle(window, title);
+
+    }
+
+    /**
+     * Set window fullscreen (true or false)
+     * @param fullscreen 
+     * @return Bool `true` if the requested setting is accepted
+     */
+    public function setWindowFullscreen(fullscreen:Bool):Bool {
+
+        #if mac
+        if (SDL.isWindowInFullscreenSpace(window) && !isSdlFullscreen) {
+            Log.debug('Clay / Ignore fullscreen setting because already using mac space fullscreen.');
+            return fullscreen;
+        }
+        #end
+
+        if (app.config.window.fullscreen == fullscreen) {
+            // Ignore, same setting as previous
+            return true;
+        }
+
+        isSdlFullscreen = fullscreen;
+
+        if (fullscreen) {
+            if (app.config.window.trueFullscreen) {
+                SDL.setWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+            }
+            else {
+                SDL.setWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+            }
+        }
+        else {
+            SDL.setWindowFullscreen(window, 0);
+        }
+
+        return true;
 
     }
 
@@ -834,9 +883,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
                 case SDL_WINDOWEVENT_MAXIMIZED:
                     type = MAXIMIZED;
+                    checkFullscreenState(e);
 
                 case SDL_WINDOWEVENT_RESTORED:
                     type = RESTORED;
+                    checkFullscreenState(e);
 
                 case SDL_WINDOWEVENT_ENTER:
                     type = ENTER;
@@ -871,6 +922,29 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             if (type != UNKNOWN) {
                 app.emitWindowEvent(type, e.window.timestamp / 1000.0, Std.int(e.window.windowID), data1, data2);
+            }
+        }
+
+    }
+
+
+    function checkFullscreenState(e:sdl.Event):Void {
+
+        #if mac
+        var fullscreenSpace = SDL.isWindowInFullscreenSpace(window);
+        #else
+        var fullscreenSpace = false;
+        #end
+
+        var isFullscreen = fullscreenSpace || isSdlFullscreen;
+        if (isFullscreen != app.config.window.fullscreen) {
+            app.config.window.fullscreen = isFullscreen;
+
+            if (isFullscreen) {
+                app.emitWindowEvent(ENTER_FULLSCREEN, e.window.timestamp / 1000.0, Std.int(e.window.windowID), 0, 0);
+            }
+            else {
+                app.emitWindowEvent(EXIT_FULLSCREEN, e.window.timestamp / 1000.0, Std.int(e.window.windowID), 0, 0);
             }
         }
 

@@ -251,6 +251,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         // Window events
 
+        js.Browser.document.addEventListener('fullscreenchange', handleFullscreenChange);
+        js.Browser.document.addEventListener('fullscreenerror', handleFullscreenError);
+
         window.addEventListener('mouseenter', handleMouseEnter);
         window.addEventListener('mouseleave', handleMouseLeave);
 
@@ -316,15 +319,41 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    function handleFullscreenChange(ev:js.html.Event) {
+
+        // document.fullscreenElement will point to the element that
+        // is in fullscreen mode if there is one. If there isn't one,
+        // the value of the property is null.
+        var document = js.Browser.document;
+        var fullscreenElement = untyped document.fullscreenElement;
+        if (fullscreenElement != null) {
+            Log.debug('Web / Entering fullscreen (id=${fullscreenElement.id})');
+            app.config.window.fullscreen = true;
+            app.emitWindowEvent(ENTER_FULLSCREEN, timestamp(), webWindowId, 0, 0);
+        }
+        else {
+            Log.debug('Web / Leaving fullscreen');
+            app.config.window.fullscreen = false;
+            app.emitWindowEvent(EXIT_FULLSCREEN, timestamp(), webWindowId, 0, 0);
+        }
+
+    }
+
+    function handleFullscreenError(ev:js.html.Event) {
+
+        Log.warning('Web / Failed to change fullscreen setting: ' + ev);
+
+    }
+
     function handleMouseEnter(ev:js.html.MouseEvent) {
 
-        app.events.mouseEnter(ev);
+        app.emitWindowEvent(ENTER, timestamp(), webWindowId, 0, 0);
 
     }
 
     function handleMouseLeave(ev:js.html.MouseEvent) {
 
-        app.events.mouseLeave(ev);
+        app.emitWindowEvent(LEAVE, timestamp(), webWindowId, 0, 0);
 
     }
 
@@ -824,6 +853,27 @@ class WebRuntime extends clay.base.BaseRuntime {
     override inline public function windowHeight():Int {
 
         return Math.round(windowH * windowDevicePixelRatio());
+
+    }
+
+    public function setWindowFullscreen(fullscreen:Bool):Bool {
+
+        if (fullscreen) {
+            window.requestFullscreen();
+        }
+        else {
+            js.Browser.document.exitFullscreen();
+        }
+
+        return true;
+
+    }
+
+    public function setWindowTitle(title:String):Void {
+
+        app.config.window.title = title;
+
+        js.Browser.document.title = title;
 
     }
 

@@ -21,14 +21,6 @@ class Events {
 
     #end
 
-    #if clay_web
-
-    public function mouseEnter(event:js.html.MouseEvent):Void {}
-
-    public function mouseLeave(event:js.html.MouseEvent):Void {}
-
-    #end
-
     public function keyDown(keycode:Int, scancode:Int, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {}
 
     public function keyUp(keycode:Int, scancode:Int, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {}
