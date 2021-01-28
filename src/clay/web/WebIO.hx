@@ -3,6 +3,8 @@ package clay.web;
 import clay.buffers.Uint8Array;
 import clay.base.BaseIO;
 
+using StringTools;
+
 class WebIO extends BaseIO {
 
     #if clay_web_use_electron_fs
@@ -41,7 +43,7 @@ class WebIO extends BaseIO {
             var cwd = js.Syntax.code("{0}.remote.process.cwd()", electron);
 
             try {
-                var result = fs.readFileSync(_path);
+                var result = fs.readFileSync(path);
 
                 // Copy data and get rid of nodejs buffer
                 var data = new Uint8Array(result.length);
