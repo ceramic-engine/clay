@@ -117,7 +117,7 @@ class WAV {
 
     }
 
- //helpers
+/// Helpers
 
     static var ID_DATA  = 'data'; 
     static var ID_FMT   = 'fmt '; 
