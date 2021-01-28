@@ -93,9 +93,11 @@ class Clay {
         this.freeze = freeze;
         if (freeze) {
             events.freeze();
+            audio.suspend();
         }
         else {
             events.unfreeze();
+            audio.resume();
         }
         return freeze;
     }
@@ -239,10 +241,16 @@ class Clay {
     function emitWindowEvent(type:WindowEventType, timestamp:Float, windowId:Int, x:Int, y:Int):Void {
 
         #if clay_native
-        if (type == WindowEventType.FOCUS_LOST) {
-            windowInBackground = true;
-        } else if(type == WindowEventType.FOCUS_GAINED) {
-            windowInBackground = false;
+        switch type {
+            case MINIMIZED:
+                audio.suspend();
+            case RESTORED:
+                audio.resume();
+            case FOCUS_GAINED:
+                windowInBackground = false;
+            case FOCUS_LOST:
+                windowInBackground = true;
+            case _:
         }
         #end
 

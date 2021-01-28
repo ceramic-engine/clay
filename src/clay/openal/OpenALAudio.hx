@@ -25,8 +25,14 @@ class OpenALAudio extends clay.native.NativeAudio {
     public var device:Device;
     public var context:Context;
 
+    var suspended:Bool = false;
+
     var handleSeq:Int = 1;
     var instances:IntMap<ALSound>;
+
+    #if ceramic
+    var instancesKeys:Array<Int>;
+    #end
 
     /** A map of audio source to AL buffer handles */
     var buffers:Map<String, ALuint>;
@@ -39,6 +45,7 @@ class OpenALAudio extends clay.native.NativeAudio {
         
         #if ceramic
         instances = new IntMap(16, 0.5, true);
+        instancesKeys = [];
         #else
         instances = new IntMap();
         #end
@@ -58,11 +65,22 @@ class OpenALAudio extends clay.native.NativeAudio {
             return;
 
         #if ceramic
-        for (i in 0...instances.iterableKeys.length) {
-            var handle:Int = instances.iterableKeys[i];
+        // Iterate over a copy of keys because original keys array
+        // will change if we add/destroy a sound instance during iteration.
+        // This code is still better than regular haxe.ds.IntMap.keys()
+        // because it doesn't need any allocation as we always
+        // reuse the same array for the copy.
+        var iterableKeys = instances.iterableKeys;
+        var len = iterableKeys.length;
+        for (i in 0...len) {
+            instancesKeys[i] = iterableKeys[i];
+        }
+        for (i in 0...len) {
+            var handle:Int = instancesKeys[i];
             tickAudioHandle(delta, handle);
         }
         #else
+        // Ceramic not available, this will create an array on the fly
         for (handle in instances.keys()) {
             tickAudioHandle(delta, handle);
         }
@@ -87,8 +105,13 @@ class OpenALAudio extends clay.native.NativeAudio {
                 }
             }
 
-            if (!didEmitEnd && sound.instance.hasEnded()) {
-                emitAudioEvent(END, handle);
+            if (sound.instance.hasEnded()) {
+                
+                if (!didEmitEnd)
+                    emitAudioEvent(END, handle);
+
+                if (!sound.instance.destroyed)
+                    sound.instance.destroy();
             }
         }
 
@@ -207,12 +230,15 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         if (!active) return;
 
+        if (suspended) return;
+        suspended = true;
+
         Log.debug('Audio / suspend AL ${ALError.desc(AL.getError())}');
         Log.debug('Audio / suspend ALC ${ALCError.desc(ALC.getError(device))}');
 
         #if android
-            Log.debug('Audio / android: alc suspend');
-            ALC.androidSuspend();
+        Log.debug('Audio / android: alc suspend');
+        ALC.androidSuspend();
         #end
 
         ALC.suspendContext(context);
@@ -224,11 +250,14 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         if (!active) return;
 
+        if (!suspended) return;
+        suspended = true;
+
         Log.debug('Audio / resuming context');
 
         #if android
         Log.debug('Audio / android: alc resume');
-            ALC.androidResume();
+        ALC.androidResume();
         #end
 
         ALC.makeContextCurrent(context);
@@ -241,7 +270,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     inline function soundOf(handle:AudioHandle):ALSound {
 
-        return instances.get(handle);
+        return handle == null ? null : instances.get(handle);
 
     }
 
@@ -481,19 +510,19 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     }
 
-    inline function ensureNoError(reason:AudioErrorReason) {
+    inline function ensureNoError(reason:AudioErrorReason, ?pos:haxe.PosInfos) {
 
         var err = AL.getError();
 
         if (err != AL.NO_ERROR) {
             if (err != -1) {
                 var s = 'Audio / $err / $reason: failed with ' + ALError.desc(err);
-                trace(s);
+                haxe.Log.trace(s, pos);
                 throw s;
             }
             else {
                 var s = 'Audio / $reason / not played, too many concurrent sounds?';
-                trace(s);
+                haxe.Log.trace(s, pos);
                 Log.debug(s);
             }
         } else {

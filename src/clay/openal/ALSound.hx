@@ -127,8 +127,8 @@ class ALSound {
         return source;
     }
 
-    inline function ensureNoError(reason:AudioErrorReason) {
-        audio.ensureNoError(reason);
+    inline function ensureNoError(reason:AudioErrorReason, ?pos:haxe.PosInfos) {
+        audio.ensureNoError(reason, pos);
     }
 
     function sourceFormat() {

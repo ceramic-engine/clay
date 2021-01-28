@@ -37,6 +37,8 @@ class WebAudio extends clay.base.BaseAudio {
 
     static inline var HALF_PI:Float = 1.5707;
 
+    var suspended:Bool = false;
+
     var handleSeq:Int = 0;
 
     var instances:Map<AudioHandle, WebSound>;
@@ -509,11 +511,20 @@ class WebAudio extends clay.base.BaseAudio {
 
     public function suspend():Void {
 
+        if (suspended)
+            return;
+
+        suspended = true;
         context.suspend();
 
     }
 
     public function resume():Void {
+
+        if (!suspended)
+            return;
+
+        suspended = false;
 
         context.resume();
 
