@@ -52,6 +52,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     var windowDpr:Float = 1.0;
 
+    #if (ios || tvos || android)
+    var mobileInBackground:Bool = false;
+    #end
+
     /** Map of gamepad index to SDL gamepad instance */
     var gamepads:IntMap<sdl.GameController>;
 
@@ -549,7 +553,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
         
                 #end
 
-                windowSwap();
+                #if ios
+                // iOS doesn't like it when we send GPU commands when app is in background
+                if (!mobileInBackground) {
+                #end
+                    windowSwap();
+                #if (ios || tvos || android)
+                }
+                #end
             }
 
         }
@@ -952,6 +963,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Mobile
 
+    #if (android || ios || tvos)
+
     function handleSdlEventWatch(_, e:sdl.Event):Int {
 
         var type:AppEventType = UNKNOWN;
@@ -965,8 +978,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 type = WILL_ENTER_BACKGROUND;
             case SDL_APP_DIDENTERBACKGROUND:
                 type = DID_ENTER_BACKGROUND;
+                mobileInBackground = true;
             case SDL_APP_WILLENTERFOREGROUND:
                 type = WILL_ENTER_FOREGROUND;
+                mobileInBackground = false;
             case SDL_APP_DIDENTERFOREGROUND:
                 type = DID_ENTER_FOREGROUND;
             case _:
@@ -978,6 +993,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         return 1;
 
     }
+
+    #end
 
 /// Helpers
 
