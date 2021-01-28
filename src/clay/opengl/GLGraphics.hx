@@ -112,6 +112,12 @@ class GLGraphics {
 
         GL.deleteTexture(textureId);
 
+        for (i in 0..._boundTexture2D.length) {
+            if (_boundTexture2D.unsafeGet(i) == textureId) {
+                _boundTexture2D.unsafeSet(i, NO_TEXTURE);
+            }
+        }
+
     }
 
     /**
@@ -384,6 +390,12 @@ class GLGraphics {
 
             case GL.FRAMEBUFFER_UNSUPPORTED:
                 throw("Incomplete framebuffer: FRAMEBUFFER_UNSUPPORTED");
+            
+            case 36059:
+                throw("Incomplete framebuffer: FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER");
+            
+            case 36060:
+                throw("Incomplete framebuffer: FRAMEBUFFER_INCOMPLETE_READ_BUFFER");
 
             default:
                 throw("Incomplete framebuffer: " + status);
@@ -432,11 +444,17 @@ class GLGraphics {
     public static function deleteRenderTarget(renderTarget:GLGraphics_RenderTarget):Void {
 
         if (renderTarget.framebuffer != NO_FRAMEBUFFER) {
+            if (_boundFramebuffer == renderTarget.framebuffer) {
+                _boundFramebuffer = NO_FRAMEBUFFER;
+            }
             GL.deleteFramebuffer(renderTarget.framebuffer);
             renderTarget.framebuffer = NO_FRAMEBUFFER;
         }
 
         if (renderTarget.renderbuffer != NO_RENDERBUFFER) {
+            if (_boundRenderbuffer == renderTarget.renderbuffer) {
+                _boundRenderbuffer = NO_RENDERBUFFER;
+            }
             GL.deleteRenderbuffer(renderTarget.renderbuffer);
             renderTarget.renderbuffer = NO_RENDERBUFFER;
         }
@@ -564,6 +582,10 @@ class GLGraphics {
     }
 
     public static function deleteShader(shader:GLGraphics_GpuShader):Void {
+
+        if (_boundProgram == shader.program) {
+            _boundProgram = GLGraphics.NO_PROGRAM;
+        }
 
         if (shader.vertShader != GLGraphics.NO_SHADER) {
             GL.deleteShader(shader.vertShader);

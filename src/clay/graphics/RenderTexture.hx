@@ -49,13 +49,13 @@ class RenderTexture extends Texture {
 
     override function destroy() {
 
+        super.destroy();
+
         // Delete render target
         if (renderTarget != null) {
             Graphics.deleteRenderTarget(renderTarget);
             renderTarget = null;
         }
-
-        super.destroy();
 
     }
 
