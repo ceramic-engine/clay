@@ -564,7 +564,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     if (shouldUpdate) {
                         windowSwap();
                     }
-                #if (ios || tvos || android)
+                #if ios
                 }
                 #end
             }
