@@ -536,7 +536,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             }
 
-            app.emitTick();
+            var newTimestamp = timestamp();
+            var shouldUpdate = app.shouldUpdate(newTimestamp);
+            if (shouldUpdate) {
+                app.emitTick(newTimestamp);
+            }
 
             if (app.config.runtime.autoSwap && !app.hasShutdown) {
 
@@ -557,7 +561,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 // iOS doesn't like it when we send GPU commands when app is in background
                 if (!mobileInBackground) {
                 #end
-                    windowSwap();
+                    if (shouldUpdate) {
+                        windowSwap();
+                    }
                 #if (ios || tvos || android)
                 }
                 #end

@@ -92,7 +92,10 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         }
 
-        app.emitTick();
+        var newTimestamp = timestamp();
+        if (app.shouldUpdate(newTimestamp)) {
+            app.emitTick(newTimestamp);
+        }
 
         if (!app.shuttingDown) {
             js.Browser.window.requestAnimationFrame(loop);

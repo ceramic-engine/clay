@@ -239,4 +239,9 @@ class Config {
      */
     var runtime:RuntimeConfig = null;
 
+    /**
+     * If this is non zero, updates will be forced to this rate
+     */
+    var updateRate:Float = 0;
+
 }

@@ -87,6 +87,11 @@ class Clay {
 
     public var immediateShutdown:Bool = false;
 
+    /**
+     * Used for update loop and update rate
+     */
+    var nextTick:Float = 0;
+
     /** Whether or not we are frozen, ignoring events i.e backgrounded/paused */
     public var freeze(default, set):Bool = false;
     function set_freeze(freeze:Bool):Bool {
@@ -167,6 +172,7 @@ class Clay {
 
         timestamp = Runtime.timestamp();
         ready = true;
+        nextTick = timestamp;
 
         updateScreen();
 
@@ -212,7 +218,27 @@ class Clay {
 
     }
 
-    function emitTick():Void {
+    function shouldUpdate(newTimestamp:Float):Bool {
+
+        // Cap update rate if needed
+        if (config.updateRate > 0) {
+            if (newTimestamp < nextTick) {
+                return false;
+            }
+
+            while (nextTick <= newTimestamp) {
+                nextTick += config.updateRate;
+            }
+        }
+        else {
+            nextTick = newTimestamp;
+        }
+
+        return true;
+
+    }
+
+    function emitTick(newTimestamp:Float):Void {
 
         if (freeze)
             return;
@@ -228,7 +254,6 @@ class Clay {
         updateScreen();
 
         if (!shuttingDown && ready) {
-            var newTimestamp = Runtime.timestamp();
             var delta = newTimestamp - timestamp;
             timestamp = newTimestamp;
 
