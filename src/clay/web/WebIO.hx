@@ -1,7 +1,7 @@
 package clay.web;
 
-import clay.buffers.Uint8Array;
 import clay.base.BaseIO;
+import clay.buffers.Uint8Array;
 
 using StringTools;
 
