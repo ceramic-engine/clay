@@ -35,11 +35,26 @@ class ALStream extends ALSound {
 
         Log.debug('Audio / alsource: $alsource');
 
+        #if clay_debug_openal_crash
+        var count = source.streamBufferCount;
+        var len = source.streamBufferLength;
+        var _alsource = alsource;
+        #end
+
         buffers = [for (i in 0...source.streamBufferCount) 0];
         buffers = AL.genBuffers(source.streamBufferCount, buffers);
         bufferData = new Uint8Array(source.streamBufferLength);
 
+        #if clay_debug_openal_crash
+        try {
+            ensureNoError(GEN_BUFFERS);
+        }
+        catch (e:Dynamic) {
+            throw 'count=$count len=$len alsource=$_alsource / ' + e;
+        }
+        #else
         ensureNoError(GEN_BUFFERS);
+        #end
 
         instance.dataSeek(0);
 

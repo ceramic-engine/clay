@@ -367,9 +367,23 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         Log.debug('Audio / stop handle=$handle, ' + sound.source.data.id);
 
+        #if clay_debug_openal_crash
+        var id = sound.source.data.id;
+        var alsource = sound.alsource;
+        #end
+
         AL.sourceStop(sound.alsource);
 
+        #if clay_debug_openal_crash
+        try {
+            ensureNoError(STOP);
+        }
+        catch (e:Dynamic) {
+            throw 'handle=$handle alsource=$alsource id=$id / ' + e;
+        }
+        #else
         ensureNoError(STOP);
+        #end
 
     }
 
