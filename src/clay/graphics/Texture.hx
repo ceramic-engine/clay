@@ -15,6 +15,11 @@ class Texture extends Resource {
     public var textureId(default, null):TextureId = Graphics.NO_TEXTURE;
 
     /**
+     * Is `true` if image has been processed to be stored as premultiplied alpha in GPU memory.
+     */
+    public var premultiplyAlpha(default, null):Bool;
+
+    /**
      * If `true`, the pixels buffer should store compressed image data that the GPU understands
      */
     public var compressed:Bool = false;
@@ -114,9 +119,16 @@ class Texture extends Resource {
 
     }
 
-    public static function fromImage(image:Image):Texture {
+    public static function fromImage(image:Image, premultiplyAlpha:Bool = false):Texture {
 
         var texture = new Texture();
+
+        texture.premultiplyAlpha = premultiplyAlpha;
+
+        // Preprocess pixels premultiplied alpha if needed (platform dependant)
+        if (premultiplyAlpha && Graphics.needsPreprocessedPremultipliedAlpha()) {
+            image.premultiplyAlpha();
+        }
 
         // This could be improved, if needed
         if (image.bitsPerPixel != 4)
@@ -213,10 +225,10 @@ class Texture extends Resource {
         switch type {
             case TEXTURE_2D:
                 if (compressed) {
-                    Graphics.submitCompressedTexture2dPixels(0, format, widthActual, heightActual, pixels);
+                    Graphics.submitCompressedTexture2dPixels(0, format, widthActual, heightActual, pixels, premultiplyAlpha);
                 }
                 else {
-                    Graphics.submitTexture2dPixels(0, format, widthActual, heightActual, dataType, pixels);
+                    Graphics.submitTexture2dPixels(0, format, widthActual, heightActual, dataType, pixels, premultiplyAlpha);
                 }
         }
 

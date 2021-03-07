@@ -164,14 +164,31 @@ class GLGraphics {
     }
 
     /**
+     * Returns `true` if premultiplied textures should have their pixels buffer preprocessed before submit
+     * @return Bool
+     */
+    public inline static function needsPreprocessedPremultipliedAlpha():Bool {
+        #if web
+        return false;
+        #else
+        return true;
+        #end
+    }
+
+    /**
      * Submit compressed texture 2D pixels
      * @param level The level of detail. Level 0 is the base image level. Level n is the nth mipmap reduction image.
      * @param format The texture format (RGBA)
      * @param width The width of the texture to submit
      * @param height The height of the texture to submit
      * @param pixels The pixels buffer when the data will be written to
+     * @param premultipliedAlpha The pixels buffer should be stored as premultiplied alpha
      */
-    public inline static function submitCompressedTexture2dPixels(level:Int, format:TextureFormat, width:Int, height:Int, pixels:Uint8Array):Void {
+    public inline static function submitCompressedTexture2dPixels(level:Int, format:TextureFormat, width:Int, height:Int, pixels:Uint8Array, premultipliedAlpha:Bool):Void {
+
+        #if web
+        GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultipliedAlpha ? 1 : 0);
+        #end
 
         GL.compressedTexImage2D(GL.TEXTURE_2D, level, format, width, height, 0, pixels);
 
@@ -185,8 +202,13 @@ class GLGraphics {
      * @param height The height of the texture to submit
      * @param dataType The data type of the pixel data (UNSIGNED_BYTE)
      * @param pixels The pixels buffer containing data to submit
+     * @param premultipliedAlpha The pixels buffer should be stored as premultiplied alpha
      */
-    public inline static function submitTexture2dPixels(level:Int, format:TextureFormat, width:Int, height:Int, dataType:TextureDataType, pixels:Uint8Array):Void {
+    public inline static function submitTexture2dPixels(level:Int, format:TextureFormat, width:Int, height:Int, dataType:TextureDataType, pixels:Uint8Array, premultipliedAlpha:Bool):Void {
+
+        #if web
+        GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultipliedAlpha ? 1 : 0);
+        #end
 
         GL.texImage2D(GL.TEXTURE_2D, level, format, width, height, 0, format, dataType, pixels);
 
