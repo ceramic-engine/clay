@@ -155,14 +155,16 @@ class WebRuntime extends clay.base.BaseRuntime {
         var gl = null;
 
         if (config.webgl.version != 1) {
-            gl = window.getContext('webgl${config.webgl.version}');
+            gl = window.getContext('webgl${config.webgl.version}', attr);
             if (gl == null) {
-                gl = window.getContext('experimental-webgl${config.webgl.version}');
+                gl = window.getContext('experimental-webgl${config.webgl.version}', attr);
             }
         }
 
         // Minimum requirement: webgl 1 (if nothing else worked)
-        gl = window.getContextWebGL(attr);
+        if (gl == null) {
+            gl = window.getContextWebGL(attr);
+        }
 
         clay.opengl.GL.gl = gl;
 
