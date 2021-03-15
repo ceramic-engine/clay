@@ -168,7 +168,7 @@ class GLGraphics {
      * @return Bool
      */
     public inline static function needsPreprocessedPremultipliedAlpha():Bool {
-        #if web
+        #if (web && clay_webgl_unpack_premultiply_alpha)
         return false;
         #else
         return true;
@@ -186,7 +186,7 @@ class GLGraphics {
      */
     public inline static function submitCompressedTexture2dPixels(level:Int, format:TextureFormat, width:Int, height:Int, pixels:Uint8Array, premultipliedAlpha:Bool):Void {
 
-        #if web
+        #if (web && clay_webgl_unpack_premultiply_alpha)
         GL.pixelStorei(GL.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premultipliedAlpha ? 1 : 0);
         #end
 
