@@ -229,9 +229,10 @@ class OpenALAudio extends clay.native.NativeAudio {
     public function suspend() {
 
         if (!active) return;
-
         if (suspended) return;
+
         suspended = true;
+        active = false;
 
         Log.debug('Audio / suspend AL ${ALError.desc(AL.getError())}');
         Log.debug('Audio / suspend ALC ${ALCError.desc(ALC.getError(device))}');
@@ -248,10 +249,11 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     public function resume() {
 
-        if (!active) return;
-
+        if (active) return;
         if (!suspended) return;
-        suspended = true;
+
+        suspended = false;
+        active = true;
 
         Log.debug('Audio / resuming context');
 
@@ -270,7 +272,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     inline function soundOf(handle:AudioHandle):ALSound {
 
-        return handle == null ? null : instances.get(handle);
+        return handle == null || (handle:Int) == -1 ? null : instances.get(handle);
 
     }
 
@@ -367,23 +369,9 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         Log.debug('Audio / stop handle=$handle, ' + sound.source.data.id);
 
-        #if clay_debug_openal_crash
-        var id = sound.source.data.id;
-        var alsource = sound.alsource;
-        #end
-
         AL.sourceStop(sound.alsource);
 
-        #if clay_debug_openal_crash
-        try {
-            ensureNoError(STOP);
-        }
-        catch (e:Dynamic) {
-            throw 'handle=$handle alsource=$alsource id=$id / ' + e;
-        }
-        #else
         ensureNoError(STOP);
-        #end
 
     }
 
