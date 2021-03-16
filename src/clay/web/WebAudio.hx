@@ -511,21 +511,26 @@ class WebAudio extends clay.base.BaseAudio {
 
     public function suspend():Void {
 
+        if (!active)
+            return;
         if (suspended)
             return;
 
         suspended = true;
+        active = false;
         context.suspend();
 
     }
 
     public function resume():Void {
 
+        if (active)
+            return;
         if (!suspended)
             return;
 
         suspended = false;
-
+        active = true;
         context.resume();
 
     }
