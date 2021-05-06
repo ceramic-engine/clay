@@ -24,6 +24,16 @@ class WebRuntime extends clay.base.BaseRuntime {
     /** The runtime window canvas */
     public var window:WindowHandle;
 
+    /**
+     * For advanced usage: disable handling of mouse events
+     */
+    public var skipMouseEvents:Bool = false;
+
+    /**
+     * For advanced usage: disable handling of keyboard events
+     */
+    public var skipKeyboardEvents:Bool = false;
+
 /// Internal
 
     /** The window x position. 
@@ -364,6 +374,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     function handleMouseDown(ev:js.html.MouseEvent) {
 
+        if (skipMouseEvents)
+            return;
+
         app.input.emitMouseDown(
             translateMouseX(ev),
             translateMouseY(ev),
@@ -376,6 +389,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     function handleMouseUp(ev:js.html.MouseEvent) {
 
+        if (skipMouseEvents)
+            return;
+
         app.input.emitMouseUp(
             translateMouseX(ev),
             translateMouseY(ev),
@@ -387,6 +403,9 @@ class WebRuntime extends clay.base.BaseRuntime {
     }
 
     function handleMouseMove(ev:js.html.MouseEvent) {
+
+        if (skipMouseEvents)
+            return;
 
         var movementX = ev.movementX == null ? 0 : ev.movementX;
         var movementY = ev.movementY == null ? 0 : ev.movementY;
@@ -409,6 +428,9 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (app.config.runtime.preventDefaultMouseWheel) {
             ev.preventDefault();
         }
+
+        if (skipMouseEvents)
+            return;
 
         final wheelFactor = 0.1; // Try to have consistent behavior between web and native platforms
         app.input.emitMouseWheel(
@@ -536,6 +558,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     function handleKeyDown(ev:js.html.KeyboardEvent) {
 
+        if (skipKeyboardEvents)
+            return;
+
         var keyCode = convertKeyCode(ev.keyCode);
         var scanCode = KeyCode.toScanCode(keyCode);
         var modState = modStateFromEvent(ev);
@@ -557,6 +582,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     function handleKeyUp(ev:js.html.KeyboardEvent) {
 
+        if (skipKeyboardEvents)
+            return;
+
         var keyCode = convertKeyCode(ev.keyCode);
         var scanCode = KeyCode.toScanCode(keyCode);
         var modState = modStateFromEvent(ev);
@@ -577,6 +605,9 @@ class WebRuntime extends clay.base.BaseRuntime {
     }
 
     function handleKeyPress(ev:js.html.KeyboardEvent) {
+
+        if (skipKeyboardEvents)
+            return;
 
         if (ev.which != 0 && ev.keyCode != KeyCode.BACKSPACE && ev.keyCode != KeyCode.ENTER) {
 

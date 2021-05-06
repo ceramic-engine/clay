@@ -42,6 +42,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
      */
     public var currentSdlEvent:sdl.Event = null;
 
+    /**
+     * For advanced usage: disable handling of mouse events
+     */
+    public var skipMouseEvents:Bool = false;
+
+    /**
+     * For advanced usage: disable handling of keyboard events
+     */
+    public var skipKeyboardEvents:Bool = false;
+
 /// Internal
 
     static var timestampStart:Float = 0.0;
@@ -523,10 +533,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
                 currentSdlEvent = e;
 
+                app.events.sdlEvent(e);
+
                 handleInputEvent(e);
                 handleWindowEvent(e);
-
-                app.events.sdlEvent(e);
 
                 if (e.type == SDL_QUIT) {
                     app.emitQuit();
@@ -593,87 +603,103 @@ class SDLRuntime extends clay.base.BaseRuntime {
         /// Keys
 
             case SDL_KEYDOWN:
-                app.input.emitKeyDown(
-                    e.key.keysym.sym,
-                    e.key.keysym.scancode,
-                    e.key.repeat,
-                    toKeyMod(e.key.keysym.mod),
-                    e.key.timestamp / 1000.0,
-                    Std.int(e.key.windowID)
-                );
+                if (!skipKeyboardEvents) {
+                    app.input.emitKeyDown(
+                        e.key.keysym.sym,
+                        e.key.keysym.scancode,
+                        e.key.repeat,
+                        toKeyMod(e.key.keysym.mod),
+                        e.key.timestamp / 1000.0,
+                        Std.int(e.key.windowID)
+                    );
+                }
 
             case SDL_KEYUP:
-                app.input.emitKeyUp(
-                    e.key.keysym.sym,
-                    e.key.keysym.scancode,
-                    e.key.repeat,
-                    toKeyMod(e.key.keysym.mod),
-                    e.key.timestamp / 1000.0,
-                    Std.int(e.key.windowID)
-                );
+                if (!skipKeyboardEvents) {
+                    app.input.emitKeyUp(
+                        e.key.keysym.sym,
+                        e.key.keysym.scancode,
+                        e.key.repeat,
+                        toKeyMod(e.key.keysym.mod),
+                        e.key.timestamp / 1000.0,
+                        Std.int(e.key.windowID)
+                    );
+                }
 
             case SDL_TEXTEDITING:
-                app.input.emitText(
-                    e.edit.text,
-                    e.edit.start,
-                    e.edit.length,
-                    TextEventType.EDIT,
-                    e.edit.timestamp / 1000.0,
-                    Std.int(e.edit.windowID)
-                );
+                if (!skipKeyboardEvents) {
+                    app.input.emitText(
+                        e.edit.text,
+                        e.edit.start,
+                        e.edit.length,
+                        TextEventType.EDIT,
+                        e.edit.timestamp / 1000.0,
+                        Std.int(e.edit.windowID)
+                    );
+                }
 
             case SDL_TEXTINPUT:
-                app.input.emitText(
-                    e.text.text,
-                    0,
-                    0,
-                    TextEventType.INPUT,
-                    e.text.timestamp / 1000.0,
-                    Std.int(e.text.windowID)
-                );
+                if (!skipKeyboardEvents) {
+                    app.input.emitText(
+                        e.text.text,
+                        0,
+                        0,
+                        TextEventType.INPUT,
+                        e.text.timestamp / 1000.0,
+                        Std.int(e.text.windowID)
+                    );
+                }
 
         /// Mouse
 
             case SDL_MOUSEMOTION:
-                app.input.emitMouseMove(
-                    toPixels(e.motion.x),
-                    toPixels(e.motion.y),
-                    toPixels(e.motion.xrel),
-                    toPixels(e.motion.yrel),
-                    e.motion.timestamp / 1000.0,
-                    Std.int(e.motion.windowID)
-                );
+                if (!skipMouseEvents) {
+                    app.input.emitMouseMove(
+                        toPixels(e.motion.x),
+                        toPixels(e.motion.y),
+                        toPixels(e.motion.xrel),
+                        toPixels(e.motion.yrel),
+                        e.motion.timestamp / 1000.0,
+                        Std.int(e.motion.windowID)
+                    );
+                }
 
             case SDL_MOUSEBUTTONDOWN:
-                app.input.emitMouseDown(
-                    toPixels(e.button.x),
-                    toPixels(e.button.y),
-                    e.button.button - 1,
-                    e.button.timestamp / 1000.0,
-                    Std.int(e.button.windowID)
-                );
+                if (!skipMouseEvents) {
+                    app.input.emitMouseDown(
+                        toPixels(e.button.x),
+                        toPixels(e.button.y),
+                        e.button.button - 1,
+                        e.button.timestamp / 1000.0,
+                        Std.int(e.button.windowID)
+                    );
+                }
             case SDL_MOUSEBUTTONUP:
-                app.input.emitMouseUp(
-                    toPixels(e.button.x),
-                    toPixels(e.button.y),
-                    e.button.button - 1,
-                    e.button.timestamp / 1000.0,
-                    Std.int(e.button.windowID)
-                );
+                if (!skipMouseEvents) {
+                    app.input.emitMouseUp(
+                        toPixels(e.button.x),
+                        toPixels(e.button.y),
+                        e.button.button - 1,
+                        e.button.timestamp / 1000.0,
+                        Std.int(e.button.windowID)
+                    );
+                }
 
             case SDL_MOUSEWHEEL:
-                final wheelFactor = -5.0; // Try to have consistent behavior between web and native platforms
-                app.input.emitMouseWheel(
-                    #if !clay_no_wheel_round
-                    Math.round(e.wheel.x * wheelFactor),
-                    Math.round(e.wheel.y * wheelFactor),
-                    #else
-                    e.wheel.x * wheelFactor,
-                    e.wheel.y * wheelFactor,
-                    #end
-                    e.wheel.timestamp / 1000.0,
-                    Std.int(e.wheel.windowID)
-                );
+                if (!skipMouseEvents) {
+                    final wheelFactor = -5.0; // Try to have consistent behavior between web and native platforms
+                    app.input.emitMouseWheel(
+                        #if !clay_no_wheel_round
+                        Math.round(e.wheel.x * wheelFactor),
+                        Math.round(e.wheel.y * wheelFactor),
+                        #else
+                        e.wheel.x * wheelFactor,
+                        e.wheel.y * wheelFactor,
+                        #end
+                        e.wheel.timestamp / 1000.0,
+                        Std.int(e.wheel.windowID)
+                    );
+                }
 
         /// Touch
 
