@@ -18,19 +18,19 @@ class GLGraphics {
 
     inline static final TEXTURE_2D_MULTISAMPLE = 0x9100;
 
-    #if !debug inline #end public static final NO_TEXTURE:TextureId = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_TEXTURE:TextureId = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_FRAMEBUFFER:GLFramebuffer = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_FRAMEBUFFER:GLFramebuffer = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_RENDERBUFFER:GLRenderbuffer = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_RENDERBUFFER:GLRenderbuffer = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_SHADER:GLShader = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_SHADER:GLShader = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_PROGRAM:GLProgram = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_PROGRAM:GLProgram = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_LOCATION:GLUniformLocation = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_LOCATION:GLUniformLocation = #if clay_web null #else 0 #end;
 
-    #if !debug inline #end public static final NO_BUFFER:GLBuffer = #if clay_web null #else 0 #end;
+    #if (!debug && !completion) inline #end public static final NO_BUFFER:GLBuffer = #if clay_web null #else 0 #end;
 
     static var _boundTexture2D:Array<TextureId> = [];
 
