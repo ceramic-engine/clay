@@ -5,7 +5,7 @@ package clay.buffers;
 
 #if cpp
 
-typedef UINT = Int
+typedef UINT = Int;
 
 //:todo: ArrayBufferIO Big Endian
 

@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract DataView(js.lib.DataView)
+    abstract DataViewImplJS(js.lib.DataView)
         from js.lib.DataView
         to js.lib.DataView {
 
@@ -101,11 +101,13 @@ package clay.buffers;
 
     }
 
+    typedef DataView = DataViewImplJS;
+
 #else
 
     import clay.buffers.ArrayBuffer;
 
-    class DataView {
+    class DataViewImpl {
 
         public var buffer:ArrayBuffer;
         public var byteLength:Int;
@@ -222,4 +224,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef DataView = DataViewImpl;
+
+#end

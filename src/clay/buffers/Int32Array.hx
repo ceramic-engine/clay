@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Int32Array(js.lib.Int32Array)
+    abstract Int32ArrayImplJS(js.lib.Int32Array)
         from js.lib.Int32Array
         to js.lib.Int32Array {
 
@@ -51,13 +51,15 @@ package clay.buffers;
 
     }
 
+    typedef Int32Array = Int32ArrayImplJS;
+
 #else
 
     import clay.buffers.ArrayBufferView;
     import clay.buffers.TypedArrayType;
 
     @:forward
-    abstract Int32Array(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Int32ArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 4;
 
@@ -114,5 +116,7 @@ package clay.buffers;
         inline function toString() return this == null ? null : 'Int32Array [byteLength:${this.byteLength}, length:${this.length}]';
 
     }
+
+    typedef Int32Array = Int32ArrayImpl;
 
 #end //!js

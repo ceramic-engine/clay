@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Int8Array(js.lib.Int8Array)
+    abstract Int8ArrayImplJS(js.lib.Int8Array)
         from js.lib.Int8Array
         to js.lib.Int8Array {
 
@@ -50,13 +50,15 @@ package clay.buffers;
 
     }
 
+    typedef Int8Array = Int8ArrayImplJS;
+
 #else
 
     import clay.buffers.ArrayBufferView;
     import clay.buffers.TypedArrayType;
 
     @:forward
-    abstract Int8Array(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Int8ArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 1;
 
@@ -114,4 +116,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef Int8Array = Int8ArrayImpl;
+
+#end

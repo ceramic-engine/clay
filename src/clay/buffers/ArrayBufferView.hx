@@ -12,7 +12,7 @@ package clay.buffers;
     using cpp.NativeArray;
     import clay.buffers.TypedArrayType;
 
-    class ArrayBufferView {
+    class ArrayBufferViewImpl {
 
         public var type = TypedArrayType.None;
         public var buffer: ArrayBuffer;
@@ -352,4 +352,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef ArrayBufferView = ArrayBufferViewImpl;
+
+#end

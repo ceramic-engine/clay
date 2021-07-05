@@ -7,7 +7,7 @@ package clay.buffers;
 
     @:forward
     @:arrayAccess
-    abstract Float32Array(js.lib.Float32Array)
+    abstract Float32ArrayImplJS(js.lib.Float32Array)
         from js.lib.Float32Array
         to js.lib.Float32Array {
 
@@ -53,13 +53,15 @@ package clay.buffers;
 
     }
 
+    typedef Float32Array = Float32ArrayImplJS;
+
 #else
 
     import clay.buffers.ArrayBufferView;
     import clay.buffers.TypedArrayType;
 
     @:forward
-    abstract Float32Array(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Float32ArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 4;
 
@@ -116,5 +118,7 @@ package clay.buffers;
         }
 
     }
+
+    typedef Float32Array = Float32ArrayImpl;
 
 #end //!js

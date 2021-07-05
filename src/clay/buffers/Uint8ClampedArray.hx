@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Uint8ClampedArray(js.lib.Uint8ClampedArray)
+    abstract Uint8ClampedArrayImplJS(js.lib.Uint8ClampedArray)
         from js.lib.Uint8ClampedArray
         to js.lib.Uint8ClampedArray {
 
@@ -59,6 +59,8 @@ package clay.buffers;
 
     }
 
+    typedef Uint8ClampedArrayImplJS = Uint8ClampedArray;
+
 #else
 
     import clay.buffers.ArrayBufferView;
@@ -66,7 +68,7 @@ package clay.buffers;
 
     @:forward
     @:arrayAccess
-    abstract Uint8ClampedArray(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Uint8ClampedArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 1;
 
@@ -124,4 +126,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef Uint8ClampedArray = Uint8ClampedArrayImpl;
+
+#end

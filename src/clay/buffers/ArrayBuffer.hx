@@ -12,7 +12,7 @@ package clay.buffers;
     import haxe.io.BytesData;
 
     @:forward
-    abstract ArrayBuffer(BytesData) from BytesData to BytesData {
+    abstract ArrayBufferImpl(BytesData) from BytesData to BytesData {
 
         public var byteLength (get, never) : Int;
 
@@ -26,4 +26,6 @@ package clay.buffers;
         }
     }
 
-#end //!js
+    typedef ArrayBuffer = ArrayBufferImpl;
+
+#end

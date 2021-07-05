@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Float64Array(js.lib.Float64Array)
+    abstract Float64ArrayImplJS(js.lib.Float64Array)
         from js.lib.Float64Array
         to js.lib.Float64Array {
 
@@ -52,13 +52,15 @@ package clay.buffers;
 
     }
 
+    typedef Float64Array = Float64ArrayImplJS;
+
 #else
 
     import clay.buffers.ArrayBufferView;
     import clay.buffers.TypedArrayType;
 
     @:forward
-    abstract Float64Array(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Float64ArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 8;
 
@@ -117,4 +119,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef Float64Array = Float64ArrayImpl;
+
+#end

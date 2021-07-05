@@ -6,7 +6,7 @@ package clay.buffers;
 #if js
 
     @:forward
-    abstract Uint32Array(js.lib.Uint32Array)
+    abstract Uint32ArrayImplJS(js.lib.Uint32Array)
         from js.lib.Uint32Array
         to js.lib.Uint32Array {
 
@@ -51,13 +51,15 @@ package clay.buffers;
 
     }
 
+    typedef Uint32Array = Uint32ArrayImplJS;
+
 #else
 
     import clay.buffers.ArrayBufferView;
     import clay.buffers.TypedArrayType;
 
     @:forward
-    abstract Uint32Array(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
+    abstract Uint32ArrayImpl(ArrayBufferView) from ArrayBufferView to ArrayBufferView {
 
         public inline static var BYTES_PER_ELEMENT : Int = 4;
 
@@ -115,4 +117,6 @@ package clay.buffers;
 
     }
 
-#end //!js
+    typedef Uint32Array = Uint32ArrayImpl;
+
+#end

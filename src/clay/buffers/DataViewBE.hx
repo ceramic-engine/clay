@@ -8,7 +8,7 @@ import clay.buffers.DataView;
 #if js
 
     @:forward
-    abstract DataViewBE(js.lib.DataView)
+    abstract DataViewBEImplJS(js.lib.DataView)
         from js.lib.DataView
         to js.lib.DataView {
 
@@ -103,6 +103,8 @@ import clay.buffers.DataView;
 
     }
 
+    typedef DataViewBE = DataViewBEImplJS;
+
 
 #else
 
@@ -110,7 +112,7 @@ import clay.buffers.DataView;
             where all get/set calls will read/write in BE,
             overriding the behavior of the underlying dataview.
             Note that this class doesn't work correctly (yet) on CPP! */
-    class DataViewBE {
+    class DataViewBEImpl {
 
         public var buffer:ArrayBuffer;
         public var byteLength:Int;
@@ -224,4 +226,6 @@ import clay.buffers.DataView;
 
     }
 
-#end //!js
+    typedef DataViewBE = DataViewBEImpl;
+
+#end
