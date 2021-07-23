@@ -57,13 +57,13 @@ class Clay {
     public var runtime(default, null):Runtime;
 
     /** `true` if shut down has begun */
-    public var shuttingDown:Bool = false;
+    public var shuttingDown(default, null):Bool = false;
 
     /** `true` if shut down has completed  */
-    public var hasShutdown:Bool = false;
+    public var hasShutdown(default, null):Bool = false;
 
     /** The last known timestamp in seconds, or `-1` if not defined yet */
-    public var timestamp:Float = -1;
+    public var timestamp(default, null):Float = -1;
 
     /**
      * App identifier
@@ -185,7 +185,7 @@ class Clay {
 
     }
 
-    function shutdown() {
+    public function shutdown() {
 
         if (shuttingDown) {
             Log.debug('Clay / shutdown() called again, already shutting down - ignoring');
