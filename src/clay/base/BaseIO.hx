@@ -24,20 +24,20 @@ class BaseIO {
         return false;
 
     }
-    
+
     public function appPath():String {
 
         return null;
 
     }
-    
+
     public function appPathPrefs():String {
 
         return null;
 
     }
-    
-    public function loadData(path:String, binary:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
+
+    public function loadData(path:String, binary:Bool = false, async:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
         if (callback != null) {
             Immediate.push(() -> {

@@ -1,9 +1,8 @@
 package clay;
 
-import haxe.Json;
-
 import clay.Config;
 import clay.Types;
+import haxe.Json;
 
 using StringTools;
 
@@ -85,6 +84,11 @@ class Clay {
      */
     public var screenDensity(default, null):Float;
 
+    /**
+     * Shared background queue
+     */
+    public var backgroundQueue(default, null):BackgroundQueue;
+
     public var immediateShutdown:Bool = false;
 
     /**
@@ -142,7 +146,10 @@ class Clay {
 
         @:privateAccess runtime = new Runtime(this);
         Immediate.flush();
-        
+
+        Runner.init();
+        backgroundQueue = new BackgroundQueue();
+
         init();
 
     }
@@ -191,7 +198,7 @@ class Clay {
             Log.debug('Clay / shutdown() called again, already shutting down - ignoring');
             return;
         }
-        
+
         if (hasShutdown) {
             throw 'Clay / calling shutdown() more than once is disallowed';
         }
@@ -248,6 +255,8 @@ class Clay {
             Sys.sleep(config.window.backgroundSleep);
         }
         #end
+
+        Runner.tick();
 
         Immediate.flush();
 
@@ -337,7 +346,7 @@ class Clay {
         #end
 
         return window;
-        
+
     }
 
     function defaultRenderConfig():RenderConfig {
@@ -367,7 +376,7 @@ class Clay {
             }
             #end
         };
-        
+
     }
 
     function defaultRuntimeConfig():RuntimeConfig {
@@ -411,7 +420,7 @@ class Clay {
             greenBits: config.greenBits,
             blueBits: config.blueBits,
             alphaBits: config.alphaBits,
-            defaultClear: { 
+            defaultClear: {
                 r: config.defaultClear.r,
                 g: config.defaultClear.g,
                 b: config.defaultClear.b,

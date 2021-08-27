@@ -1,7 +1,7 @@
 package clay.native;
 
-import clay.buffers.Uint8Array;
 import clay.base.BaseAssets;
+import clay.buffers.Uint8Array;
 
 class NativeAssets extends BaseAssets {
 
@@ -11,35 +11,51 @@ class NativeAssets extends BaseAssets {
 
     }
 
-    override function loadImage(path:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    override function loadImage(path:String, components:Int = 4, async:Bool = false, ?callback:(image:Image)->Void):Image {
 
         if (path == null)
             throw 'Image path is null!';
 
-        // Get binary data
-        var bytes:Uint8Array = null;
-        bytes = app.io.loadData(path, true);
-        if (bytes == null) {
-            if (callback != null) {
-                Immediate.push(() -> {
-                    callback(null);
+
+        if (async) {
+            Clay.app.backgroundQueue.schedule(function() {
+                var image = loadImage(path, components, false);
+                Runner.runInMain(function() {
+                    if (callback != null) {
+                        Immediate.push(() -> {
+                            callback(image);
+                        });
+                    }
                 });
-            }
+            });
             return null;
         }
+        else {
+            // Get binary data
+            var bytes:Uint8Array = null;
+            bytes = app.io.loadData(path, true);
+            if (bytes == null) {
+                if (callback != null) {
+                    Immediate.push(() -> {
+                        callback(null);
+                    });
+                }
+                return null;
+            }
 
-        // Decode binary data into image
-        var image = imageFromBytes(bytes, components);
-        if (callback != null) {
-            Immediate.push(() -> {
-                callback(image);
-            });
+            // Decode binary data into image
+            var image = imageFromBytes(bytes, components);
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(image);
+                });
+            }
+            return image;
         }
-        return image;
 
     }
 
-    public function imageFromBytes(bytes:Uint8Array, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    public function imageFromBytes(bytes:Uint8Array, components:Int = 4, async:Bool = false, ?callback:(image:Image)->Void):Image {
 
         if (bytes == null)
             throw 'Image bytes are null!';

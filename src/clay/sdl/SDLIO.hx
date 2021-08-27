@@ -1,10 +1,9 @@
 package clay.sdl;
 
-import clay.native.NativeIO;
 import clay.buffers.ArrayBufferView;
-import sdl.SDL;
-
 import clay.buffers.Uint8Array;
+import clay.native.NativeIO;
+import sdl.SDL;
 
 typedef FileHandle = sdl.RWops;
 
@@ -21,7 +20,7 @@ class SDLIO extends NativeIO {
         return true;
 
     }
-    
+
     override function appPath():String {
 
         var path = SDL.getBasePath();
@@ -30,7 +29,7 @@ class SDLIO extends NativeIO {
         return path;
 
     }
-    
+
     override function appPathPrefs():String {
 
         var parts = Clay.app.appId.split('.');
@@ -41,19 +40,41 @@ class SDLIO extends NativeIO {
 
     }
 
-    override function loadData(path:String, binary:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
+    override function loadData(path:String, binary:Bool = false, async:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
         if (path == null)
             throw 'Path is null!';
 
+        var dest:Uint8Array = null;
+        if (async) {
+            Clay.app.backgroundQueue.schedule(function() {
+                dest = _doLoadData(path, binary);
+                Runner.runInMain(function() {
+                    if (callback != null) {
+                        Immediate.push(() -> {
+                            callback(dest);
+                        });
+                    }
+                });
+            });
+        }
+        else {
+            dest = _doLoadData(path, binary);
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(dest);
+                });
+            }
+        }
+        return dest;
+
+    }
+
+    private function _doLoadData(path:String, binary:Bool):Uint8Array {
+
         var file = SDL.RWFromFile(path, binary ? 'rb' : 'r');
 
         if (file == null) {
-            if (callback != null) {
-                Immediate.push(() -> {
-                    callback(null);
-                });
-            }
             return null;
         }
         var size = fileSize(file);
@@ -66,11 +87,6 @@ class SDLIO extends NativeIO {
         // close + release the file handle
         fileClose(file);
 
-        if (callback != null) {
-            Immediate.push(() -> {
-                callback(dest);
-            });
-        }
         return dest;
 
     }
@@ -108,7 +124,7 @@ class SDLIO extends NativeIO {
     }
 
     public function fileSeek(file:FileHandle, offset:Int, whence:Int):Int {
-        
+
         if (file == null)
             throw 'Parameter `file` should not be null';
 

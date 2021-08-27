@@ -2,14 +2,14 @@ package clay.web;
 
 #if js
 
-import clay.buffers.Uint8Array;
-import clay.buffers.Float32Array;
-import clay.audio.AudioSource;
-import clay.audio.AudioInstance;
-import clay.audio.AudioHandle;
 import clay.audio.AudioData;
-import clay.audio.AudioState;
 import clay.audio.AudioFormat;
+import clay.audio.AudioHandle;
+import clay.audio.AudioInstance;
+import clay.audio.AudioSource;
+import clay.audio.AudioState;
+import clay.buffers.Float32Array;
+import clay.buffers.Uint8Array;
 
 private typedef WebSound = {
     source: AudioSource,
@@ -181,7 +181,7 @@ class WebAudio extends clay.base.BaseAudio {
 
         instances.set(handle, sound);
 
-        // TODO handle paused flag, also why is there a paused flag? 
+        // TODO handle paused flag, also why is there a paused flag?
         // when do you ever want to call play with paused as true?
 
         if (bufferNode != null) {
@@ -322,7 +322,7 @@ class WebAudio extends clay.base.BaseAudio {
         if (sound.gainNode != null) {
             sound.gainNode.disconnect();
             sound.gainNode = null;
-        } 
+        }
 
         if (sound.panNode != null) {
             sound.panNode.disconnect();
@@ -537,12 +537,12 @@ class WebAudio extends clay.base.BaseAudio {
 
 /// Data API
 
-    override function loadData(path:String, isStream:Bool, format:AudioFormat, ?callback:(data:AudioData)->Void):AudioData {
+    override function loadData(path:String, isStream:Bool, format:AudioFormat, async:Bool = false, ?callback:(data:AudioData)->Void):AudioData {
 
         if (path == null)
             throw 'path is null!';
 
-        
+
         if (!active) {
             Log.error('Audio / WebAudio context unavailable');
             if (callback != null) {

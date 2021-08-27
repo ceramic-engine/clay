@@ -1,14 +1,13 @@
 package clay.web;
 
+import clay.base.BaseAssets;
 import clay.buffers.Uint8Array;
-
 #if ceramic
 import ceramic.Path;
 #else
 import haxe.io.Path;
 #end
 
-import clay.base.BaseAssets;
 
 class WebAssets extends BaseAssets {
 
@@ -24,7 +23,7 @@ class WebAssets extends BaseAssets {
 
     }
 
-    override function loadImage(path:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    override function loadImage(path:String, components:Int = 4, async:Bool = false, ?callback:(image:Image)->Void):Image {
 
         if (path == null)
             throw 'Image path is null!';
@@ -34,8 +33,8 @@ class WebAssets extends BaseAssets {
         #if clay_web_use_electron_pngjs
         bindElectronPngjs();
 
-        if (pngjs != null && ext == 'png') {
-            
+        if (pngjs != null && ext == 'png' && !async) {
+
             if (app.io.isSynchronous()) {
                 var bytes = app.io.loadData(path, true);
                 if (bytes == null) {
@@ -200,7 +199,7 @@ class WebAssets extends BaseAssets {
 
         img.src = src;
 
-        return null; 
+        return null;
 
     }
 
@@ -274,12 +273,12 @@ class WebAssets extends BaseAssets {
         }
 
         // Cleanup
-        tmpCanvas = null; 
+        tmpCanvas = null;
         tmpContext = null;
         imgdata = null;
 
         return Uint8Array.fromView(imageBytes.data);
-    
+
     }
 
     /** Return a POT array of bytes from an image/canvas element */

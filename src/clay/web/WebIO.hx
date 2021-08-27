@@ -28,7 +28,7 @@ class WebIO extends BaseIO {
 
     }
 
-    override function loadData(path:String, binary:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
+    override function loadData(path:String, binary:Bool = false, async:Bool = false, ?callback:(data:Uint8Array)->Void):Uint8Array {
 
         if (path == null)
             throw 'Path is null!';
@@ -37,7 +37,7 @@ class WebIO extends BaseIO {
 
         bindElectron();
 
-        if (electron != null && !path.startsWith('http://') && !path.startsWith('https://')) {
+        if (!async && electron != null && !path.startsWith('http://') && !path.startsWith('https://')) {
 
             var fs = js.Syntax.code("{0}.remote.require('fs')", electron);
             var cwd = js.Syntax.code("{0}.remote.process.cwd()", electron);
@@ -73,10 +73,10 @@ class WebIO extends BaseIO {
 
         #end
 
-        var async = true;
+        var asyncHttp = true;
 
         var request = new js.html.XMLHttpRequest();
-        request.open("GET", path, async);
+        request.open("GET", path, asyncHttp);
 
         if (binary) {
             request.overrideMimeType('text/plain; charset=x-user-defined');
@@ -85,7 +85,7 @@ class WebIO extends BaseIO {
         }
 
         // Only async can set this type
-        if (async) {
+        if (asyncHttp) {
             request.responseType = js.html.XMLHttpRequestResponseType.ARRAYBUFFER;
         }
 

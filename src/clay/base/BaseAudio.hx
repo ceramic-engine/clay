@@ -6,10 +6,10 @@ import ceramic.Path;
 import haxe.io.Path;
 #end
 
-import clay.audio.AudioEvent;
 import clay.audio.AudioData;
-import clay.audio.AudioHandle;
+import clay.audio.AudioEvent;
 import clay.audio.AudioFormat;
+import clay.audio.AudioHandle;
 
 class BaseAudio {
 
@@ -37,8 +37,8 @@ class BaseAudio {
     public function tick(delta:Float):Void {}
 
     public function shutdown():Void {}
-    
-    public function loadData(path:String, isStream:Bool, format:AudioFormat, ?callback:(data:AudioData)->Void):AudioData {
+
+    public function loadData(path:String, isStream:Bool, format:AudioFormat, async:Bool = false, ?callback:(data:AudioData)->Void):AudioData {
 
         if (callback != null) {
             Immediate.push(() -> {
