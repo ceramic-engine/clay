@@ -1,5 +1,6 @@
 package clay.opengl;
 
+import clay.buffers.Int32Array;
 import clay.buffers.Float32Array;
 import clay.buffers.Uint8Array;
 import clay.Types;
@@ -676,6 +677,13 @@ class GLGraphics {
 
         useShader(shader);
         GL.uniform1i(location, value);
+
+    }
+
+    inline public static function setIntArrayUniform(shader:GpuShader, location:GLUniformLocation, value:Int32Array):Void {
+
+        useShader(shader);
+        GL.uniform1iv(location, value);
 
     }
 

@@ -2,6 +2,7 @@ package clay.graphics;
 
 import clay.Types;
 import clay.buffers.Float32Array;
+import clay.buffers.Int32Array;
 
 using clay.Extensions;
 
@@ -11,6 +12,7 @@ class Uniforms {
     // On web, we identify uniforms by their name
 
     var ints        :Map<String,Int> = new Map();
+    var intArrays   :Map<String,Int32Array> = new Map();
     var floats      :Map<String,Float> = new Map();
     var floatArrays :Map<String,Float32Array> = new Map();
     var vector2s    :Map<String,Vector2> = new Map();
@@ -21,6 +23,7 @@ class Uniforms {
     var textures    :Map<String,TextureAndSlot> = new Map();
 
     var dirtyInts          :Array<String> = [];
+    var dirtyIntArrays     :Array<String> = [];
     var dirtyFloats        :Array<String> = [];
     var dirtyFloatArrays   :Array<String> = [];
     var dirtyVector2s      :Array<String> = [];
@@ -33,6 +36,7 @@ class Uniforms {
     // On native, we can identify uniforms with integers: better
 
     var ints        :IntMap<Int> = new IntMap();
+    var intArrays   :IntMap<Int32Array> = new IntMap();
     var floats      :IntMap<Float> = new IntMap();
     var floatArrays :IntMap<Float32Array> = new IntMap();
     var vector2s    :IntMap<Vector2> = new IntMap();
@@ -43,6 +47,7 @@ class Uniforms {
     var textures    :IntMap<TextureAndSlot> = new IntMap();
 
     var dirtyInts          :Array<Int> = [];
+    var dirtyIntArrays     :Array<Int> = [];
     var dirtyFloats        :Array<Int> = [];
     var dirtyFloatArrays   :Array<Int> = [];
     var dirtyVector2s      :Array<Int> = [];
@@ -71,6 +76,20 @@ class Uniforms {
         #else
         ints.set(location, value);
         dirtyInts.push(location);
+        #end
+
+    }
+
+    public function setIntArray(name:String, value:Int32Array):Void {
+
+        var location = Graphics.getUniformLocation(gpuShader, name);
+        
+        #if web
+        intArrays.set(name, value);
+        dirtyIntArrays.push(name);
+        #else
+        intArrays.set(location, value);
+        dirtyIntArrays.push(location);
         #end
 
     }
@@ -295,6 +314,17 @@ class Uniforms {
             #else
             var location = dirtyInts.pop();
             Graphics.setIntUniform(gpuShader, location, ints.get(location));
+            #end
+        }
+
+        while (dirtyIntArrays.length > 0) {
+            #if web
+            var name = dirtyIntArrays.pop();
+            var location = Graphics.getUniformLocation(gpuShader, name);
+            Graphics.setIntArrayUniform(gpuShader, location, intArrays.get(name));
+            #else
+            var location = dirtyIntArrays.pop();
+            Graphics.setIntArrayUniform(gpuShader, location, intArrays.get(location));
             #end
         }
 
