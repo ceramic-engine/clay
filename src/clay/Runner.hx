@@ -7,8 +7,6 @@ import sys.thread.Deque;
 import sys.thread.Thread;
 #end
 
-import ceramic.Shortcuts.*;
-
 /**
 A simple Haxe class for easily running threads and calling functions on the primary thread.
 from https://github.com/underscorediscovery/
