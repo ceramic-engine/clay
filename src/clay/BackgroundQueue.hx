@@ -47,10 +47,14 @@ class BackgroundQueue {
         pending.push(fn);
         mutex.release();
 
-        #else
+        #elseif ceramic
 
         // Defer in main thread if background threading is not available
         ceramic.App.app.onceImmediate(fn);
+
+        #else
+
+        fn();
 
         #end
 
