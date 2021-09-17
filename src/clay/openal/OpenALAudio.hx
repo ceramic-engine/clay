@@ -1,16 +1,14 @@
 package clay.openal;
 
 import clay.Types;
-
+import clay.audio.AudioErrorReason;
 import clay.audio.AudioHandle;
+import clay.audio.AudioInstance;
 import clay.audio.AudioSource;
 import clay.audio.AudioState;
-import clay.audio.AudioInstance;
-import clay.audio.AudioErrorReason;
-
-import clay.openal.AL;
 import clay.openal.AL.Context;
 import clay.openal.AL.Device;
+import clay.openal.AL;
 import clay.openal.ALSound;
 import clay.openal.ALStream;
 
@@ -42,7 +40,7 @@ class OpenALAudio extends clay.native.NativeAudio {
     override public function new(app:Clay) {
 
         super(app);
-        
+
         #if ceramic
         instances = new IntMap(16, 0.5, true);
         instancesKeys = [];
@@ -106,7 +104,7 @@ class OpenALAudio extends clay.native.NativeAudio {
             }
 
             if (sound.instance.hasEnded()) {
-                
+
                 if (!didEmitEnd)
                     emitAudioEvent(END, handle);
 
@@ -195,7 +193,7 @@ class OpenALAudio extends clay.native.NativeAudio {
     }
 
 /// Internal
-    
+
     function initAL() {
 
         Log.debug('Audio / init');
@@ -221,7 +219,7 @@ class OpenALAudio extends clay.native.NativeAudio {
     override function ready() {
 
         Log.debug('Audio / ready');
-        
+
     }
 
 /// Public API
@@ -512,6 +510,10 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     }
 
+    #if clay_no_openal_error_throw
+    static var _numPrintedErrors:Int = 0;
+    #end
+
     inline function ensureNoError(reason:AudioErrorReason, ?pos:haxe.PosInfos) {
 
         var err = AL.getError();
@@ -519,8 +521,14 @@ class OpenALAudio extends clay.native.NativeAudio {
         if (err != AL.NO_ERROR) {
             if (err != -1) {
                 var s = 'Audio / $err / $reason: failed with ' + ALError.desc(err);
+                #if clay_no_openal_error_throw
+                if (_numPrintedErrors++ < 32) {
+                    haxe.Log.trace(s, pos);
+                }
+                #else
                 haxe.Log.trace(s, pos);
                 throw s;
+                #end
             }
             else {
                 var s = 'Audio / $reason / not played, too many concurrent sounds?';
