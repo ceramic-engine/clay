@@ -125,6 +125,8 @@ class Clay {
 
         Clay.app = this;
 
+        Runner.init();
+
         extractAppId();
 
         this.config = defaultConfig();
@@ -147,7 +149,6 @@ class Clay {
         @:privateAccess runtime = new Runtime(this);
         Immediate.flush();
 
-        Runner.init();
         backgroundQueue = new BackgroundQueue();
 
         init();

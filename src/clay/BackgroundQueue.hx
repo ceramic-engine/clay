@@ -64,6 +64,12 @@ class BackgroundQueue {
 
     private function internalRunInBackground():Void {
 
+        #if (android && linc_sdl)
+        // This lets us attach thread to JNI.
+        // Required because some JNI calls could be done in background
+        sdl.SDL.androidGetJNIEnv();
+        #end
+
         while (!stop) {
             var shouldSleep = true;
 
