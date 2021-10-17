@@ -88,7 +88,7 @@ class WebAssets extends BaseAssets {
                 return;
             }
 
-            imageFromBytes(bytes, ext, 4, function(image) {
+            imageFromBytesUsingImageElement(bytes, ext, 4, function(image) {
                 if (callback != null) {
                     Immediate.push(() -> {
                         callback(image);
@@ -170,6 +170,25 @@ class WebAssets extends BaseAssets {
     }
 
     public function imageFromBytes(bytes:Uint8Array, ext:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+
+        #if clay_web_use_electron_pngjs
+        bindElectronPngjs();
+
+        if (pngjs != null && ext == 'png' && components == 4) {
+            var image = decodePngWithPngjs(bytes);
+            callback(image);
+            return image;
+        }
+        else {
+        #end
+            return imageFromBytesUsingImageElement(bytes, ext, components, callback);
+        #if clay_web_use_electron_pngjs
+        }
+        #end
+
+    }
+
+    public function imageFromBytesUsingImageElement(bytes:Uint8Array, ext:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
 
         if (bytes == null)
             throw 'Image bytes are null!';
