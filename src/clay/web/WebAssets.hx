@@ -102,14 +102,14 @@ class WebAssets extends BaseAssets {
 
     #if clay_web_use_electron_pngjs
 
-    public function decodePngWithPngjs(bytes:Uint8Array):Image {
+    public function decodePngWithPngjs(bytes:Uint8Array, pot:Bool = true):Image {
 
         try {
             var Buffer = js.Syntax.code("{0}.remote.require('buffer').Buffer", electron);
             var pngjsInfo = pngjs.PNG.sync.read(Buffer.from(bytes));
 
-            var widthPot = nearestPowerOfTwo(pngjsInfo.width);
-            var heightPot = nearestPowerOfTwo(pngjsInfo.height);
+            var widthActual = pot ? nearestPowerOfTwo(pngjsInfo.width) : pngjsInfo.width;
+            var heightActual = pot ? nearestPowerOfTwo(pngjsInfo.height) : pngjsInfo.height;
 
             // Copy data and get rid of nodejs buffer
             var bufferData = pngjsInfo.data;
@@ -118,13 +118,13 @@ class WebAssets extends BaseAssets {
                 pngjsData[i] = js.Syntax.code("{0}[{1}]", bufferData, i);
             }
 
-            var imageBytes = potBytesFromPixels(pngjsInfo.width, pngjsInfo.height, widthPot, heightPot, pngjsData);
+            var imageBytes = paddedBytesFromPixels(pngjsInfo.width, pngjsInfo.height, widthActual, heightActual, pngjsData);
 
             var image:Image = {
                 width: pngjsInfo.width,
                 height: pngjsInfo.height,
-                widthActual: widthPot,
-                heightActual: heightPot,
+                widthActual: widthActual,
+                heightActual: heightActual,
                 sourceBitsPerPixel: 4,
                 bitsPerPixel: 4,
                 pixels: imageBytes
@@ -147,17 +147,17 @@ class WebAssets extends BaseAssets {
     #end
 
     /** Create an image info (padded to POT) from a given Canvas or Image element. */
-    public function decodeImageFromElement(elem:js.html.ImageElement):Image {
+    public function decodeImageFromElement(elem:js.html.ImageElement, pot:Bool = true):Image {
 
-        var widthPot = nearestPowerOfTwo(elem.width);
-        var heightPot = nearestPowerOfTwo(elem.height);
-        var imageBytes = potBytesFromElement(elem.width, elem.height, widthPot, heightPot, elem);
+        var widthActual = pot ? nearestPowerOfTwo(elem.width) : elem.width;
+        var heightActual = pot ? nearestPowerOfTwo(elem.height) : elem.height;
+        var imageBytes = paddedBytesFromElement(elem.width, elem.height, widthActual, heightActual, elem);
 
         var image:Image = {
             width: elem.width,
             height: elem.height,
-            widthActual: widthPot,
-            heightActual: heightPot,
+            widthActual: widthActual,
+            heightActual: heightActual,
             sourceBitsPerPixel: 4,
             bitsPerPixel: 4,
             pixels: imageBytes
@@ -169,26 +169,26 @@ class WebAssets extends BaseAssets {
 
     }
 
-    public function imageFromBytes(bytes:Uint8Array, ext:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    public function imageFromBytes(bytes:Uint8Array, ext:String, components:Int = 4, pot:Bool = true, ?callback:(image:Image)->Void):Image {
 
         #if clay_web_use_electron_pngjs
         bindElectronPngjs();
 
         if (pngjs != null && ext == 'png' && components == 4) {
-            var image = decodePngWithPngjs(bytes);
+            var image = decodePngWithPngjs(bytes, pot);
             callback(image);
             return image;
         }
         else {
         #end
-            return imageFromBytesUsingImageElement(bytes, ext, components, callback);
+            return imageFromBytesUsingImageElement(bytes, ext, components, pot, callback);
         #if clay_web_use_electron_pngjs
         }
         #end
 
     }
 
-    public function imageFromBytesUsingImageElement(bytes:Uint8Array, ext:String, components:Int = 4, ?callback:(image:Image)->Void):Image {
+    public function imageFromBytesUsingImageElement(bytes:Uint8Array, ext:String, components:Int = 4, pot:Bool = true, ?callback:(image:Image)->Void):Image {
 
         if (bytes == null)
             throw 'Image bytes are null!';
@@ -204,7 +204,7 @@ class WebAssets extends BaseAssets {
         var img = new js.html.Image();
 
         img.onload = function(_) {
-            var image = decodeImageFromElement(img);
+            var image = decodeImageFromElement(img, pot);
             if (callback != null) {
                 Immediate.push(() -> {
                     callback(image);
@@ -219,6 +219,82 @@ class WebAssets extends BaseAssets {
         img.src = src;
 
         return null;
+
+    }
+
+    /** Return a padded array of bytes from raw image pixels */
+    public function paddedBytesFromPixels(width:Int, height:Int, widthPadded:Int, heightPadded:Int, source:Uint8Array):Uint8Array {
+
+        var tmpCanvas = js.Browser.document.createCanvasElement();
+
+        tmpCanvas.width = widthPadded;
+        tmpCanvas.height = heightPadded;
+
+        var tmpContext = tmpCanvas.getContext2d();
+        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height );
+
+        var imageBytes = null;
+        var pixels = new js.lib.Uint8ClampedArray(source.buffer);
+        var imgdata = tmpContext.createImageData(width, height);
+        imgdata.data.set(pixels);
+
+        try {
+
+            // Store the data in it first
+            tmpContext.putImageData(imgdata, 0, 0);
+            // Then bring out the full size
+            imageBytes = tmpContext.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+
+        }
+        catch (e:Dynamic) {
+
+            throw e;
+
+        }
+
+        // Cleanup
+        tmpCanvas = null;
+        tmpContext = null;
+        imgdata = null;
+
+        return Uint8Array.fromView(imageBytes.data);
+
+    }
+
+    /** Return a padded array of bytes from an image/canvas element. */
+    public function paddedBytesFromElement(width:Int, height:Int, widthPadded:Int, heightPadded:Int, source:js.html.ImageElement):Uint8Array {
+
+        var tmpCanvas = js.Browser.document.createCanvasElement();
+
+        tmpCanvas.width = widthPadded;
+        tmpCanvas.height = heightPadded;
+
+        var tmpContext = tmpCanvas.getContext2d();
+        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+        tmpContext.drawImage(source, 0, 0, width, height);
+
+        var imageBytes = null;
+
+        try {
+
+            imageBytes = tmpContext.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+
+        }
+        catch (e:Dynamic) {
+
+            var tips = '- textures served from file:/// throw security errors\n';
+                tips += '- textures served over http:// work for cross origin byte requests';
+
+            Log.info(tips);
+            throw e;
+
+        }
+
+        // Cleanup
+        tmpCanvas = null;
+        tmpContext = null;
+
+        return Uint8Array.fromView(imageBytes.data);
 
     }
 
@@ -258,82 +334,6 @@ class WebAssets extends BaseAssets {
         value++;
 
         return value;
-
-    }
-
-    /** Return a POT array of bytes from raw image pixels */
-    function potBytesFromPixels(width:Int, height:Int, widthPot:Int, heightPot:Int, source:Uint8Array):Uint8Array {
-
-        var tmpCanvas = js.Browser.document.createCanvasElement();
-
-        tmpCanvas.width = widthPot;
-        tmpCanvas.height = heightPot;
-
-        var tmpContext = tmpCanvas.getContext2d();
-        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height );
-
-        var imageBytes = null;
-        var pixels = new js.lib.Uint8ClampedArray(source.buffer);
-        var imgdata = tmpContext.createImageData(width, height);
-        imgdata.data.set(pixels);
-
-        try {
-
-            // Store the data in it first
-            tmpContext.putImageData(imgdata, 0, 0);
-            // Then bring out the full size
-            imageBytes = tmpContext.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-
-        }
-        catch (e:Dynamic) {
-
-            throw e;
-
-        }
-
-        // Cleanup
-        tmpCanvas = null;
-        tmpContext = null;
-        imgdata = null;
-
-        return Uint8Array.fromView(imageBytes.data);
-
-    }
-
-    /** Return a POT array of bytes from an image/canvas element */
-    function potBytesFromElement(width:Int, height:Int, widthPot:Int, heightPot:Int, source:js.html.ImageElement):Uint8Array {
-
-        var tmpCanvas = js.Browser.document.createCanvasElement();
-
-        tmpCanvas.width = widthPot;
-        tmpCanvas.height = heightPot;
-
-        var tmpContext = tmpCanvas.getContext2d();
-        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
-        tmpContext.drawImage(source, 0, 0, width, height);
-
-        var imageBytes = null;
-
-        try {
-
-            imageBytes = tmpContext.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-
-        }
-        catch (e:Dynamic) {
-
-            var tips = '- textures served from file:/// throw security errors\n';
-                tips += '- textures served over http:// work for cross origin byte requests';
-
-            Log.info(tips);
-            throw e;
-
-        }
-
-        // Cleanup
-        tmpCanvas = null;
-        tmpContext = null;
-
-        return Uint8Array.fromView(imageBytes.data);
 
     }
 
