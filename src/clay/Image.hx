@@ -23,28 +23,21 @@ class Image {
     public function premultiplyAlpha():Void {
 
         if (bitsPerPixel == 4) {
-            
-            var pixels = this.pixels;
-            var count = pixels.length;
-            var index = 0;
-    
-            while (index < count) {
-    
-                var r = pixels[index+0];
-                var g = pixels[index+1];
-                var b = pixels[index+2];
-                var a = pixels[index+3] / 255.0;
-    
-                pixels[index+0] = Std.int(r*a);
-                pixels[index+1] = Std.int(g*a);
-                pixels[index+2] = Std.int(b*a);
-    
-                index += 4;
-    
-            }
+            PremultiplyAlpha.premultiplyAlpha(pixels);
         }
         else {
             Log.warning('Can only premultiply alpha on images with 4 bits per pixels (RGBA)');
+        }
+
+    }
+
+    public function reversePremultiplyAlpha():Void {
+
+        if (bitsPerPixel == 4) {
+            PremultiplyAlpha.reversePremultiplyAlpha(pixels);
+        }
+        else {
+            Log.warning('Can only reverse premultiply alpha on images with 4 bits per pixels (RGBA)');
         }
 
     }
