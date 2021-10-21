@@ -222,6 +222,51 @@ class WebAssets extends BaseAssets {
 
     }
 
+    /** Return PNG data from the given pixels */
+    public function pixelsToPngData(width:Int, height:Int, pixels:Uint8Array, ?callback:(data:Uint8Array)->Void):Void {
+
+        var tmpCanvas = js.Browser.document.createCanvasElement();
+
+        tmpCanvas.width = width;
+        tmpCanvas.height = height;
+
+        var tmpContext = tmpCanvas.getContext2d();
+        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
+
+        var imageBytes = null;
+        var pixels = new js.lib.Uint8ClampedArray(pixels.buffer);
+        var imgdata = tmpContext.createImageData(width, height);
+        imgdata.data.set(pixels);
+
+        try {
+
+            // Store the data in it first
+            tmpContext.putImageData(imgdata, 0, 0);
+
+            // Extract png data
+            tmpCanvas.toBlob(function(blob:Dynamic) {
+                blob.arrayBuffer().then(function(buffer:js.lib.ArrayBuffer) {
+
+                    // Get final Uint8Array
+                    var pngData = clay.buffers.Uint8Array.fromBuffer(buffer, 0, buffer.byteLength);
+                    callback(pngData);
+
+                    // Cleanup
+                    tmpCanvas = null;
+                    tmpContext = null;
+                    imgdata = null;
+                });
+            }, 'image/png');
+
+        }
+        catch (e:Dynamic) {
+
+            throw e;
+
+        }
+
+    }
+
     /** Return a padded array of bytes from raw image pixels */
     public function paddedBytesFromPixels(width:Int, height:Int, widthPadded:Int, heightPadded:Int, source:Uint8Array):Uint8Array {
 
@@ -231,7 +276,7 @@ class WebAssets extends BaseAssets {
         tmpCanvas.height = heightPadded;
 
         var tmpContext = tmpCanvas.getContext2d();
-        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height );
+        tmpContext.clearRect(0, 0, tmpCanvas.width, tmpCanvas.height);
 
         var imageBytes = null;
         var pixels = new js.lib.Uint8ClampedArray(source.buffer);
