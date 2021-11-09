@@ -1,9 +1,8 @@
 package clay.sdl;
 
-import clay.opengl.GLGraphics;
 import clay.Config;
 import clay.Types;
-
+import clay.opengl.GLGraphics;
 import sdl.SDL;
 import timestamp.Timestamp;
 
@@ -95,7 +94,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         createWindow();
 
         Log.debug('SDL / ready');
-        
+
     }
 
     override function run():Bool {
@@ -448,7 +447,34 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Public API
 
+    #if android
+
+    var _didFetchAndroidDPI:Bool = false;
+
+    var _computedAndroidDensity:Float = 1.0;
+
+    #end
+
     override function windowDevicePixelRatio():Float {
+
+        #if android
+
+        if (!_didFetchAndroidDPI) {
+            _didFetchAndroidDPI = true;
+
+            var dpiInfo:Array<cpp.Float32> = [];
+            SDL.getDisplayDPI(0, dpiInfo);
+            var dpi:Float = dpiInfo[1];
+            var density = Math.round(dpi / 160);
+            if (density < 1) {
+                density = 1;
+            }
+            _computedAndroidDensity = density;
+        }
+
+        return _computedAndroidDensity;
+
+        #else
 
         _sdlSize = SDL.GL_GetDrawableSize(window, _sdlSize);
         var pixelHeight = _sdlSize.w;
@@ -457,6 +483,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         var deviceHeight = _sdlSize.w;
 
         return pixelHeight / deviceHeight;
+
+        #end
 
     }
 
@@ -482,7 +510,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     /**
      * Set window fullscreen (true or false)
-     * @param fullscreen 
+     * @param fullscreen
      * @return Bool `true` if the requested setting is accepted
      */
     public function setWindowFullscreen(fullscreen:Bool):Bool {
@@ -555,7 +583,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             if (app.config.runtime.autoSwap && !app.hasShutdown) {
 
                 #if !clay_native_no_tick_sleep
-        
+
                 #if mac
                 // Prevent the app from using 100% CPU for nothing because vsync
                 // Doesn't work properly on mojave
@@ -564,7 +592,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 #else
                 Sys.sleep(0);
                 #end
-        
+
                 #end
 
                 #if ios
@@ -580,7 +608,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
 
         }
-        
+
         if (app.config.runtime.uncaughtErrorHandler != null) {
             try {
                 _loop();
