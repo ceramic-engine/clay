@@ -400,12 +400,19 @@ class SDLRuntime extends clay.base.BaseRuntime {
         var size = SDL.GL_GetDrawableSize(window, { w: config.width, h: config.height });
         var pos = SDL.getWindowPosition(window, { x: config.x, y: config.y });
 
+        windowDpr = windowDevicePixelRatio();
+
         config.x = pos.x;
         config.y = pos.y;
+        windowW = size.w;
+        windowH = size.h;
+        #if android
+        windowW = Math.round(windowW / windowDpr);
+        windowH = Math.round(windowH / windowDpr);
+        #end
         config.width = windowW = size.w;
         config.height = windowH = size.h;
 
-        windowDpr = windowDevicePixelRatio();
         Log.debug('SDL / window / x=${config.x} y=${config.y} w=${config.width} h=${config.height} scale=$windowDpr');
 
         return config;
@@ -978,14 +985,26 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 case SDL_WINDOWEVENT_RESIZED:
                     type = RESIZED;
                     windowDpr = windowDevicePixelRatio();
-                    windowW = data1 = toPixels(data1);
-                    windowH = data2 = toPixels(data2);
+                    windowW = toPixels(data1);
+                    windowH = toPixels(data2);
+                    #if android
+                    windowW = Math.round(windowW / windowDpr);
+                    windowH = Math.round(windowH / windowDpr);
+                    #end
+                    data1 = windowW;
+                    data2 = windowH;
 
                 case SDL_WINDOWEVENT_SIZE_CHANGED:
                     type = SIZE_CHANGED;
                     windowDpr = windowDevicePixelRatio();
-                    windowW = data1 = toPixels(data1);
-                    windowH = data2 = toPixels(data2);
+                    windowW = toPixels(data1);
+                    windowH = toPixels(data2);
+                    #if android
+                    windowW = Math.round(windowW / windowDpr);
+                    windowH = Math.round(windowH / windowDpr);
+                    #end
+                    data1 = windowW;
+                    data2 = windowH;
 
                 case SDL_WINDOWEVENT_NONE:
 
