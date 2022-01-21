@@ -1,8 +1,8 @@
 package clay.web;
 
-import clay.opengl.GL;
 import clay.Config;
 import clay.Types;
+import clay.opengl.GL;
 
 typedef WindowHandle = js.html.CanvasElement;
 
@@ -36,7 +36,7 @@ class WebRuntime extends clay.base.BaseRuntime {
 
 /// Internal
 
-    /** The window x position. 
+    /** The window x position.
         Internal, set by update_window_bounds */
     var windowX:Int = 0;
 
@@ -56,6 +56,10 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var gamepadAxisCache:Array<Array<Float>>;
 
+    var pendingKeyUps:Array<Dynamic> = [];
+
+    var keyDownStates = new IntMap<Bool>();
+
 /// Lifecycle
 
     override function init() {
@@ -72,7 +76,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         createWindow();
 
         Log.debug('Web / ready');
-        
+
     }
 
     override function run():Bool {
@@ -106,6 +110,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (app.shouldUpdate(newTimestamp)) {
             app.emitTick(newTimestamp);
         }
+
+        clearPendingKeyUps();
 
         if (!app.shuttingDown) {
             js.Browser.window.requestAnimationFrame(loop);
@@ -149,7 +155,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             createRenderContextFailed();
             return;
         }
-        
+
         postRenderContext(window);
 
         setupEvents();
@@ -285,7 +291,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         window.addEventListener('contextmenu', handleContextMenu);
 
         var eventsWindow = app.config.runtime.mouseUseBrowserWindowEvents ? js.Browser.window : window;
-        
+
         eventsWindow.addEventListener('mousedown', handleMouseDown);
         eventsWindow.addEventListener('mouseup', handleMouseUp);
         eventsWindow.addEventListener('mousemove', handleMouseMove);
@@ -479,7 +485,7 @@ class WebRuntime extends clay.base.BaseRuntime {
                 touch.identifier,
                 timestamp()
             );
-        
+
         }
 
     }
@@ -556,6 +562,26 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    function clearPendingKeyUps() {
+
+        while (pendingKeyUps.length > 0) {
+            var info = pendingKeyUps.shift();
+
+            if (keyDownStates.get(info.keyCode) == true) {
+                keyDownStates.set(info.keyCode, false);
+                app.input.emitKeyUp(
+                    info.keyCode,
+                    info.scanCode,
+                    info.repeat,
+                    info.modState,
+                    timestamp(),
+                    info.windowId
+                );
+            }
+        }
+
+    }
+
     function handleKeyDown(ev:js.html.KeyboardEvent) {
 
         if (skipKeyboardEvents)
@@ -565,9 +591,29 @@ class WebRuntime extends clay.base.BaseRuntime {
         var scanCode = KeyCode.toScanCode(keyCode);
         var modState = modStateFromEvent(ev);
 
+        if (!modState.none) {
+            switch keyCode {
+                case LCTRL | RCTRL | LMETA | RMETA | LSHIFT | RSHIFT | LALT | RALT:
+                default:
+                    // On web (and apparently specifically on mac), keyUp events are not fired by
+                    // the browser if a modifier key is pressed. So in that case, we trigger a fake
+                    // keyUp event in the next frame of the keys pressed with a modifier key to
+                    // try to keep a consistent behaviour with other targets
+                    pendingKeyUps.push({
+                        keyCode: keyCode,
+                        scanCode: scanCode,
+                        repeat: ev.repeat,
+                        modState: modState,
+                        windowId: webWindowId
+                    });
+            }
+        }
+
         if (app.config.runtime.preventDefaultKeys.indexOf(keyCode) != -1) {
             ev.preventDefault();
         }
+
+        keyDownStates.set(keyCode, true);
 
         app.input.emitKeyDown(
             keyCode,
@@ -593,14 +639,17 @@ class WebRuntime extends clay.base.BaseRuntime {
             ev.preventDefault();
         }
 
-        app.input.emitKeyUp(
-            keyCode,
-            scanCode,
-            ev.repeat,
-            modState,
-            timestamp(),
-            webWindowId
-        );
+        if (keyDownStates.get(keyCode) == true) {
+            keyDownStates.set(keyCode, false);
+            app.input.emitKeyUp(
+                keyCode,
+                scanCode,
+                ev.repeat,
+                modState,
+                timestamp(),
+                webWindowId
+            );
+        }
 
     }
 
@@ -692,17 +741,17 @@ class WebRuntime extends clay.base.BaseRuntime {
         app.input.modState.shift   = keyEvent.shiftKey;
         app.input.modState.alt     = keyEvent.altKey;
         app.input.modState.meta    = keyEvent.metaKey;
-        
+
         return app.input.modState;
 
     }
 
 /// Window helpers
-    
+
     inline function getWindowX(bounds:js.html.DOMRect) {
         return Math.round(bounds.left + js.Browser.window.pageXOffset - js.Browser.document.body.clientTop);
     }
-    
+
     inline function getWindowY(bounds:js.html.DOMRect) {
         return Math.round(bounds.top + js.Browser.window.pageYOffset - js.Browser.document.body.clientLeft);
     }
@@ -820,7 +869,7 @@ class WebRuntime extends clay.base.BaseRuntime {
                     index++;
                     continue;
                 }
-                
+
                 initGamepadCacheIfNeeded(gamepad);
 
                 var axisCache = gamepadAxisCache[gamepad.index];
