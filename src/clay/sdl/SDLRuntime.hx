@@ -515,6 +515,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function getGamepadName(index:Int):String {
+
+        return SDL.gameControllerNameForIndex(index);
+
+    }
+
     /**
      * Set window fullscreen (true or false)
      * @param fullscreen

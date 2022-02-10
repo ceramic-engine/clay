@@ -962,6 +962,21 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function getGamepadName(index:Int):String {
+
+        var list = getGamepadList();
+        if (list != null) {
+            for (gamepad in list) {
+                if (gamepad != null && gamepad.index == index) {
+                    return gamepad.id;
+                }
+            }
+        }
+
+        return null;
+
+    }
+
 /// Helpers
 
     inline public static function timestamp():Float {
