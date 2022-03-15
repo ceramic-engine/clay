@@ -588,7 +588,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             return;
 
         var keyCode = convertKeyCode(ev.keyCode);
-        var scanCode = KeyCode.toScanCode(keyCode);
+        var scanCode = convertScanCode(ev.code, keyCode);
         var modState = modStateFromEvent(ev);
 
         if (!modState.none) {
@@ -632,7 +632,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             return;
 
         var keyCode = convertKeyCode(ev.keyCode);
-        var scanCode = KeyCode.toScanCode(keyCode);
+        var scanCode = convertScanCode(ev.code, keyCode);
         var modState = modStateFromEvent(ev);
 
         if (app.config.runtime.preventDefaultKeys.indexOf(keyCode) != -1) {
@@ -714,6 +714,154 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         // This will pass back the same value if unmapped
         return DOMKeys.domKeyToKeyCode(domKeyCode);
+
+    }
+
+    /** This taks a KeyboardEvent.code value and returns a clay ScanCode value */
+    function convertScanCode(rawCode:String, keyCode:KeyCode):ScanCode {
+
+        if (rawCode == null)
+            return KeyCode.toScanCode(keyCode);
+
+        return switch rawCode {
+            default: KeyCode.toScanCode(keyCode);
+            case 'Escape': ScanCode.ESCAPE;
+            case 'Digit1': ScanCode.KEY_1;
+            case 'Digit2': ScanCode.KEY_2;
+            case 'Digit3': ScanCode.KEY_3;
+            case 'Digit4': ScanCode.KEY_4;
+            case 'Digit5': ScanCode.KEY_5;
+            case 'Digit6': ScanCode.KEY_6;
+            case 'Digit7': ScanCode.KEY_7;
+            case 'Digit8': ScanCode.KEY_8;
+            case 'Digit9': ScanCode.KEY_9;
+            case 'Digit0': ScanCode.KEY_0;
+            case 'Minus': ScanCode.MINUS;
+            case 'Equal': ScanCode.EQUALS;
+            case 'Backspace': ScanCode.BACKSPACE;
+            case 'Tab': ScanCode.TAB;
+            case 'KeyA': ScanCode.KEY_A;
+            case 'KeyB': ScanCode.KEY_B;
+            case 'KeyC': ScanCode.KEY_C;
+            case 'KeyD': ScanCode.KEY_D;
+            case 'KeyE': ScanCode.KEY_E;
+            case 'KeyF': ScanCode.KEY_F;
+            case 'KeyG': ScanCode.KEY_G;
+            case 'KeyH': ScanCode.KEY_H;
+            case 'KeyI': ScanCode.KEY_I;
+            case 'KeyJ': ScanCode.KEY_J;
+            case 'KeyK': ScanCode.KEY_K;
+            case 'KeyL': ScanCode.KEY_L;
+            case 'KeyM': ScanCode.KEY_M;
+            case 'KeyN': ScanCode.KEY_N;
+            case 'KeyO': ScanCode.KEY_O;
+            case 'KeyP': ScanCode.KEY_P;
+            case 'KeyQ': ScanCode.KEY_Q;
+            case 'KeyR': ScanCode.KEY_R;
+            case 'KeyS': ScanCode.KEY_S;
+            case 'KeyT': ScanCode.KEY_T;
+            case 'KeyU': ScanCode.KEY_U;
+            case 'KeyV': ScanCode.KEY_V;
+            case 'KeyW': ScanCode.KEY_W;
+            case 'KeyX': ScanCode.KEY_X;
+            case 'KeyY': ScanCode.KEY_Y;
+            case 'KeyZ': ScanCode.KEY_Z;
+            case 'BracketLeft': ScanCode.LEFTBRACKET;
+            case 'BracketRight': ScanCode.RIGHTBRACKET;
+            case 'Enter': ScanCode.ENTER;
+            case 'ControlLeft': ScanCode.LCTRL;
+            case 'ControlRight': ScanCode.RCTRL;
+            case 'Semicolon': ScanCode.SEMICOLON;
+            case 'Quote': ScanCode.APOSTROPHE;
+            case 'Backquote': ScanCode.GRAVE;
+            case 'ShiftLeft': ScanCode.LSHIFT;
+            case 'ShiftRight': ScanCode.RSHIFT;
+            case 'Backslash': ScanCode.BACKSLASH;
+            case 'Comma': ScanCode.COMMA;
+            case 'Period': ScanCode.PERIOD;
+            case 'Slash': ScanCode.SLASH;
+            case 'AltLeft': ScanCode.LALT;
+            case 'AltRight': ScanCode.RALT;
+            case 'Space': ScanCode.SPACE;
+            case 'CapsLock': ScanCode.CAPSLOCK;
+            case 'F1': ScanCode.F1;
+            case 'F2': ScanCode.F2;
+            case 'F3': ScanCode.F3;
+            case 'F4': ScanCode.F4;
+            case 'F5': ScanCode.F5;
+            case 'F6': ScanCode.F6;
+            case 'F7': ScanCode.F7;
+            case 'F8': ScanCode.F8;
+            case 'F9': ScanCode.F9;
+            case 'F10': ScanCode.F10;
+            case 'F11': ScanCode.F11;
+            case 'F12': ScanCode.F12;
+            case 'Pause': ScanCode.PAUSE;
+            case 'ScrollLock': ScanCode.SCROLLLOCK;
+            case 'Numpad0': ScanCode.KP_0;
+            case 'Numpad1': ScanCode.KP_1;
+            case 'Numpad2': ScanCode.KP_2;
+            case 'Numpad3': ScanCode.KP_3;
+            case 'Numpad4': ScanCode.KP_4;
+            case 'Numpad5': ScanCode.KP_5;
+            case 'Numpad6': ScanCode.KP_6;
+            case 'Numpad7': ScanCode.KP_7;
+            case 'Numpad8': ScanCode.KP_8;
+            case 'Numpad9': ScanCode.KP_9;
+            case 'NumpadMultiply': ScanCode.KP_MULTIPLY;
+            case 'NumpadSubtract': ScanCode.KP_MINUS;
+            case 'NumpadAdd': ScanCode.KP_PLUS;
+            case 'NumpadDecimal': ScanCode.KP_DECIMAL;
+            case 'NumpadEqual': ScanCode.KP_EQUALS;
+            case 'NumpadComma': ScanCode.KP_COMMA;
+            case 'NumpadEnter': ScanCode.KP_ENTER;
+            case 'NumpadDivide': ScanCode.KP_DIVIDE;
+            case 'PrintScreen': ScanCode.PRINTSCREEN;
+            case 'IntlBackslash': ScanCode.NONUSBACKSLASH;
+            case 'Lang1' | 'KanaMode': ScanCode.LANG1;
+            case 'Lang2': ScanCode.LANG2;
+            case 'Lang3': ScanCode.LANG3;
+            case 'Lang4': ScanCode.LANG4;
+            case 'Lang5': ScanCode.LANG5;
+            case 'Lang6': ScanCode.LANG6;
+            case 'Lang7': ScanCode.LANG7;
+            case 'Lang8': ScanCode.LANG8;
+            case 'Lang9': ScanCode.LANG9;
+            case 'MediaTrackNext': ScanCode.AUDIONEXT;
+            case 'MediaTrackPrevious': ScanCode.AUDIOPREV;
+            case 'MediaPlayPause': ScanCode.AUDIOPLAY;
+            case 'MediaStop': ScanCode.AUDIOSTOP;
+            case 'AudioVolumeMute': ScanCode.AUDIOMUTE;
+            case 'LaunchApp1': ScanCode.APP1;
+            case 'LaunchApp2': ScanCode.APP2;
+            case 'VolumeDown' | 'AudioVolumeDown': ScanCode.VOLUMEDOWN;
+            case 'VolumeUp' | 'AudioVolumeUp': ScanCode.VOLUMEUP;
+            case 'NumLock': ScanCode.NUMLOCKCLEAR;
+            case 'Home': ScanCode.HOME;
+            case 'ArrowUp': ScanCode.UP;
+            case 'ArrowDown': ScanCode.DOWN;
+            case 'ArrowRight': ScanCode.RIGHT;
+            case 'ArrowLeft': ScanCode.LEFT;
+            case 'End': ScanCode.END;
+            case 'PageUp': ScanCode.PAGEUP;
+            case 'PageDown': ScanCode.PAGEDOWN;
+            case 'Insert' | 'Help': ScanCode.INSERT;
+            case 'Delete': ScanCode.DELETE;
+            case 'OSLeft' | 'MetaLeft': ScanCode.LMETA;
+            case 'OSRight' | 'MetaRight': ScanCode.RMETA;
+            case 'ContextMenu': ScanCode.MENU;
+            case 'Power': ScanCode.POWER;
+            case 'BrowserHome': ScanCode.AC_HOME;
+            case 'BrowserSearch': ScanCode.AC_SEARCH;
+            case 'BrowserFavorites': ScanCode.AC_BOOKMARKS;
+            case 'BrowserRefresh': ScanCode.AC_REFRESH;
+            case 'BrowserStop': ScanCode.AC_STOP;
+            case 'BrowserForward': ScanCode.AC_FORWARD;
+            case 'BrowserBack': ScanCode.AC_BACK;
+            case 'Cancel': ScanCode.CANCEL;
+            case 'LaunchMail': ScanCode.MAIL;
+            case 'MediaSelect': ScanCode.MEDIASELECT;
+        }
 
     }
 
