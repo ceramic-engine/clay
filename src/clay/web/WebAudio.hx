@@ -575,6 +575,11 @@ class WebAudio extends clay.base.BaseAudio {
             return;
         }
 
+        if (id == null)
+            throw 'id is null!';
+        if (bytes == null)
+            throw 'bytes is null!';
+
         context.decodeAudioData(bytes.buffer, function(buffer:js.html.audio.AudioBuffer) {
 
             var data = new WebAudioData(app, buffer, null, null, {
@@ -624,7 +629,16 @@ class WebAudio extends clay.base.BaseAudio {
 
         app.io.loadData(path, true, function(bytes) {
 
-            dataFromBytes(path, bytes, format, callback);
+            if (bytes != null) {
+                dataFromBytes(path, bytes, format, callback);
+            }
+            else {
+                if (callback != null) {
+                    Immediate.push(() -> {
+                        callback(null);
+                    });
+                }
+            }
 
         });
 
