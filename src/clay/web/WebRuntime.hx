@@ -595,17 +595,19 @@ class WebRuntime extends clay.base.BaseRuntime {
             switch keyCode {
                 case LCTRL | RCTRL | LMETA | RMETA | LSHIFT | RSHIFT | LALT | RALT:
                 default:
-                    // On web (and apparently specifically on mac), keyUp events are not fired by
-                    // the browser if a modifier key is pressed. So in that case, we trigger a fake
-                    // keyUp event in the next frame of the keys pressed with a modifier key to
-                    // try to keep a consistent behaviour with other targets
-                    pendingKeyUps.push({
-                        keyCode: keyCode,
-                        scanCode: scanCode,
-                        repeat: ev.repeat,
-                        modState: modState,
-                        windowId: webWindowId
-                    });
+                    if (modState.lctrl || modState.rctrl || modState.lalt || modState.ralt || modState.lmeta || modState.rmeta) {
+                        // On web (and apparently specifically on mac), keyUp events are not fired by
+                        // the browser if a modifier key is pressed. So in that case, we trigger a fake
+                        // keyUp event in the next frame of the keys pressed with a modifier key to
+                        // try to keep a consistent behaviour with other targets
+                        pendingKeyUps.push({
+                            keyCode: keyCode,
+                            scanCode: scanCode,
+                            repeat: ev.repeat,
+                            modState: modState,
+                            windowId: webWindowId
+                        });
+                    }
             }
         }
 
