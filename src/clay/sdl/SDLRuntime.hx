@@ -541,6 +541,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
 
         isSdlFullscreen = fullscreen;
+        app.config.window.fullscreen = fullscreen;
 
         if (fullscreen) {
             if (app.config.window.trueFullscreen) {
