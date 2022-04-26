@@ -1,9 +1,8 @@
 package clay;
 
+import clay.Types;
 import clay.audio.AudioEvent;
 import clay.audio.AudioHandle;
-
-import clay.Types;
 
 class Events {
 
@@ -46,6 +45,8 @@ class Events {
     public function gamepadDown(gamepad:Int, button:Int, value:Float, timestamp:Float) {}
 
     public function gamepadUp(gamepad:Int, button:Int, value:Float, timestamp:Float) {}
+
+    public function gamepadGyro(gamepad:Int, dx:Float, dy:Float, dz:Float, timestamp:Float) {}
 
     public function gamepadDevice(gamepad:Int, name:String, type:GamepadDeviceEventType, timestamp:Float) {}
 

@@ -14,7 +14,7 @@ class Input {
     function new(app:Clay) {
 
         this.app = app;
-        
+
         modState = new ModState();
         modState.none = true;
 
@@ -99,6 +99,12 @@ class Input {
     inline public function emitGamepadUp(gamepad:Int, button:Int, value:Float, timestamp:Float) {
 
         app.events.gamepadUp(gamepad, button, value, timestamp);
+
+    }
+
+    inline public function emitGamepadGyro(gamepad:Int, dx:Float, dy:Float, dz:Float, timestamp:Float) {
+
+        app.events.gamepadGyro(gamepad, dx, dy, dz, timestamp);
 
     }
 

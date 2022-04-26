@@ -160,6 +160,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / init controller');
         }
 
+        #if clay_sdl_init_sensor
+        // Init sensors
+        var status = SDL.initSubSystem(SDL_INIT_SENSOR);
+        if (status != 0) {
+            throw 'SDL / Failed to init sensor: ${SDL.getError()}';
+        }
+        else {
+            Log.debug('SDL / init sensor');
+        }
+        #end
+
         // Init joystick
         var status = SDL.initSubSystem(SDL_INIT_JOYSTICK);
         if (status == -1) {
@@ -876,6 +887,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 var _gamepad = SDL.gameControllerOpen(e.cdevice.which);
                 gamepads.set(e.cdevice.which, _gamepad);
 
+                #if !clay_no_gamepad_sensor
+                SDL.gameControllerSetSensorEnabled(_gamepad, SDL_SENSOR_GYRO, true);
+                #end
+
                 app.input.emitGamepadDevice(
                     e.cdevice.which,
                     SDL.gameControllerNameForIndex(e.cdevice.which),
@@ -903,6 +918,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     GamepadDeviceEventType.DEVICE_REMAPPED,
                     e.cdevice.timestamp / 1000.0
                 );
+
+            case SDL_CONTROLLERSENSORUPDATE:
+                if (e.csensor.sensor == SDL_SENSOR_GYRO) {
+                    var dx:Float = untyped __cpp__('(Float){0}[0]', e.csensor.data);
+                    var dy:Float = untyped __cpp__('(Float){0}[1]', e.csensor.data);
+                    var dz:Float = untyped __cpp__('(Float){0}[2]', e.csensor.data);
+                    app.input.emitGamepadGyro(
+                        e.csensor.which,
+                        dx, dy, dz,
+                        e.csensor.timestamp / 1000.0
+                    );
+                }
 
             case _:
 
