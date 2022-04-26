@@ -329,6 +329,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         var flags:SDLWindowFlags = 0;
 
+        #if clay_sdl_headless
+        flags |= SDL_WINDOW_HIDDEN;
+        #end
+
         flags |= SDL_WINDOW_OPENGL;
         flags |= SDL_WINDOW_ALLOW_HIGHDPI;
 
