@@ -230,7 +230,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             throw 'SDL / failed to init video: ${SDL.getError()}';
         }
         else {
-            Log.debug('SDL / init video');
+            Log.debug('SDL / init video (window)');
         }
 
         #if windows
