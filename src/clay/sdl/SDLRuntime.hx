@@ -68,6 +68,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /** Map of gamepad index to SDL gamepad instance */
     var gamepads:IntMap<sdl.GameController>;
 
+    /** Map to retrieve original index from gamepad instance ids */
+    var gamepadInstanceIds:IntMap<Int> = new IntMap();
+
     /** Map of joystick index to SDL joystick instance */
     var joysticks:IntMap<sdl.Joystick>;
 
@@ -532,7 +535,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     public function getGamepadName(index:Int):String {
 
-        return SDL.gameControllerNameForIndex(index);
+        var deviceIndex = gamepadInstanceIds.exists(index) ? gamepadInstanceIds.get(index) : index;
+        return SDL.gameControllerNameForIndex(deviceIndex);
 
     }
 
@@ -889,14 +893,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
             case SDL_CONTROLLERDEVICEADDED:
 
                 var _gamepad = SDL.gameControllerOpen(e.cdevice.which);
+                var instanceId = SDL.joystickInstanceID(SDL.gameControllerGetJoystick(_gamepad));
                 gamepads.set(e.cdevice.which, _gamepad);
+                gamepadInstanceIds.set(instanceId, e.cdevice.which);
 
                 #if !clay_no_gamepad_sensor
                 SDL.gameControllerSetSensorEnabled(_gamepad, SDL_SENSOR_GYRO, true);
                 #end
 
                 app.input.emitGamepadDevice(
-                    e.cdevice.which,
+                    instanceId,
                     SDL.gameControllerNameForIndex(e.cdevice.which),
                     GamepadDeviceEventType.DEVICE_ADDED,
                     e.cdevice.timestamp / 1000.0
@@ -908,17 +914,22 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 SDL.gameControllerClose(_gamepad);
                 gamepads.remove(e.cdevice.which);
 
+                var deviceIndex = gamepadInstanceIds.exists(e.cdevice.which) ? gamepadInstanceIds.get(e.cdevice.which) : e.cdevice.which;
+
                 app.input.emitGamepadDevice(
                     e.cdevice.which,
-                    SDL.gameControllerNameForIndex(e.cdevice.which),
+                    SDL.gameControllerNameForIndex(deviceIndex),
                     GamepadDeviceEventType.DEVICE_REMOVED,
                     e.cdevice.timestamp / 1000.0
                 );
 
             case SDL_CONTROLLERDEVICEREMAPPED:
+
+                var deviceIndex = gamepadInstanceIds.exists(e.cdevice.which) ? gamepadInstanceIds.get(e.cdevice.which) : e.cdevice.which;
+
                 app.input.emitGamepadDevice(
                     e.cdevice.which,
-                    SDL.gameControllerNameForIndex(e.cdevice.which),
+                    SDL.gameControllerNameForIndex(deviceIndex),
                     GamepadDeviceEventType.DEVICE_REMAPPED,
                     e.cdevice.timestamp / 1000.0
                 );
