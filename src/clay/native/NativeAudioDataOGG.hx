@@ -3,7 +3,6 @@ package clay.native;
 import clay.Types;
 import clay.audio.AudioData;
 import clay.buffers.Uint8Array;
-
 import ogg.Ogg;
 
 class NativeAudioDataOGG extends clay.audio.AudioData {
@@ -56,7 +55,7 @@ class NativeAudioDataOGG extends clay.audio.AudioData {
         var readLen = len;
 
         #if clay_debug_audio_verbose
-        Log.debug('Audio / OGG > requested ogg portion start $_start / len $_len');
+        Log.debug('Audio / OGG > requested ogg portion start $start / len $len');
         #end
 
         var st = Ogg.ov_time_tell(oggFile);

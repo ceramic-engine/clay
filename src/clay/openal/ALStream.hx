@@ -1,13 +1,12 @@
 package clay.openal;
 
 import clay.Types;
-import clay.audio.AudioSource;
-import clay.audio.AudioInstance;
 import clay.audio.AudioErrorReason;
+import clay.audio.AudioInstance;
+import clay.audio.AudioSource;
 import clay.buffers.Uint8Array;
-
-import clay.openal.OpenALAudio;
 import clay.openal.AL;
+import clay.openal.OpenALAudio;
 
 @:allow(clay.openal.OpenALAudio)
 class ALStream extends ALSound {
@@ -26,7 +25,7 @@ class ALStream extends ALSound {
     public function new(audio:OpenALAudio, source:AudioSource, instance:AudioInstance) {
 
         super(audio, source, instance);
-        
+
         duration = source.getDuration();
 
     }
@@ -101,7 +100,7 @@ class ALStream extends ALSound {
         instance.dataSeek(samples);
 
         #if clay_debug_audio_verbose
-        Log.debug('Audio / position $_time, seek to $_samples');
+        Log.debug('Audio / position $time, seek to $samples');
         #end
 
         // Make sure queue is refilled from the new position
@@ -192,7 +191,7 @@ class ALStream extends ALSound {
         return _dataGetResult;
 
     }
-    
+
 /// ALStream
 
     override function tick(delta:Float):Void {
@@ -206,7 +205,7 @@ class ALStream extends ALSound {
         var stillStreaming = true;
 
         #if clay_debug_audio_verbose
-        Log.debug('Audio / alsource:$alsource ${state_str()} ${position_of()}/$duration | ${source.seconds_to_bytes(position_of())}/${source.data.length} | ${buffers_left} ');
+        Log.debug('Audio / alsource:$alsource ${stateToString()} ${getPosition()}/$duration | ${source.secondsToBytes(getPosition())}/${source.data.length} | ${buffersLeft} ');
         #end
 
         var processedBuffers = AL.getSourcei(alsource, AL.BUFFERS_PROCESSED);
@@ -226,7 +225,7 @@ class ALStream extends ALSound {
             currentTime += source.bytesToSeconds(bufferSize);
 
             #if clay_debug_audio_verbose
-            Log.debug('Audio / buffer was done / ${_buffer} / size(${bufferSize}) / currentTime(${currentTime}) / pos(${position_of()})');
+            Log.debug('Audio / buffer was done / ${buffer} / size(${bufferSize}) / currentTime(${currentTime}) / pos(${getPosition()})');
             #end
 
             // Repopulate this empty buffer,
@@ -235,10 +234,10 @@ class ALStream extends ALSound {
             var dataState = fillBuffer(buffer);
             var dataAmount = dataState[0];
             var dataEnded = (dataState[1] == 1);
-            
+
             // If not looping, we shouldn't queue up the buffer again
             var skipQueue = (!looping && dataEnded);
-                
+
             // Make sure the time resets correctly when looping
             var timeIsAtEnd = (getPosition() >= duration);
             // If the time has run over, we reset the timer if looping
@@ -253,8 +252,8 @@ class ALStream extends ALSound {
             #end
 
             // If the data was complete,
-            // we reset the source data to 0, 
-            // and try get some more, otherwise 
+            // we reset the source data to 0,
+            // and try get some more, otherwise
             // we just wait for our queued buffers to run out
             if (dataEnded) {
 
@@ -263,7 +262,7 @@ class ALStream extends ALSound {
                     #if clay_debug_audio_verbose
                     Log.debug('Audio / data ended while looping, seek audio to 0');
                     #end
-                
+
                     instance.dataSeek(0);
 
                     // If looping, and we just reset the data source,
@@ -275,10 +274,10 @@ class ALStream extends ALSound {
                         #end
                         fillBuffer(buffer);
                     }
-                
+
                 }
                 else {
-                
+
                     buffersLeft--;
                     #if clay_debug_audio_verbose
                     Log.debug('Audio / running down buffers, one more down, ${buffersLeft} to go');
@@ -289,7 +288,7 @@ class ALStream extends ALSound {
                     else {
                         skipQueue = false;
                     }
-                
+
                 }
 
             }
