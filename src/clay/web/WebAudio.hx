@@ -23,9 +23,12 @@ private typedef WebSound = {
     gainNode: js.html.audio.GainNode,
     panNode: js.html.audio.PannerNode,
 
+    ignoreNextEnded: Int,
+
     state: AudioState,
     loop: Bool,
     pan: Float,
+    pitch: Float,
     timeResume: Float,
     timeResumeAppTime: Float,
     ?timePause: Float,
@@ -44,6 +47,9 @@ class WebAudio extends clay.base.BaseAudio {
     var instances:Map<AudioHandle, WebSound>;
     var buffers:Map<AudioSource, js.html.audio.AudioBuffer>;
 
+    var ignoreEndedSoundsTick0:Array<WebSound> = [];
+    var ignoreEndedSoundsTick1:Array<WebSound> = [];
+
     public var context(default, null):js.html.audio.AudioContext;
 
     public var active(default, null):Bool = false;
@@ -59,6 +65,46 @@ class WebAudio extends clay.base.BaseAudio {
     override function init() {
 
         initWebAudio();
+
+    }
+
+    override function tick(delta:Float) {
+
+        for (handle => sound in instances) {
+            if (sound.loop) {
+                switch sound.state {
+                    default:
+                    case PLAYING:
+                        var time = switch sound.state {
+                            case PLAYING: sound.timeResume + (app.timestamp - sound.timeResumeAppTime) * sound.pitch;
+                            default: 0.0;
+                        }
+                        var duration = sound.source.getDuration();
+                        if (duration > 0) {
+                            if (time >= duration) {
+                                emitAudioEvent(END, handle);
+                                while (time >= duration) {
+                                    time -= duration;
+                                    sound.timeResumeAppTime += duration / sound.pitch;
+                                }
+                            }
+                        }
+                }
+            }
+        }
+
+        // Just a way to ensure we don't ignore the
+        // next onended event on a sound
+        // for more than two ticks
+        while (ignoreEndedSoundsTick1.length > 0) {
+            var sound = ignoreEndedSoundsTick1.shift();
+            if (sound.ignoreNextEnded > 0)
+                sound.ignoreNextEnded--;
+        }
+        while (ignoreEndedSoundsTick0.length > 0) {
+            var sound = ignoreEndedSoundsTick0.shift();
+            ignoreEndedSoundsTick1.push(sound);
+        }
 
     }
 
@@ -116,12 +162,15 @@ class WebAudio extends clay.base.BaseAudio {
     function playBufferAgain(handle:AudioHandle, sound:WebSound, startTime:Float) {
 
         sound.bufferNode = playBuffer(cast sound.source.data);
+        sound.bufferNode.playbackRate.value = sound.pitch;
         sound.bufferNode.connect(sound.panNode);
         sound.bufferNode.loop = sound.loop;
         sound.panNode.connect(sound.gainNode);
         sound.gainNode.connect(context.destination);
         sound.bufferNode.start(0, startTime);
-        sound.bufferNode.onended = destroySound.bind(sound);
+        sound.bufferNode.onended = function() {
+            soundEnded(sound);
+        };
 
     }
 
@@ -173,6 +222,9 @@ class WebAudio extends clay.base.BaseAudio {
             state      : PLAYING,
             loop       : loop,
             pan        : 0,
+            pitch      : 1,
+
+            ignoreNextEnded : 0,
 
             timeResumeAppTime : app.timestamp,
             timeResume        : 0.0,
@@ -186,20 +238,17 @@ class WebAudio extends clay.base.BaseAudio {
 
         if (bufferNode != null) {
             bufferNode.start(0);
-            bufferNode.onended = destroySound.bind(sound);
+            bufferNode.onended = () -> {
+                soundEnded(sound);
+            };
         }
 
         if (data.mediaNode != null) {
-
             data.mediaElem.play();
-
-            // TODO looping audio element ended event
-            data.mediaNode.addEventListener('ended', function() {
-                emitAudioEvent(END, handle);
-                sound.state = STOPPED;
-            });
-
-        } //media node
+            data.mediaElem.onended = () -> {
+                soundEnded(sound);
+            };
+        }
 
     }
 
@@ -259,23 +308,14 @@ class WebAudio extends clay.base.BaseAudio {
 
         Log.debug('Audio / pause handle=$handle, ' + sound.source.data.id);
 
-        var timePause = sound.timeResume + app.timestamp - sound.timeResumeAppTime;
-        var duration = sound.source.getDuration();
-        if (duration > 0) {
-            if (sound.loop) {
-                timePause = timePause % duration;
-            }
-            else if (timePause > duration) {
-                timePause = duration;
-            }
-        }
+        var timePause = positionOf(handle);
         sound.timePause = timePause;
         sound.state = PAUSED;
 
         if (sound.bufferNode != null) {
             stopBuffer(sound);
         }
-        else if(sound.mediaNode != null) {
+        else if (sound.mediaNode != null) {
             sound.mediaElem.pause();
         }
 
@@ -303,11 +343,29 @@ class WebAudio extends clay.base.BaseAudio {
 
     }
 
+    function soundEnded(sound:WebSound) {
+
+        if (sound.ignoreNextEnded > 0) {
+            sound.ignoreNextEnded--;
+            return;
+        }
+        if (sound.state != PAUSED && (sound.state != PLAYING || positionOf(sound.handle) + 0.1 >= sound.source.getDuration())) {
+            destroySound(sound);
+        }
+
+    }
+
     function destroySound(sound:WebSound) {
+
+        if (positionOf(sound.handle) + 0.1 >= sound.source.getDuration()) {
+            emitAudioEvent(END, sound.handle);
+        }
 
         if (sound.bufferNode != null) {
             sound.bufferNode.stop();
             sound.bufferNode.disconnect();
+            sound.gainNode.disconnect();
+            sound.panNode.disconnect();
             sound.bufferNode = null;
         }
 
@@ -330,6 +388,7 @@ class WebAudio extends clay.base.BaseAudio {
         }
 
         instances.remove(sound.handle);
+        emitAudioEvent(DESTROYED, sound.handle);
         sound = null;
 
     }
@@ -383,11 +442,20 @@ class WebAudio extends clay.base.BaseAudio {
 
         Log.debug('Audio / pitch=$pitch handle=$handle, ' + sound.source.data.id);
 
+        if (sound.mediaNode == null) {
+            var position = positionOf(handle);
+            sound.pitch = pitch;
+            if (sound.state == PLAYING) {
+                // Adjust timeResumeAppTime so that it matches the new pitch
+                sound.timeResumeAppTime = sound.timeResume + app.timestamp - (position / sound.pitch);
+            }
+        }
+
         if (sound.bufferNode != null) {
             sound.bufferNode.playbackRate.value = pitch;
         }
         else if (sound.mediaNode != null) {
-            sound.mediaElem.playbackRate = pitch;
+            // Pitch not supported on streamed sounds
         }
 
     }
@@ -399,16 +467,25 @@ class WebAudio extends clay.base.BaseAudio {
 
         Log.debug('Audio / position=$time handle=$handle, ' + sound.source.data.id);
 
-        if (sound.bufferNode != null) {
-            stopBuffer(sound);
-            playBufferAgain(handle, sound, time);
+        if (sound.state == PAUSED) {
+            sound.timePause = time;
         }
         else {
-            sound.mediaElem.currentTime = time;
+            sound.timeResume = time;
+            sound.timeResumeAppTime = app.timestamp;
+
+            if (sound.bufferNode != null) {
+                sound.ignoreNextEnded++;
+                ignoreEndedSoundsTick0.push(sound);
+                stopBuffer(sound);
+                playBufferAgain(handle, sound, time);
+            }
+            else {
+                sound.mediaElem.currentTime = time;
+            }
         }
 
     }
-
 
     public function volumeOf(handle:AudioHandle):Float {
 
@@ -433,16 +510,7 @@ class WebAudio extends clay.base.BaseAudio {
         var sound = soundOf(handle);
         if (sound == null) return 0.0;
 
-        var result = 1.0;
-
-        if (sound.bufferNode != null) {
-            result = sound.bufferNode.playbackRate.value;
-        }
-        else if (sound.mediaNode != null) {
-            result = sound.mediaElem.playbackRate;
-        }
-
-        return result;
+        return sound.pitch;
 
     }
 
@@ -451,14 +519,14 @@ class WebAudio extends clay.base.BaseAudio {
         var sound = soundOf(handle);
         if (sound == null) return 0.0;
 
-        if (sound.bufferNode != null) {
+        if (sound.mediaElem == null) {
             switch sound.state {
                 case INVALID | STOPPED:
                     return 0.0;
                 case PLAYING | PAUSED:
                     var time = switch sound.state {
                         case PAUSED: sound.timePause;
-                        case PLAYING: sound.timeResume + (app.timestamp - sound.timeResumeAppTime);
+                        case PLAYING: sound.timeResume + (app.timestamp - sound.timeResumeAppTime) * sound.pitch;
                         default: 0.0;
                     }
                     var duration = sound.source.getDuration();
@@ -542,7 +610,6 @@ class WebAudio extends clay.base.BaseAudio {
         if (path == null)
             throw 'path is null!';
 
-
         if (!active) {
             Log.error('Audio / WebAudio context unavailable');
             if (callback != null) {
@@ -589,6 +656,7 @@ class WebAudio extends clay.base.BaseAudio {
                 samples    : null,
                 length     : buffer.length,
                 channels   : buffer.numberOfChannels,
+                duration   : buffer.duration,
                 rate       : Std.int(buffer.sampleRate)
             });
 
@@ -691,7 +759,8 @@ class WebAudio extends clay.base.BaseAudio {
                 samples    : null,
                 length     : length,
                 channels   : channels,
-                rate       : rate
+                rate       : rate,
+                duration   : element.duration
             });
 
             if (callback != null) {

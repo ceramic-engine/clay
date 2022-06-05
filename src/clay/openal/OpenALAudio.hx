@@ -86,7 +86,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
     }
 
-    inline function tickAudioHandle(delta:Float, handle:AudioHandle):Void {
+    #if !clay_debug inline #end function tickAudioHandle(delta:Float, handle:AudioHandle):Void {
 
         var sound:ALSound = instances.get(handle);
         if (sound != null) {
@@ -95,9 +95,12 @@ class OpenALAudio extends clay.native.NativeAudio {
             var didEmitEnd = false;
 
             // TODO seems this code should be in the instance probably
+
+            var previousTime = sound.currentTime;
+            sound.currentTime = positionOf(handle);
+
             if (sound.looping && !sound.source.data.isStream) {
-                if (sound.currentTime >= sound.source.getDuration()) {
-                    sound.currentTime = 0.0;
+                if (previousTime > sound.currentTime && previousTime + 0.1 >= sound.source.getDuration()) {
                     emitAudioEvent(END, handle);
                     didEmitEnd = true;
                 }
@@ -108,8 +111,9 @@ class OpenALAudio extends clay.native.NativeAudio {
                 if (!didEmitEnd)
                     emitAudioEvent(END, handle);
 
-                if (!sound.instance.destroyed)
+                if (!sound.instance.destroyed) {
                     sound.instance.destroy();
+                }
             }
         }
 
@@ -127,6 +131,8 @@ class OpenALAudio extends clay.native.NativeAudio {
         var removed = buffers.remove(source.sourceId);
         Log.debug('Audio / source being destroyed / ${source.data.id} / buffer $buffer / removed? $removed');
 
+        emitAudioEvent(DESTROYED_SOURCE, null);
+
     }
 
     function handleInstanceDestroyed(handle:AudioHandle):Void {
@@ -142,6 +148,8 @@ class OpenALAudio extends clay.native.NativeAudio {
         }
 
         instances.remove(handle);
+
+        emitAudioEvent(DESTROYED, handle);
 
     }
 
@@ -426,6 +434,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         Log.debug('Audio / position=$time handle=$handle, ' + sound.source.data.id);
 
+        sound.currentTime = time;
         sound.setPosition(time);
 
     }
@@ -518,7 +527,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         var err = AL.getError();
 
-        if (err != AL.NO_ERROR) {
+        if (err != AL.NO_ERROR && !Clay.app.shuttingDown) {
             if (err != -1) {
                 var s = 'Audio / $err / $reason: failed with ' + ALError.desc(err);
                 #if clay_no_openal_error_throw

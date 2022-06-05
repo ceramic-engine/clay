@@ -8,6 +8,7 @@ class AudioDataOptions {
     public var id:String = null;
     public var rate:Null<Int> = null;
     public var length:Null<Int> = null;
+    public var duration:Null<Float> = null;
     public var channels:Null<Int> = null;
     public var bitsPerSample:Null<Int> = null;
     public var format:AudioFormat = null;
@@ -38,6 +39,9 @@ class AudioData {
 
     /** The PCM length in samples */
     public var length:Int = 0;
+
+    /** The duration in seconds of the PCM buffer */
+    public var duration:Float = 0;
 
     /** The number of channels for this data */
     public var channels:Int = 1;
@@ -82,6 +86,9 @@ class AudioData {
         if (options.samples != null)
             this.samples = options.samples;
 
+        if (options.duration != null)
+            this.duration = options.duration;
+
         options = null;
 
     }
@@ -96,9 +103,9 @@ class AudioData {
         destroyed = true;
 
         id = null;
-        #if clay_native 
+        #if clay_native
         if (samples != null) {
-            samples.buffer = null; 
+            samples.buffer = null;
         }
         #end
         samples = null;

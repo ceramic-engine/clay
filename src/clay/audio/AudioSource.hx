@@ -35,6 +35,10 @@ class AudioSource {
 
         instances = [];
 
+        if (data.duration <= 0) {
+            data.duration = bytesToSeconds(data.length);
+        }
+
     }
 
     /** Called by the audio system to obtain a new instance of this source. */
@@ -52,7 +56,6 @@ class AudioSource {
 
     /** A helper for converting bytes to seconds for a sound source */
     public function bytesToSeconds(bytes:Int):Float {
-
         var word = data.bitsPerSample == 16 ? 2 : 1;
         var sampleFrames = (data.rate * data.channels * word);
 
@@ -72,7 +75,7 @@ class AudioSource {
 
     public function getDuration():Float {
 
-        return bytesToSeconds(data.length);
+        return data.duration;
 
     }
 

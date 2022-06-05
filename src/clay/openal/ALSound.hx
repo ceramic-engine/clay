@@ -1,9 +1,9 @@
 package clay.openal;
 
 import clay.Types;
+import clay.audio.AudioErrorReason;
 import clay.audio.AudioInstance;
 import clay.audio.AudioSource;
-import clay.audio.AudioErrorReason;
 import clay.openal.AL;
 import clay.openal.OpenALAudio;
 
@@ -25,7 +25,7 @@ class ALSound {
     var currentTime:Float = 0.0;
 
     public function new(audio:OpenALAudio, source:AudioSource, instance:AudioInstance) {
-                
+
         this.audio = audio;
         this.source = source;
         this.instance = instance;
@@ -48,7 +48,7 @@ class ALSound {
             Log.debug('Audio / new buffer ${data.id} / format ${alformat} / buffer $buffer');
 
             if (data.samples != null) {
-                AL.bufferData(buffer, alformat, data.rate, data.samples.buffer, data.samples.byteOffset, data.samples.byteLength); 
+                AL.bufferData(buffer, alformat, data.rate, data.samples.buffer, data.samples.byteOffset, data.samples.byteLength);
             } else {
                 buffer = AL.NONE;
                 Log.debug('Audio / new buffer ${data.id} / created with AL.NONE buffer!');
@@ -74,13 +74,13 @@ class ALSound {
     }
 
     function setPosition(time:Float) {
-    
+
         AL.sourcef(alsource, AL.SEC_OFFSET, time);
-    
+
     }
 
     function getPosition() {
-        
+
         return AL.getSourcef(alsource, AL.SEC_OFFSET);
 
     }
@@ -108,10 +108,8 @@ class ALSound {
     }
 
     public function tick(delta:Float):Void {
-        
-        // instance.tick(); (not needed, there is nothing to do in instance.tick())
 
-        currentTime += delta;
+        //
 
     }
 
