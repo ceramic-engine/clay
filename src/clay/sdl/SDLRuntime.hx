@@ -535,15 +535,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     inline function clamp(n:Float) return Math.max(0, Math.min(n, 1));
 
-    public function startGamepadRumble(gamepadId:Int, leftAmount:Float, rightAmount:Float, duration: Float) {
+    public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration: Float) {
 
         var _gamepad = gamepads.get(gamepadId);
         if (!SDL.gameControllerHasRumble(_gamepad)) return;
 
-        var left = Std.int(0xffff * clamp(leftAmount));
-        var right = Std.int(0xffff * clamp(rightAmount));
+        var low = Std.int(0xffff * clamp(lowFrequency));
+        var high = Std.int(0xffff * clamp(highFrequency));
 
-        SDL.gameControllerRumble(_gamepad, left, right, Std.int(duration * 1000));
+        SDL.gameControllerRumble(_gamepad, low, high, Std.int(duration * 1000));
 
     }
 
