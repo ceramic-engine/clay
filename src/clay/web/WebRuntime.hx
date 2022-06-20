@@ -1122,7 +1122,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (vibrationActuator == null) return;
 
         var clamp = (In: Float) -> Math.max(0, Math.min(In, 1));
-        vibrationActuator.playEffect('vibration', {
+        vibrationActuator.playEffect('dual-rumble', {
             duration: durationMs,
             weakMagnitude: clamp(leftAmount),
             strongMagnitude: clamp(rightAmount),
@@ -1138,7 +1138,7 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         var vibrationActuator = untyped gamepad.vibrationActuator;
         if (vibrationActuator == null) return;
-        vibrationActuator.playEffect('vibration', {
+        vibrationActuator.playEffect('dual-rumble', {
             duration: 1,
             weakMagnitude: 0,
             strongMagnitude: 0,
