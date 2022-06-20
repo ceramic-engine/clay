@@ -1112,7 +1112,9 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
-    public function startGamepadRumble(gamepadId:Int, leftAmount:Float, rightAmount:Float, durationMs:Int) {
+    inline function clamp(n:Float) return Math.max(0, Math.min(n, 1));
+
+    public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration:Float) {
 
         var list = getGamepadList();
         var gamepad = list[gamepadId];
@@ -1121,11 +1123,10 @@ class WebRuntime extends clay.base.BaseRuntime {
         var vibrationActuator = untyped gamepad.vibrationActuator;
         if (vibrationActuator == null) return;
 
-        var clamp = (In: Float) -> Math.max(0, Math.min(In, 1));
         vibrationActuator.playEffect('dual-rumble', {
-            duration: durationMs,
-            weakMagnitude: clamp(leftAmount),
-            strongMagnitude: clamp(rightAmount),
+            duration: duration * 1000,
+            weakMagnitude: clamp(lowFrequency),
+            strongMagnitude: clamp(highFrequency),
         });
 
     }
