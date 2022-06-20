@@ -533,6 +533,29 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function startGamepadRumble(gamepadId:Int, leftAmount:Float, rightAmount:Float, durationMs:Int) {
+
+        var _gamepad = gamepads.get(gamepadId);
+        if (!SDL.gameControllerHasRumble(_gamepad)) return;
+
+        trace(durationMs);
+
+        var clamp = (In: Float) -> Math.max(0, Math.min(In, 1));
+        var left = Std.int(0xffff * clamp(leftAmount));
+        var right = Std.int(0xffff * clamp(rightAmount));
+
+        SDL.gameControllerRumble(_gamepad, left, right, durationMs);
+
+    }
+
+    public function stopGamepadRumble(gamepadId:Int) {
+
+        var _gamepad = gamepads.get(gamepadId);
+        if (!SDL.gameControllerHasRumble(_gamepad)) return;
+        SDL.gameControllerRumble(_gamepad, 0, 0, 1);
+
+    }
+
     public function getGamepadName(index:Int):String {
 
         var deviceIndex = gamepadInstanceIds.exists(index) ? gamepadInstanceIds.get(index) : index;
