@@ -1112,6 +1112,41 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    inline function clamp(n:Float) return Math.max(0, Math.min(n, 1));
+
+    public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration:Float) {
+
+        var list = getGamepadList();
+        var gamepad = list[gamepadId];
+        if (gamepad == null) return;
+
+        var vibrationActuator = untyped gamepad.vibrationActuator;
+        if (vibrationActuator == null) return;
+
+        vibrationActuator.playEffect('dual-rumble', {
+            duration: duration * 1000,
+            weakMagnitude: clamp(lowFrequency),
+            strongMagnitude: clamp(highFrequency),
+        });
+
+    }
+
+    public function stopGamepadRumble(gamepadId:Int) {
+
+        var list = getGamepadList();
+        var gamepad = list[gamepadId];
+        if (gamepad == null) return;
+
+        var vibrationActuator = untyped gamepad.vibrationActuator;
+        if (vibrationActuator == null) return;
+        vibrationActuator.playEffect('dual-rumble', {
+            duration: 1,
+            weakMagnitude: 0,
+            strongMagnitude: 0,
+        });
+
+    }
+
     public function getGamepadName(index:Int):String {
 
         var list = getGamepadList();
