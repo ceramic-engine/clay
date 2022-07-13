@@ -154,6 +154,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / init video');
         }
 
+        // Init audio
+        var status = SDL.initSubSystem(SDL_INIT_AUDIO);
+        if (status == -1) {
+            Log.warning('SDL / Failed to init audio: ${SDL.getError()}');
+        }
+        else {
+            Log.debug('SDL / init audio');
+        }
+
         // Init controllers
         var status = SDL.initSubSystem(SDL_INIT_GAMECONTROLLER);
         if (status == -1) {
