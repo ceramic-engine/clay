@@ -357,7 +357,7 @@ class WebAudio extends clay.base.BaseAudio {
 
     function destroySound(sound:WebSound) {
 
-        if (positionOf(sound.handle) + 0.1 >= sound.source.getDuration()) {
+        if (sound.source != null && instances.exists(sound.handle) && positionOf(sound.handle) + 0.1 >= sound.source.getDuration()) {
             emitAudioEvent(END, sound.handle);
         }
 
@@ -387,8 +387,10 @@ class WebAudio extends clay.base.BaseAudio {
             sound.panNode = null;
         }
 
-        instances.remove(sound.handle);
-        emitAudioEvent(DESTROYED, sound.handle);
+        if (instances.exists(sound.handle)) {
+            instances.remove(sound.handle);
+            emitAudioEvent(DESTROYED, sound.handle);
+        }
         sound = null;
 
     }
@@ -398,7 +400,8 @@ class WebAudio extends clay.base.BaseAudio {
         var sound = soundOf(handle);
         if (sound == null) return;
 
-        Log.debug('Audio / stop handle=$handle, ' + sound.source.data.id);
+        if (sound.state != STOPPED)
+            Log.debug('Audio / stop handle=$handle' + (sound.source != null && sound.source.data != null ? ', '+sound.source.data.id : ''));
 
         destroySound(sound);
 
@@ -687,7 +690,7 @@ class WebAudio extends clay.base.BaseAudio {
 
     function handleInstanceDestroyed(handle:AudioHandle):Void {
 
-        //
+        stop(handle);
 
     }
 
