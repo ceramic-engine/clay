@@ -8,6 +8,8 @@ enum abstract AudioFormat(Null<Int>) from Null<Int> to Null<Int> {
     var OGG      = 2;
     var WAV      = 3;
     var PCM      = 4;
+    var MP3      = 5;
+    var FLAC     = 6;
 
     inline function toString() {
         return switch(this) {
@@ -16,6 +18,8 @@ enum abstract AudioFormat(Null<Int>) from Null<Int> to Null<Int> {
             case OGG:       'OGG';
             case WAV:       'WAV';
             case PCM:       'PCM';
+            case MP3:       'MP3';
+            case FLAC:      'FLAC';
             case _:         '$this';
         }
     }
@@ -32,6 +36,8 @@ enum abstract AudioFormat(Null<Int>) from Null<Int> to Null<Int> {
             case 'wav': WAV;
             case 'ogg': OGG;
             case 'pcm': PCM;
+            case 'mp3': MP3;
+            case 'flac': FLAC;
             case _:     UNKNOWN;
         }
 

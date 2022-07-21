@@ -468,7 +468,7 @@ class OpenALAudio extends clay.native.NativeAudio {
     public function pitchOf(handle:AudioHandle):Float {
 
         var sound = soundOf(handle);
-        if (sound == null) return 0.0;
+        if (sound == null) return 1.0;
 
         return AL.getSourcef(sound.alsource, AL.PITCH);
 

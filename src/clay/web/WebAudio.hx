@@ -268,6 +268,10 @@ class WebAudio extends clay.base.BaseAudio {
 
         handleSeq++;
 
+        if (paused) {
+            pause(handle);
+        }
+
         return handle;
 
     }
@@ -288,6 +292,10 @@ class WebAudio extends clay.base.BaseAudio {
 
         handleSeq++;
 
+        if (paused) {
+            pause(handle);
+        }
+
         return handle;
 
     }
@@ -304,6 +312,8 @@ class WebAudio extends clay.base.BaseAudio {
 
         var sound = soundOf(handle);
         if (sound == null)
+            return;
+        if (sound.state != PLAYING)
             return;
 
         Log.debug('Audio / pause handle=$handle, ' + sound.source.data.id);
@@ -324,8 +334,10 @@ class WebAudio extends clay.base.BaseAudio {
     public function unPause(handle:AudioHandle):Void {
 
         var sound = soundOf(handle);
-        if (sound == null) return;
-        if (sound.state != PAUSED) return;
+        if (sound == null)
+            return;
+        if (sound.state != PAUSED)
+            return;
 
         Log.debug('Audio / unpause handle=$handle, ' + sound.source.data.id);
 
@@ -408,7 +420,6 @@ class WebAudio extends clay.base.BaseAudio {
         sound.state = STOPPED;
 
     }
-
 
     public function volume(handle:AudioHandle, volume:Float):Void {
 
@@ -511,7 +522,7 @@ class WebAudio extends clay.base.BaseAudio {
     public function pitchOf(handle:AudioHandle):Float {
 
         var sound = soundOf(handle);
-        if (sound == null) return 0.0;
+        if (sound == null) return 1.0;
 
         return sound.pitch;
 
