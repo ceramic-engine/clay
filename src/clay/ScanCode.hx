@@ -1,5 +1,13 @@
 package clay;
 
+#if (cpp && windows)
+@:headerCode('
+// Needed otherwise windows build fails :(
+// But why?
+#undef DELETE
+#undef OUT
+')
+#end
 enum abstract ScanCode(Int) from Int to Int {
 
     /** Convert a scanCode to a readable name */
