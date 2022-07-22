@@ -10,7 +10,6 @@
     "contributors": ["jeremyfa"],
     "dependencies": {
       "linc_ogg": "git:https://github.com/ceramic-engine/linc_ogg.git",
-      "linc_openal": "git:https://github.com/ceramic-engine/linc_openal.git",
       "linc_opengl": "git:https://github.com/ceramic-engine/linc_opengl.git",
       "linc_sdl": "git:https://github.com/ceramic-engine/linc_sdl.git",
       "linc_stb": "git:https://github.com/ceramic-engine/linc_stb.git",
