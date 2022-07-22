@@ -3,7 +3,9 @@ package clay.sdl;
 import clay.Config;
 import clay.Types;
 import clay.opengl.GLGraphics;
+import haxe.io.Path;
 import sdl.SDL;
+import sys.FileSystem;
 import timestamp.Timestamp;
 
 #if clay_use_glew
@@ -89,6 +91,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         initSDL();
         initCwd();
+
+        #if android
+        cleanupExtractedDirectory();
+        #end
 
     }
 
@@ -476,6 +482,20 @@ class SDLRuntime extends clay.base.BaseRuntime {
         return render;
 
     }
+
+    #if android
+
+    function cleanupExtractedDirectory() {
+
+        var extractedPathDir = Path.join([app.io.appPathPrefs(), 'clay', 'extracted']);
+        if (FileSystem.exists(extractedPathDir)) {
+            Log.debug('Android / cleanup extracted directory');
+            Files.deleteRecursive(extractedPathDir);
+        }
+
+    }
+
+    #end
 
     static var _sdlSize:SDLSize = { w:0, h:0 };
 
