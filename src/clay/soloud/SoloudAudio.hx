@@ -10,9 +10,14 @@ import clay.audio.AudioInstance;
 import clay.audio.AudioSource;
 import clay.audio.AudioState;
 import clay.buffers.Uint8Array;
+import haxe.io.Path;
 import soloud.Soloud;
 import soloud.Wav;
 import soloud.WavStream;
+import sys.FileSystem;
+import sys.io.File;
+
+using StringTools;
 
 @:allow(clay.audio.AudioInstance)
 @:allow(clay.audio.AudioSource)
@@ -326,9 +331,9 @@ class SoloudAudio extends clay.base.BaseAudio {
             } else {
                 sound.soloudHandle = soloud.play(data.wav, sound.volume * VOLUME_FACTOR, sound.pan, false);
             }
-            //soloud.setLooping(sound.soloudHandle, sound.loop);
+            soloud.setLooping(sound.soloudHandle, sound.loop);
             soloud.seek(sound.soloudHandle, time);
-            //soloud.setRelativePlaySpeed(sound.soloudHandle, sound.pitch);
+            soloud.setRelativePlaySpeed(sound.soloudHandle, sound.pitch);
         }
 
     }
@@ -522,7 +527,39 @@ class SoloudAudio extends clay.base.BaseAudio {
 
         if (isStream) {
             wavStream = WavStream.create();
-            wavStream.load(path);
+
+            #if android
+            var result;
+            if (path.startsWith('assets/')) {
+                // On android, soloud is not capable of directly reading the assets folder files,
+                // so we first extract the asset file to a place exploitable by soloud and use that.
+                var extractedPath = Path.join([app.io.appPathPrefs(), 'clay', 'extracted', path]);
+                var extractedPathDir = Path.directory(extractedPath);
+                if (FileSystem.exists(extractedPathDir) && !FileSystem.isDirectory(extractedPathDir)) {
+                    FileSystem.deleteFile(extractedPathDir);
+                }
+                if (!FileSystem.exists(extractedPathDir)) {
+                    FileSystem.createDirectory(extractedPathDir);
+                }
+                if (!FileSystem.exists(extractedPath)) {
+                    var bytes = app.io.loadData(path, true);
+                    File.saveBytes(extractedPath, bytes.toBytes());
+                }
+                result = wavStream.load(extractedPath);
+            }
+            else {
+                result = wavStream.load(path);
+            }
+            #else
+            var result = wavStream.load(path);
+            #end
+
+            if (result != 0) {
+                var error:SoloudErrors = result;
+                Log.error('audio stream error $error at path $path');
+                wavStream.destroy();
+                return null;
+            }
 
             length = wavStream.mSampleCount;
             duration = wavStream.getLength();
@@ -531,7 +568,28 @@ class SoloudAudio extends clay.base.BaseAudio {
         }
         else {
             wav = Wav.create();
-            wav.load(path);
+
+            #if android
+            var result;
+            if (path.startsWith('assets/')) {
+                // On android, soloud is not capable of directly reading the assets folder files,
+                // so we first read the file via clay/sdl and give soloud the raw data directly
+                var bytes = app.io.loadData(path, true);
+                result = wav.loadMem(untyped __cpp__('(unsigned char*)&{0}[0]', bytes.buffer), bytes.length);
+            }
+            else {
+                result = wav.load(path);
+            }
+            #else
+            var result = wav.load(path);
+            #end
+
+            if (result != 0) {
+                var error:SoloudErrors = result;
+                Log.error('audio error $error at path $path');
+                wav.destroy();
+                return null;
+            }
 
             length = wav.mSampleCount;
             duration = wav.getLength();
