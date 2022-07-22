@@ -24,6 +24,8 @@ class ALSound {
 
     var currentTime:Float = 0.0;
 
+    var isStreamLoopSound:Bool = false;
+
     public function new(audio:OpenALAudio, source:AudioSource, instance:AudioInstance) {
 
         this.audio = audio;
