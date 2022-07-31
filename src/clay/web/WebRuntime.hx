@@ -25,6 +25,11 @@ class WebRuntime extends clay.base.BaseRuntime {
     public var window:WindowHandle;
 
     /**
+     * The actual webgl version being used by the runtime
+     */
+    public var webglVersion(default, null):Float = 1.0;
+
+    /**
      * For advanced usage: disable handling of mouse events
      */
     public var skipMouseEvents:Bool = false;
@@ -175,11 +180,15 @@ class WebRuntime extends clay.base.BaseRuntime {
             if (gl == null) {
                 gl = window.getContext('experimental-webgl${config.webgl.version}', attr);
             }
+            if (gl != null) {
+                webglVersion = config.webgl.version;
+            }
         }
 
         // Minimum requirement: webgl 1 (if nothing else worked)
         if (gl == null) {
             gl = window.getContextWebGL(attr);
+            webglVersion = 1.0;
         }
 
         clay.opengl.GL.gl = gl;
