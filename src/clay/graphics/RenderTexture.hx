@@ -10,6 +10,11 @@ class RenderTexture extends Texture {
     public var renderTarget:RenderTarget;
 
     /**
+     * Set to `true` to also allocate a depth buffer on this render target
+     */
+    public var depth:Bool = false;
+
+    /**
      * Set to `true` to also allocate a stencil buffer on this render target
      */
     public var stencil:Bool = false;
@@ -32,7 +37,7 @@ class RenderTexture extends Texture {
         super.init();
 
         var max = Graphics.maxTextureSize();
-        
+
         if (widthActual > max)
             throw 'RenderTexture actual width bigger than maximum hardware size (width=$widthActual max=$max)';
         if (heightActual > max)
@@ -41,7 +46,7 @@ class RenderTexture extends Texture {
         // Create render target
         bind();
         renderTarget = Graphics.createRenderTarget(
-            textureId, width, height, stencil, antialiasing,
+            textureId, width, height, depth, stencil, antialiasing,
             0, format, dataType
         );
 

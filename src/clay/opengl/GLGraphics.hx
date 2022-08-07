@@ -372,7 +372,7 @@ class GLGraphics {
      */
     public static function configureRenderTargetBuffersStorage(
         renderTarget:GLGraphics_RenderTarget,
-        textureId:TextureId, width:Int, height:Int, stencil:Bool, antialiasing:Int
+        textureId:TextureId, width:Int, height:Int, depth:Bool, stencil:Bool, antialiasing:Int
         ):Void {
 
         if (antialiasing > 1) {
@@ -382,22 +382,26 @@ class GLGraphics {
             GL.renderbufferStorageMultisample(GL.RENDERBUFFER, antialiasing, RGBA8, width, height);
 
             // Setup multisample depth/stencil RBO
-            bindRenderbuffer(renderTarget.msDepthStencilRenderbuffer);
-            if (stencil) {
-                GL.renderbufferStorageMultisample(GL.RENDERBUFFER, antialiasing, DEPTH24_STENCIL8, width, height);
-            }
-            else {
-                GL.renderbufferStorageMultisample(GL.RENDERBUFFER, antialiasing, GL.DEPTH_COMPONENT16, width, height);
+            if (depth || stencil) {
+                bindRenderbuffer(renderTarget.msDepthStencilRenderbuffer);
+                if (stencil) {
+                    GL.renderbufferStorageMultisample(GL.RENDERBUFFER, antialiasing, DEPTH24_STENCIL8, width, height);
+                }
+                else {
+                    GL.renderbufferStorageMultisample(GL.RENDERBUFFER, antialiasing, GL.DEPTH_COMPONENT16, width, height);
+                }
             }
 
             // Setup multisample FBO
             bindFramebuffer(renderTarget.framebuffer);
             GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.RENDERBUFFER, renderTarget.renderbuffer);
-            if (stencil) {
-                GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_STENCIL_ATTACHMENT, GL.RENDERBUFFER, renderTarget.msDepthStencilRenderbuffer);
-            }
-            else {
-                GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, renderTarget.msDepthStencilRenderbuffer);
+            if (depth || stencil) {
+                if (stencil) {
+                    GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_STENCIL_ATTACHMENT, GL.RENDERBUFFER, renderTarget.msDepthStencilRenderbuffer);
+                }
+                else {
+                    GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, renderTarget.msDepthStencilRenderbuffer);
+                }
             }
 
             // Setup resolve color RBO
@@ -419,22 +423,27 @@ class GLGraphics {
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_STENCIL, width, height);
                 #end
             }
-            else {
+            else if (depth) {
                 #if (web || ios || tvos || android)
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, width, height);
                 #else
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT, width, height);
                 #end
             }
+            else {
+                GL.renderbufferStorage(GL.RENDERBUFFER, GL.RGBA, width, height);
+            }
 
             // Setup FBO
             bindFramebuffer(renderTarget.framebuffer);
             GL.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, textureId, 0);
-            if (stencil) {
-                GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_STENCIL_ATTACHMENT, GL.RENDERBUFFER, renderTarget.renderbuffer);
-            }
-            else {
-                GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, renderTarget.renderbuffer);
+            if (depth || stencil) {
+                if (stencil) {
+                    GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_STENCIL_ATTACHMENT, GL.RENDERBUFFER, renderTarget.renderbuffer);
+                }
+                else {
+                    GL.framebufferRenderbuffer(GL.FRAMEBUFFER, GL.DEPTH_ATTACHMENT, GL.RENDERBUFFER, renderTarget.renderbuffer);
+                }
             }
         }
 
@@ -475,13 +484,12 @@ class GLGraphics {
 
     }
 
-    #if web
-
     static final clearBufferForBlitValues = Float32Array.fromArray([0.0, 0.0, 0.0, 1.0]);
 
     public static function blitRenderTargetBuffers(renderTarget:GLGraphics_RenderTarget, width:Int, height:Int):Void {
 
-        // Blit framebuffers, no Multisample texture 2d in WebGL 2
+        // No Multisample texture 2d in WebGL 2
+        // Instead we blit framebuffers, which works on all gl targets so far.
         GL.bindFramebuffer(READ_FRAMEBUFFER, renderTarget.framebuffer);
         GL.bindFramebuffer(DRAW_FRAMEBUFFER, renderTarget.msResolveFramebuffer);
         GL.clearBufferfv(COLOR, 0, clearBufferForBlitValues);
@@ -495,13 +503,12 @@ class GLGraphics {
 
     }
 
-    #end
-
     /**
      * Create a render target from the given settings
      * @param textureId
      * @param width
      * @param height
+     * @param depth
      * @param stencil
      * @param antialiasing
      * @param level The level of detail. Level 0 is the base image level. Level n is the nth mipmap reduction image.
@@ -509,7 +516,7 @@ class GLGraphics {
      * @param dataType The data type of the pixel data (UNSIGNED_BYTE)
      */
     public static function createRenderTarget(
-        textureId:TextureId, width:Int, height:Int, stencil:Bool, antialiasing:Int,
+        textureId:TextureId, width:Int, height:Int, depth:Bool, stencil:Bool, antialiasing:Int,
         level:Int, format:TextureFormat, dataType:TextureDataType
         ):RenderTarget {
 
@@ -528,7 +535,10 @@ class GLGraphics {
             // Create buffers for multisampling, if antialiasing is enabled
             renderTarget.msResolveFramebuffer = createFramebuffer();
             renderTarget.msResolveColorRenderbuffer = createRenderbuffer();
-            renderTarget.msDepthStencilRenderbuffer = createRenderbuffer();
+            if (depth || stencil)
+                renderTarget.msDepthStencilRenderbuffer = createRenderbuffer();
+            else
+                renderTarget.msDepthStencilRenderbuffer = NO_RENDERBUFFER;
         }
         else {
             renderTarget.msResolveFramebuffer = NO_FRAMEBUFFER;
@@ -537,7 +547,7 @@ class GLGraphics {
         }
 
         // Configure buffers storage
-        configureRenderTargetBuffersStorage(renderTarget, textureId, width, height, stencil, antialiasing);
+        configureRenderTargetBuffersStorage(renderTarget, textureId, width, height, depth, stencil, antialiasing);
 
         return renderTarget;
 
