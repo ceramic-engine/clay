@@ -20,7 +20,7 @@ class OpenALSound {
     var firstHandle:AudioHandle = -1;
 
     var handle:AudioHandle = -1;
-    
+
     var timeResume:Float = -1;
 
     var timeResumeAppTime:Float = -1;
@@ -394,7 +394,7 @@ class OpenALAudio extends clay.native.NativeAudio {
             instanceData.handle = handle;
             instanceData.source = source;
             instanceData.timeResume = 0.0;
-            instanceData.timeResumeAppTime = app.timestamp;
+            instanceData.timeResumeAppTime = Runtime.timestamp();
             instanceData.timePause = -1;
             instanceData.pitch = 1.0;
             instanceData.loop = false;
@@ -449,7 +449,7 @@ class OpenALAudio extends clay.native.NativeAudio {
             instanceData.handle = handle;
             instanceData.source = sound.source;
             instanceData.timeResume = 0.0;
-            instanceData.timeResumeAppTime = app.timestamp;
+            instanceData.timeResumeAppTime = Runtime.timestamp();
             instanceData.timePause = -1;
             instanceData.pitch = 1.0;
             instanceData.loop = true;
@@ -499,7 +499,7 @@ class OpenALAudio extends clay.native.NativeAudio {
 
         if (instanceData != null) {
             instanceData.timeResume = instanceData.timePause > 0 ? instanceData.timePause : 0;
-            instanceData.timeResumeAppTime = app.timestamp;
+            instanceData.timeResumeAppTime = Runtime.timestamp();
             instanceData.timePause = -1;
         }
 
@@ -597,7 +597,7 @@ class OpenALAudio extends clay.native.NativeAudio {
         if (instanceData != null) {
             var position = positionOf(instanceData.firstHandle);
             instanceData.pitch = pitch;
-            instanceData.timeResumeAppTime = instanceData.timeResume + app.timestamp - (position / pitch);
+            instanceData.timeResumeAppTime = instanceData.timeResume + Runtime.timestamp() - (position / pitch);
         }
 
         AL.sourcef(sound.alsource, AL.PITCH, pitch);
@@ -615,7 +615,7 @@ class OpenALAudio extends clay.native.NativeAudio {
         if (sound == null) return;
 
         Log.debug('Audio / position=$time handle=$handle, ' + sound.source.data.id);
-        
+
         if (instanceData != null) {
             var state = stateOf(handle);
             if (state == PAUSED) {
@@ -623,7 +623,7 @@ class OpenALAudio extends clay.native.NativeAudio {
             }
             else {
                 instanceData.timeResume = time;
-                instanceData.timeResumeAppTime = app.timestamp;
+                instanceData.timeResumeAppTime = Runtime.timestamp();
             }
         }
 
@@ -694,7 +694,7 @@ class OpenALAudio extends clay.native.NativeAudio {
                 case PLAYING | PAUSED:
                     var time = switch state {
                         case PAUSED: instanceData.timePause;
-                        case PLAYING: instanceData.timeResume + (app.timestamp - instanceData.timeResumeAppTime) * instanceData.pitch;
+                        case PLAYING: instanceData.timeResume + (Runtime.timestamp() - instanceData.timeResumeAppTime) * instanceData.pitch;
                         default: 0.0;
                     }
                     var duration = instanceData.source.getDuration();

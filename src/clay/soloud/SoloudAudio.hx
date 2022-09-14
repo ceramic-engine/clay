@@ -170,7 +170,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         sound.loop = loop;
         sound.volume = volume;
         sound.timeResume = 0.0;
-        sound.timeResumeAppTime = app.timestamp;
+        sound.timeResumeAppTime = Runtime.timestamp();
         sound.timePause = -1;
         instances.set(handle, sound);
         handles.push(handle);
@@ -299,7 +299,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         var position = positionOf(handle);
         if (sound.state == PLAYING) {
             // Adjust timeResumeAppTime so that it matches the new pitch
-            sound.timeResumeAppTime = sound.timeResume + app.timestamp - (position / sound.pitch);
+            sound.timeResumeAppTime = sound.timeResume + Runtime.timestamp() - (position / sound.pitch);
         }
 
         soloud.setRelativePlaySpeed(sound.soloudHandle, pitch);
@@ -318,7 +318,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         }
         else {
             sound.timeResume = time;
-            sound.timeResumeAppTime = app.timestamp;
+            sound.timeResumeAppTime = Runtime.timestamp();
 
             // Stopping the sound to start a new one at the right position
             // was the only way I found to get consistent behaviour.
@@ -367,7 +367,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         Log.debug('Audio / unpause handle=$handle, ' + sound.source.data.id);
 
         sound.timeResume = sound.timePause >= 0 ? sound.timePause : 0;
-        sound.timeResumeAppTime = app.timestamp;
+        sound.timeResumeAppTime = Runtime.timestamp();
         sound.timePause = -1;
 
         soloud.setPause(sound.soloudHandle, false);
@@ -387,7 +387,7 @@ class SoloudAudio extends clay.base.BaseAudio {
             case PLAYING | PAUSED:
                 var time = switch sound.state {
                     case PAUSED: sound.timePause;
-                    case PLAYING: sound.timeResume + (app.timestamp - sound.timeResumeAppTime) * sound.pitch;
+                    case PLAYING: sound.timeResume + (Runtime.timestamp() - sound.timeResumeAppTime) * sound.pitch;
                     default: 0.0;
                 }
                 var duration = sound.source.getDuration();
