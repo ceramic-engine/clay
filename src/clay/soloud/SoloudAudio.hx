@@ -52,7 +52,15 @@ class SoloudAudio extends clay.base.BaseAudio {
         super.init();
 
         soloud = Soloud.create();
-        var result = soloud.init();
+        #if (!soloud_use_miniaudio && soloud_use_sdl)
+        var result = soloud.init(
+            0, SDL2, 0, 64, 2
+        );
+        #else
+        var result = soloud.init(
+            0, MINIAUDIO, 0, 0, 2
+        );
+        #end
         if (result == 0)
             active = true;
         else {
