@@ -160,6 +160,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / init video');
         }
 
+        #if (soloud_use_sdl || sdl_enable_audio)
         // Init audio
         var status = SDL.initSubSystem(SDL_INIT_AUDIO);
         if (status == -1) {
@@ -168,6 +169,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         else {
             Log.debug('SDL / init audio');
         }
+        #end
 
         // Init controllers
         var status = SDL.initSubSystem(SDL_INIT_GAMECONTROLLER);
