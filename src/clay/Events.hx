@@ -10,6 +10,8 @@ class Events {
 
     public function tick(delta:Float):Void {}
 
+    public function render():Void {}
+
     public function freeze():Void {}
 
     public function unfreeze():Void {}

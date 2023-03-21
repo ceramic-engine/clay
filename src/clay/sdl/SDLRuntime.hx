@@ -664,6 +664,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             var shouldUpdate = app.shouldUpdate(newTimestamp);
             if (shouldUpdate) {
                 app.emitTick(newTimestamp);
+                app.emitRender();
             }
 
             if (app.config.runtime.autoSwap && !app.hasShutdown) {

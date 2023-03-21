@@ -273,6 +273,17 @@ class Clay {
 
     }
 
+    function emitRender():Void {
+
+        if (freeze)
+            return;
+
+        if (!shuttingDown && ready) {
+            events.render();
+        }
+
+    }
+
     function emitWindowEvent(type:WindowEventType, timestamp:Float, windowId:Int, x:Int, y:Int):Void {
 
         #if clay_native
