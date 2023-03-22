@@ -104,26 +104,9 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (app.hasShutdown)
             return false;
 
-        if (didEmitTickOnce) {
-            if (app.ready) {
-                app.emitRender();
-            }
-        }
-
         if (!app.shuttingDown) {
             js.Browser.window.requestAnimationFrame(loop);
         }
-
-        js.Browser.window.setTimeout(tick, 0);
-
-        return true;
-
-    }
-
-    function tick():Bool {
-
-        if (app.hasShutdown)
-            return false;
 
         if (app.ready) {
 
@@ -141,6 +124,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         }
 
         clearPendingKeyUps();
+
+        app.emitRender();
 
         return true;
 
