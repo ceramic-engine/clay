@@ -564,6 +564,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function setWindowBorderless(borderless):Void {
+
+        app.config.window.borderless = borderless;
+
+        SDL.setWindowBordered(window, !borderless);
+
+    }
+
     inline function clamp(n:Float) return Math.max(0, Math.min(n, 1));
 
     public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration: Float) {

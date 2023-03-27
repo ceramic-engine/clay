@@ -97,7 +97,7 @@ class RenderConfigWebGL {
         clay default: uses render config antialias flag
         webgl default: true */
     var antialias:Bool = true;
-    
+
     /** If the value is true the page compositor will assume the drawing buffer contains colors with premultiplied alpha.
         If the value is false the page compositor will assume that colors in the drawing buffer are not premultiplied.
         This flag is ignored if the alpha flag is false.
@@ -182,7 +182,7 @@ class WindowConfig {
 
     /** create in fullscreen, default: false, `mobile` true */
     var fullscreen:Bool = false;
-    
+
     /** If false, the users native window/desktop resolution will be used instead of the specified window size. default: false
         On native, changing the users video mode is less than ideal, so trueFullscreen is commonly discouraged. */
     var trueFullscreen:Bool = false;
@@ -207,13 +207,13 @@ class WindowConfig {
 
     /** window title, default: 'clay app' */
     var title:String = null;
-    
+
     /** disables input arriving at/from this window. default: false */
     var noInput:Bool = false;
 
-    /** Time in seconds to sleep when in the background. 
-        Setting this to zero disables the behavior. 
-        This has no effect on the web target, 
+    /** Time in seconds to sleep when in the background.
+        Setting this to zero disables the behavior.
+        This has no effect on the web target,
         as there is no concept of sleep there (and browsers usually throttle background tabs).
         Higher sleep times (i.e 1/10 or 1/30) use less cpu. default: 1/15 */
     var backgroundSleep:Float = 1.0 / 15;
