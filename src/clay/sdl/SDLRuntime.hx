@@ -683,7 +683,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 // Prevent the app from using 100% CPU for nothing because vsync
                 // Doesn't work properly on mojave
                 // TODO fix the actual vsync issue
-                Sys.sleep(0.001);
+                Sys.sleep(0.0005);
                 #else
                 Sys.sleep(0);
                 #end
