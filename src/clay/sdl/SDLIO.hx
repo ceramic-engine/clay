@@ -128,7 +128,7 @@ class SDLIO extends NativeIO {
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return SDL.RWseek(file, offset, whence);
+        return haxe.Int64.toInt(SDL.RWseek(file, offset, whence));
 
     }
 

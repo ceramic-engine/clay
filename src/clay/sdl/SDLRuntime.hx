@@ -832,7 +832,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    Std.int(e.tfinger.fingerId),
+                    haxe.Int64.toInt(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
 
@@ -842,7 +842,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    Std.int(e.tfinger.fingerId),
+                    haxe.Int64.toInt(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
 
@@ -852,7 +852,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    Std.int(e.tfinger.fingerId),
+                    haxe.Int64.toInt(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
 
