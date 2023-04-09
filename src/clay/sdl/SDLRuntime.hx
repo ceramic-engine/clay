@@ -79,6 +79,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /** A flag to know if we SDL-triggered fullscreen is currently active or not */
     var isSdlFullscreen:Bool = false;
 
+    /** An internal list of finger ids */
+    var fingerIdList:Map<cpp.Int64, Int> = new Map();
+    var nextFingerId:Int = 1;
+
 /// Lifecycle
 
     override function init() {
@@ -832,7 +836,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    haxe.Int64.toInt(e.tfinger.fingerId),
+                    toFingerId(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
 
@@ -842,9 +846,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    haxe.Int64.toInt(e.tfinger.fingerId),
+                    toFingerId(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
+                removeFingerId(e.tfinger.fingerId);
 
             case SDL_FINGERMOTION:
                 app.input.emitTouchMove(
@@ -852,7 +857,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.y,
                     e.tfinger.dx,
                     e.tfinger.dy,
-                    haxe.Int64.toInt(e.tfinger.fingerId),
+                    toFingerId(e.tfinger.fingerId),
                     e.tfinger.timestamp / 1000.0
                 );
 
@@ -1010,6 +1015,26 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case _:
 
+        }
+
+    }
+
+    function toFingerId(value:cpp.Int64):Int {
+
+        if (!fingerIdList.exists(value)) {
+            fingerIdList.set(value, nextFingerId);
+            nextFingerId++;
+            if (nextFingerId > 999999999)
+                nextFingerId = 1;
+        }
+        return fingerIdList.get(value);
+
+    }
+
+    function removeFingerId(value:cpp.Int64):Void {
+
+        if (!fingerIdList.exists(value)) {
+            fingerIdList.remove(value);
         }
 
     }
