@@ -346,6 +346,15 @@ class WebRuntime extends clay.base.BaseRuntime {
 
 /// Input handlers
 
+    @:noCompletion
+    public function bindCustomElementTouchEvents(el:js.html.Element) {
+
+        el.addEventListener('touchstart', handleTouchStart);
+        el.addEventListener('touchend', handleTouchEnd);
+        el.addEventListener('touchmove', handleTouchMove);
+
+    }
+
     function handleContextMenu(ev:js.html.MouseEvent) {
 
         if (app.config.runtime.preventDefaultContextMenu) {
