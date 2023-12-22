@@ -37,43 +37,77 @@ class WebIO extends BaseIO {
 
         bindElectron();
 
-        if (!async && electron != null && !path.startsWith('http://') && !path.startsWith('https://')) {
+        if (electron != null && !path.startsWith('http://') && !path.startsWith('https://')) {
 
             var fs = js.Syntax.code("{0}.remote.require('fs')", electron);
             var cwd = js.Syntax.code("{0}.remote.process.cwd()", electron);
 
-            try {
-                var result = fs.readFileSync(path);
+            if (!async) {
+                try {
+                    var result = fs.readFileSync(path);
 
-                // Copy data and get rid of nodejs buffer
-                var data = new Uint8Array(result.length);
-                for (i in 0...result.length) {
-                    data[i] = js.Syntax.code("{0}[{1}]", result, i);
-                }
+                    // Copy data and get rid of nodejs buffer
+                    var data = new Uint8Array(result.length);
+                    for (i in 0...result.length) {
+                        data[i] = js.Syntax.code("{0}[{1}]", result, i);
+                    }
 
-                if (callback != null) {
-                    Immediate.push(() -> {
-                        callback(data);
-                    });
+                    if (callback != null) {
+                        Immediate.push(() -> {
+                            callback(data);
+                        });
+                    }
+                    return data;
                 }
-                return data;
-            }
-            catch (e:Dynamic) {
-                Log.error('failed to read file at path $path: ' + e);
-                if (callback != null) {
-                    Immediate.push(() -> {
-                        callback(null);
-                    });
+                catch (e:Dynamic) {
+                    Log.error('failed to read file at path $path: ' + e);
+                    if (callback != null) {
+                        Immediate.push(() -> {
+                            callback(null);
+                        });
+                    }
+                    return null;
                 }
-                return null;
             }
+            else {
+                fs.readFile(path, function(err, result) {
+                    try {
+                        if (err == null) {
+                            // Copy data and get rid of nodejs buffer
+                            var data = new Uint8Array(result.length);
+                            for (i in 0...result.length) {
+                                data[i] = js.Syntax.code("{0}[{1}]", result, i);
+                            }
+
+                            if (callback != null) {
+                                Immediate.push(() -> {
+                                    callback(data);
+                                });
+                            }
+                        }
+                        else {
+                            Log.error('failed to read file at path $path: ' + err);
+                        }
+                    }
+                    catch (e:Dynamic) {
+                        Log.error('failed to read file at path $path: ' + e);
+                        if (callback != null) {
+                            Immediate.push(() -> {
+                                callback(null);
+                            });
+                        }
+                    }
+                });
+            }
+
+            return null;
 
         }
         else {
 
         #end
 
-        var asyncHttp = true;
+        var asyncHttp = async;
 
         var request = new js.html.XMLHttpRequest();
         request.open("GET", path, asyncHttp);
