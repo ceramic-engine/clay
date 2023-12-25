@@ -107,7 +107,7 @@ class WebIO extends BaseIO {
 
         #end
 
-        var asyncHttp = async;
+        var asyncHttp = true;
 
         var request = new js.html.XMLHttpRequest();
         request.open("GET", path, asyncHttp);
