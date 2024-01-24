@@ -29,8 +29,8 @@ package clay.buffers;
         }
         
 
-        @:arrayAccess @:extern inline function __set(idx:Int, val:Float) : Void this[idx] = val;
-        @:arrayAccess @:extern inline function __get(idx:Int) : Float return this[idx];
+        @:arrayAccess extern inline function __set(idx:Int, val:Float) : Void this[idx] = val;
+        @:arrayAccess extern inline function __get(idx:Int) : Float return this[idx];
 
 
             //non spec haxe conversions
@@ -104,13 +104,13 @@ package clay.buffers;
 
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __get(idx:Int) : Float {
             return ArrayBufferIO.getFloat64(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT));
         }
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __set(idx:Int, val:Float) : Void {
             ArrayBufferIO.setFloat64(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT), val);
         }
