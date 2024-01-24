@@ -28,8 +28,8 @@ package clay.buffers;
             return new js.lib.Uint8ClampedArray(_buffer, _byteOffset, _byteLength);
         }
 
-        @:arrayAccess @:extern inline function __set(idx:Int, val:UInt) : Void this[idx] = _clamp(val);
-        @:arrayAccess @:extern inline function __get(idx:Int) : UInt return this[idx];
+        @:arrayAccess extern inline function __set(idx:Int, val:UInt) : Void this[idx] = _clamp(val);
+        @:arrayAccess extern inline function __get(idx:Int) : UInt return this[idx];
 
 
             //non spec haxe conversions
@@ -111,13 +111,13 @@ package clay.buffers;
 
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __get(idx:Int) {
             return ArrayBufferIO.getUint8(this.buffer, this.byteOffset+idx);
         }
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __set(idx:Int, val:UInt) : Void {
             ArrayBufferIO.setUint8Clamped(this.buffer, this.byteOffset+idx, val);
         }
