@@ -28,8 +28,8 @@ package clay.buffers;
             return new js.lib.Int16Array(_buffer, _byteOffset, Std.int(_byteLength/BYTES_PER_ELEMENT));
         }
 
-        @:arrayAccess @:extern inline function __set(idx:Int, val:Int) : Void this[idx] = val;
-        @:arrayAccess @:extern inline function __get(idx:Int) : Int return this[idx];
+        @:arrayAccess extern inline function __set(idx:Int, val:Int) : Void this[idx] = val;
+        @:arrayAccess extern inline function __get(idx:Int) : Int return this[idx];
 
 
             //non spec haxe conversions
@@ -102,13 +102,13 @@ package clay.buffers;
 
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __get(idx:Int) {
             return ArrayBufferIO.getInt16(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT));
         }
 
         @:noCompletion
-        @:arrayAccess @:extern
+        @:arrayAccess extern
         public inline function __set(idx:Int, val:Int) : Void {
             ArrayBufferIO.setInt16(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT), val);
         }
