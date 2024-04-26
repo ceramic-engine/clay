@@ -53,6 +53,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
      */
     public var skipKeyboardEvents:Bool = false;
 
+    /**
+     * If a frame takes less time (in seconds) than this value,
+     * it will be put to sleep.
+     */
+    public var minFrameTime:Float = 0.005;
+
 /// Internal
 
     static var timestampStart:Float = 0.0;
@@ -82,6 +88,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /** An internal list of finger ids */
     var fingerIdList:Map<cpp.Int64, Int> = new Map();
     var nextFingerId:Int = 1;
+
+    var lastFrameTime:Float = 0;
 
 /// Lifecycle
 
@@ -124,6 +132,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         Log.debug('SDL / running main loop');
 
+        lastFrameTime = Timestamp.now();
         while (!app.shuttingDown) {
             loop(0);
         }
@@ -646,10 +655,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function windowSwap() {
 
         SDL.GL_SwapWindow(window);
+        GL.finish();
 
     }
 
     function loop(_) {
+
+        var doUpdate = false;
 
         inline function _loop() {
 
@@ -673,37 +685,40 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
 
             var newTimestamp = timestamp();
-            var shouldUpdate = app.shouldUpdate(newTimestamp);
-            if (shouldUpdate) {
+            doUpdate = app.shouldUpdate(newTimestamp);
+            if (doUpdate) {
                 app.emitTick(newTimestamp);
                 app.emitRender();
+
+                #if (mac || windows || linux)
+                #if !clay_native_no_tick_sleep
+                var spent = Timestamp.now() - lastFrameTime;
+                if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
+                #end
+                #end
+            }
+            else {
+                #if !clay_native_no_tick_sleep
+                Sys.sleep(0.0001);
+                #end
             }
 
             if (app.config.runtime.autoSwap && !app.hasShutdown) {
-
-                #if !clay_native_no_tick_sleep
-
-                #if mac
-                // Prevent the app from using 100% CPU for nothing because vsync
-                // Doesn't work properly on mojave
-                // TODO fix the actual vsync issue
-                Sys.sleep(0.0005);
-                #else
-                Sys.sleep(0);
-                #end
-
-                #end
 
                 #if ios
                 // iOS doesn't like it when we send GPU commands when app is in background
                 if (!mobileInBackground) {
                 #end
-                    if (shouldUpdate) {
+                    if (doUpdate) {
                         windowSwap();
                     }
                 #if ios
                 }
                 #end
+            }
+
+            if (doUpdate) {
+                lastFrameTime = Timestamp.now();
             }
 
         }
