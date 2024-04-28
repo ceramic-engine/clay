@@ -655,7 +655,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function windowSwap() {
 
         SDL.GL_SwapWindow(window);
+        #if clay_gl_finish
         GL.finish();
+        #end
 
     }
 
