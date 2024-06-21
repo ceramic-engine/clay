@@ -5,7 +5,7 @@ import sys.thread.Mutex;
 #end
 
 /**
- * An utility to enqueue functions and execute them in bbackground, in a serialized way,
+ * An utility to enqueue functions and execute them in background, in a serialized way,
  * meaning it is garanteed that no function in this queue will be run in parallel. An enqueued
  * function will always be started after every previous function has finished executing.
  */
