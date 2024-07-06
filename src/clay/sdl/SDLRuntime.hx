@@ -878,6 +878,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.tfinger.timestamp / 1000.0
                 );
 
+        #if clay_sdl_joystick_to_gamepad
+
         /// Joystick events
 
             case SDL_JOYAXISMOTION:
@@ -886,6 +888,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     // (range: -32768 to 32767)
                     var val:Float = (e.jaxis.value+32768)/(32767+32768);
                     var normalizedVal = (-0.5 + val) * 2.0;
+
                     app.input.emitGamepadAxis(
                         e.jaxis.which,
                         e.jaxis.axis,
@@ -944,6 +947,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
                         e.jdevice.timestamp / 1000.0
                     );
                 }
+
+        #end
 
         /// Gamepad
 
