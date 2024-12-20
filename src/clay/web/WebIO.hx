@@ -8,17 +8,17 @@ using StringTools;
 class WebIO extends BaseIO {
 
     #if clay_web_use_electron_fs
-    var testedElectronAvailability:Bool = false;
-    var electron:Dynamic = null;
+    var testedElectronRemoteAvailability:Bool = false;
+    var electronRemote:Dynamic = null;
     #end
 
     override function isSynchronous():Bool {
 
         #if clay_web_use_electron_fs
 
-        bindElectron();
+        bindElectronRemote();
 
-        return (electron != null);
+        return (electronRemote != null);
 
         #else
 
@@ -35,12 +35,12 @@ class WebIO extends BaseIO {
 
         #if clay_web_use_electron_fs
 
-        bindElectron();
+        bindElectronRemote();
 
-        if (electron != null && !path.startsWith('http://') && !path.startsWith('https://')) {
+        if (electronRemote != null && !path.startsWith('http://') && !path.startsWith('https://')) {
 
-            var fs = js.Syntax.code("{0}.remote.require('fs')", electron);
-            var cwd = js.Syntax.code("{0}.remote.process.cwd()", electron);
+            var fs = js.Syntax.code("{0}.require('fs')", electronRemote);
+            var cwd = js.Syntax.code("{0}.process.cwd()", electronRemote);
 
             if (!async) {
                 try {
@@ -156,12 +156,12 @@ class WebIO extends BaseIO {
 
     #if clay_web_use_electron_fs
 
-    inline function bindElectron():Void {
+    inline function bindElectronRemote():Void {
 
-        if (!testedElectronAvailability) {
-            testedElectronAvailability = true;
+        if (!testedElectronRemoteAvailability) {
+            testedElectronRemoteAvailability = true;
             try {
-                electron = js.Syntax.code("require('electron')");
+                electronRemote = js.Syntax.code("require('@electron/remote')");
             }
             catch (e:Dynamic) {}
         }

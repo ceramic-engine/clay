@@ -13,7 +13,7 @@ class WebAssets extends BaseAssets {
 
     #if clay_web_use_electron_pngjs
     var testedElectronPngjsAvailability:Bool = false;
-    var electron:Dynamic = null;
+    var electronRemote:Dynamic = null;
     var pngjs:Dynamic = null;
     #end
 
@@ -105,7 +105,7 @@ class WebAssets extends BaseAssets {
     public function decodePngWithPngjs(bytes:Uint8Array, pot:Bool = true):Image {
 
         try {
-            var Buffer = js.Syntax.code("{0}.remote.require('buffer').Buffer", electron);
+            var Buffer = js.Syntax.code("{0}.require('buffer').Buffer", electronRemote);
             var pngjsInfo = pngjs.PNG.sync.read(Buffer.from(bytes));
 
             var widthActual = pot ? nearestPowerOfTwo(pngjsInfo.width) : pngjsInfo.width;
@@ -352,8 +352,8 @@ class WebAssets extends BaseAssets {
         if (!testedElectronPngjsAvailability) {
             testedElectronPngjsAvailability = true;
             try {
-                electron = js.Syntax.code("require('electron')");
-                pngjs = js.Syntax.code("{0}.remote.require('pngjs')", electron);
+                electronRemote = js.Syntax.code("require('@electron/remote')");
+                pngjs = js.Syntax.code("{0}.require('pngjs')", electronRemote);
             }
             catch (e:Dynamic) {}
         }
