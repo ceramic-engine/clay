@@ -67,6 +67,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var didEmitTickOnce = false;
 
+    var nextFrameCallbacks:Array<()->Void> = [];
+
 /// Lifecycle
 
     override function init() {
@@ -106,6 +108,16 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (!app.shuttingDown) {
             js.Browser.window.requestAnimationFrame(loop);
+        }
+
+        if (nextFrameCallbacks.length > 0) {
+            final cbs = [];
+            while (nextFrameCallbacks.length > 0) {
+                cbs.push(nextFrameCallbacks.shift());
+            }
+            for (i in 0...cbs.length) {
+                cbs[i]();
+            }
         }
 
         if (app.ready) {
@@ -361,6 +373,8 @@ class WebRuntime extends clay.base.BaseRuntime {
             ev.preventDefault();
         }
 
+
+
     }
 
     function handleFullscreenChange(ev:js.html.Event) {
@@ -406,6 +420,10 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (skipMouseEvents)
             return;
 
+        #if !clay_no_mouse_prevent_default
+        ev.preventDefault();
+        #end
+
         app.input.emitMouseDown(
             translateMouseX(ev),
             translateMouseY(ev),
@@ -414,12 +432,35 @@ class WebRuntime extends clay.base.BaseRuntime {
             webWindowId
         );
 
+        if (ev.button == 2) {
+            // On web, right click mouse up might not fire,
+            // so we simulate it
+            final x = translateMouseX(ev);
+            final y = translateMouseY(ev);
+            final button = ev.button;
+            nextFrameCallbacks.push(() -> {
+                nextFrameCallbacks.push(() -> {
+                    app.input.emitMouseUp(
+                        x,
+                        y,
+                        button,
+                        timestamp(),
+                        webWindowId
+                    );
+                });
+            });
+        }
+
     }
 
     function handleMouseUp(ev:js.html.MouseEvent) {
 
         if (skipMouseEvents)
             return;
+
+        #if !clay_no_mouse_prevent_default
+        ev.preventDefault();
+        #end
 
         app.input.emitMouseUp(
             translateMouseX(ev),
@@ -435,6 +476,10 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (skipMouseEvents)
             return;
+
+        #if !clay_no_mouse_prevent_default
+        ev.preventDefault();
+        #end
 
         var movementX = ev.movementX == null ? 0 : ev.movementX;
         var movementY = ev.movementY == null ? 0 : ev.movementY;
