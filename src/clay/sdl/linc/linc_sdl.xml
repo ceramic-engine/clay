@@ -1,0 +1,81 @@
+<xml>
+
+    <files id="haxe">
+
+        <compilerflag value="-DLINC_SDL_WITH_SDL_MAIN" if="android" />
+
+        <compilerflag value="-I${LINC_SDL_PATH}../../../../SDL/include" />
+        <compilerflag value="-I${LINC_SDL_PATH}linc/" />
+
+        <file name="${LINC_SDL_PATH}linc/linc_sdl.cpp" />
+
+    </files>
+
+    <target id="haxe">
+
+        <lib name="-lSDL3" if="windows || linux" />
+        <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-mac-universal/lib/libSDL3.dylib" if="mac" />
+
+        <vflag name="-framework" value="SDL3" if="ios" />
+
+        <section if="android">
+            <lib name="-lOpenSLES" />
+            <lib name="-ldl" />
+            <lib name="-llog" />
+            <lib name="-landroid" />
+            <lib name="-lOpenSLES" />
+            <lib name="-latomic" />
+
+            <section if="clay_android_ndk_r28">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r28/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r28/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r28/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r28/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r27">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r27/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r27/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r27/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r27/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r26">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r26/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r26/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r26/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r26/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r25">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r25/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r25/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r25/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r25/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r24">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r24/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r24/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r24/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r24/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r23">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r23/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r23/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r23/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r23/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section if="clay_android_ndk_r22">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r22/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r22/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r22/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r22/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+            <section unless="clay_android_ndk_r22 || clay_android_ndk_r22 || clay_android_ndk_r23 || clay_android_ndk_r25 || clay_android_ndk_r26 || clay_android_ndk_r27 || clay_android_ndk_r28">
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r21/lib/armeabi-v7a/libSDL3.a" if="HXCPP_ARMV7" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r21/lib/arm64-v8a/libSDL3.a" if="HXCPP_ARM64" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r21/lib/x86/libSDL3.a" if="HXCPP_X86" />
+                <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-android-r21/lib/x86_64/libSDL3.a" if="HXCPP_X86_64" />
+            </section>
+        </section>
+
+    </target>
+
+</xml>

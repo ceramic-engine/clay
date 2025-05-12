@@ -19,6 +19,13 @@ import sys.io.File;
 
 using StringTools;
 
+#if clay_sdl
+import clay.sdl.SDL;
+#end
+
+#if clay_sdl
+@:headerCode('#include <SDL3/SDL.h>')
+#end
 @:allow(clay.audio.AudioInstance)
 @:allow(clay.audio.AudioSource)
 class SoloudAudio extends clay.base.BaseAudio {

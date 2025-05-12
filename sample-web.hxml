@@ -7,7 +7,6 @@
 -D web
 -D clay_app_id=claysample
 -lib linc_opengl
--lib linc_sdl
 -lib linc_ogg
 -lib linc_stb
 -lib linc_timestamp

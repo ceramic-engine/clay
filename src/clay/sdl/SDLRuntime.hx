@@ -3,8 +3,16 @@ package clay.sdl;
 import clay.Config;
 import clay.Types;
 import clay.opengl.GLGraphics;
+import clay.sdl.SDL;
+import cpp.Float32;
+import cpp.Int16;
+import cpp.Int64;
+import cpp.NativeArray;
+import cpp.UInt16;
+import cpp.UInt32;
+import cpp.UInt64;
+import haxe.atomic.AtomicBool;
 import haxe.io.Path;
-import sdl.SDL;
 import sys.FileSystem;
 import timestamp.Timestamp;
 
@@ -12,15 +20,27 @@ import timestamp.Timestamp;
 import glew.GLEW;
 #end
 
+#if clay_use_glad
+import glad.GLAD;
+#end
+
 #if (!clay_no_initial_glclear && linc_opengl)
 import opengl.WebGL as GL;
 #end
 
-typedef WindowHandle = sdl.Window;
+typedef WindowHandle = UInt32;
 
-/**
- * Native runtime, using SDL to operate
- */
+#if (gles_angle && ios)
+@:headerCode('
+#include "linc_sdl.h"
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
+')
+#else
+@:headerCode('#include "linc_sdl.h"')
+#end
 @:access(clay.Clay)
 @:access(clay.Input)
 @:access(clay.Screen)
@@ -28,68 +48,41 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Properties
 
-    /**
-     * The SDL GL context
-     */
-    public var gl:sdl.GLContext;
-
-    /**
-     * The SDL window handle
-     */
-    public var window:WindowHandle;
-
-    /**
-     * Current SDL event being handled, if any
-     */
-    public var currentSdlEvent:sdl.Event = null;
-
-    /**
-     * For advanced usage: disable handling of mouse events
-     */
+    public var gl:SDLGLContext;
+    public var window:SDLWindowPointer;
+    public var currentSdlEvent:SDLEvent = null;
     public var skipMouseEvents:Bool = false;
-
-    /**
-     * For advanced usage: disable handling of keyboard events
-     */
     public var skipKeyboardEvents:Bool = false;
-
-    /**
-     * If a frame takes less time (in seconds) than this value,
-     * it will be put to sleep.
-     */
     public var minFrameTime:Float = 0.005;
 
 /// Internal
 
     static var timestampStart:Float = 0.0;
-
     var windowW:Int;
-
     var windowH:Int;
-
     var windowDpr:Float = 1.0;
 
     #if (ios || tvos || android)
-    var mobileInBackground:Bool = false;
+    var mobileInBackground:AtomicBool = new AtomicBool(false);
     #end
 
-    /** Map of gamepad index to SDL gamepad instance */
-    var gamepads:IntMap<sdl.GameController>;
-
-    /** Map to retrieve original index from gamepad instance ids */
-    var gamepadInstanceIds:IntMap<Int> = new IntMap();
-
-    /** Map of joystick index to SDL joystick instance */
-    var joysticks:IntMap<sdl.Joystick>;
-
-    /** A flag to know if we SDL-triggered fullscreen is currently active or not */
+    var gamepads:haxe.ds.IntMap<SDLGamepadPointer>;
+    var gamepadInstanceIds:haxe.ds.IntMap<Int> = new haxe.ds.IntMap();
+    var joysticks:haxe.ds.IntMap<SDLJoystickPointer>;
     var isSdlFullscreen:Bool = false;
-
-    /** An internal list of finger ids */
-    var fingerIdList:Map<cpp.Int64, Int> = new Map();
+    var fingerIdList:Map<Int64, Int> = new Map();
     var nextFingerId:Int = 1;
-
     var lastFrameTime:Float = 0;
+
+    var _sdlEvent:SDLEventPointer = null;
+    var _sdlPoint:SDLPoint = null;
+    var _sdlSize:SDLSize = null;
+
+    #if (gles_angle && ios)
+    var _eglDisplay:cpp.RawPointer<Void>;
+    var _eglSurface:cpp.RawPointer<Void>;
+    var _eglConfig:cpp.RawPointer<Void>;
+    #end
 
 /// Lifecycle
 
@@ -98,8 +91,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         timestampStart = Timestamp.now();
         name = 'sdl';
 
-        gamepads = new IntMap();
-        joysticks = new IntMap();
+        gamepads = new haxe.ds.IntMap();
+        joysticks = new haxe.ds.IntMap();
 
         initSDL();
         initCwd();
@@ -113,7 +106,6 @@ class SDLRuntime extends clay.base.BaseRuntime {
     override function ready() {
 
         createWindow();
-
         Log.debug('SDL / ready');
 
     }
@@ -125,8 +117,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         #if (ios || tvos)
 
         done = false;
-        Log.debug('SDL / attaching iOS CADisplayLink loop');
-        SDL.iPhoneSetAnimationCallback(window, 1, loop, null);
+        Log.debug('SDL / iOS / attach animation callback');
+        SDL.setiOSAnimationCallback(window, iOSAnimationCallback);
 
         #else
 
@@ -143,6 +135,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    #if (ios || tvos)
+    function iOSAnimationCallback():Void {
+        loop(0);
+    }
+    #end
+
     override function shutdown(immediate:Bool = false) {
 
         if (!immediate) {
@@ -158,73 +156,87 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     function initSDL() {
 
+        SDL.bind();
+
+        #if (gles_angle && !ios)
+        // Set SDL hint to use ANGLE for OpenGL ES
+        SDL.setHint(SDL.SDL_HINT_OPENGL_ES_DRIVER, "1");
+        #end
+
+        // Init value pointers
+        _sdlEvent = untyped __cpp__('new SDL_Event()');
+        _sdlSize = untyped __cpp__('new ::linc::sdl::SDLSize()');
+        _sdlPoint = untyped __cpp__('new ::linc::sdl::SDLPoint()');
+
         // Init SDL
-        var status = SDL.init(SDL_INIT_TIMER);
-        if (status != 0) {
-            throw 'SDL / Failed to init: ${SDL.getError()}';
+        var status = SDL.init();
+        if (!status) {
+            throw 'SDL / failed to init: ${SDL.getError()}';
+        }
+
+        // Init SDL events subsystem
+        if (!SDL.initSubSystem(SDL.SDL_INIT_EVENTS)) {
+            throw 'SDL / failed to init events: ${SDL.getError()}';
+        } else {
+            Log.debug('SDL / init events');
         }
 
         // Init video
-        var status = SDL.initSubSystem(SDL_INIT_VIDEO);
-        if (status != 0) {
-            throw 'SDL / Failed to init video: ${SDL.getError()}';
-        }
-        else {
+        if (!SDL.initSubSystem(SDL.SDL_INIT_VIDEO)) {
+            throw 'SDL / failed to init video: ${SDL.getError()}';
+        } else {
             Log.debug('SDL / init video');
         }
 
         #if (soloud_use_sdl || sdl_enable_audio)
         // Init audio
-        var status = SDL.initSubSystem(SDL_INIT_AUDIO);
-        if (status == -1) {
-            Log.warning('SDL / Failed to init audio: ${SDL.getError()}');
-        }
-        else {
+        if (!SDL.initSubSystem(SDL.SDL_INIT_AUDIO)) {
+            Log.warning('SDL / failed to init audio: ${SDL.getError()}');
+        } else {
             Log.debug('SDL / init audio');
         }
         #end
 
         // Init controllers
-        var status = SDL.initSubSystem(SDL_INIT_GAMECONTROLLER);
-        if (status == -1) {
-            Log.warning('SDL / Failed to init controller: ${SDL.getError()}');
-        }
-        else {
-            Log.debug('SDL / init controller');
+        if (!SDL.initSubSystem(SDL.SDL_INIT_GAMEPAD)) {
+            Log.warning('SDL / failed to init gamepad: ${SDL.getError()}');
+        } else {
+            Log.debug('SDL / init gamepad');
         }
 
         #if clay_sdl_init_sensor
         // Init sensors
-        var status = SDL.initSubSystem(SDL_INIT_SENSOR);
-        if (status != 0) {
-            throw 'SDL / Failed to init sensor: ${SDL.getError()}';
-        }
-        else {
+        if (!SDL.initSubSystem(SDL.SDL_INIT_SENSOR)) {
+            throw 'SDL / failed to init sensor: ${SDL.getError()}';
+        } else {
             Log.debug('SDL / init sensor');
         }
         #end
 
         // Init joystick
-        var status = SDL.initSubSystem(SDL_INIT_JOYSTICK);
-        if (status == -1) {
-            Log.warning('SDL / Failed to init joystick: ${SDL.getError()}');
-        }
-        else {
+        if (!SDL.initSubSystem(SDL.SDL_INIT_JOYSTICK)) {
+            Log.warning('SDL / failed to init joystick: ${SDL.getError()}');
+        } else {
             Log.debug('SDL / init joystick');
         }
 
-        // Init haptic
-        var status = SDL.initSubSystem(SDL_INIT_HAPTIC);
-        if (status == -1) {
-            Log.warning('SDL / Failed to init haptic: ${SDL.getError()}');
+        // Init gamepad
+        if (!SDL.initSubSystem(SDL.SDL_INIT_GAMEPAD)) {
+            throw 'SDL / failed to init gamepad: ${SDL.getError()}';
+        } else {
+            Log.debug('SDL / init gamepad');
         }
-        else {
+
+        // Init haptic
+        if (!SDL.initSubSystem(SDL.SDL_INIT_HAPTIC)) {
+            Log.warning('SDL / failed to init haptic: ${SDL.getError()}');
+        } else {
             Log.debug('SDL / init haptic');
         }
 
         // Mobile events
         #if (android || ios || tvos)
-        SDL.addEventWatch(handleSdlEventWatch, null);
+        SDL.setEventWatch(window, handleSdlEventWatch);
         #end
 
         Log.success('SDL / init success');
@@ -238,8 +250,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         Log.debug('Runtime / init with app path $appPath');
         if (appPath != null && appPath != '') {
             Sys.setCwd(appPath);
-        }
-        else {
+        } else {
             Log.debug('Runtime / no need to change cwd');
         }
 
@@ -258,45 +269,50 @@ class SDLRuntime extends clay.base.BaseRuntime {
         windowH = windowConfig.height;
 
         // Init SDL video subsystem
-        var status = SDL.initSubSystem(SDL_INIT_VIDEO);
-        if (status != 0) {
+        if (!SDL.initSubSystem(SDL.SDL_INIT_VIDEO)) {
             throw 'SDL / failed to init video: ${SDL.getError()}';
-        }
-        else {
+        } else {
             Log.debug('SDL / init video (window)');
         }
 
         #if windows
         // Get DPI info (needed on windows to adapt window size)
-        var dpiInfo:Array<cpp.Float32> = [];
-        SDL.getDisplayDPI(0, dpiInfo);
-        var createWindowWidth:Int = Std.int(windowConfig.width * dpiInfo[1] / dpiInfo[3]);
-        var createWindowHeight:Int = Std.int(windowConfig.height * dpiInfo[2] / dpiInfo[3]);
+        var displayID = SDL.getPrimaryDisplay();
+        var contentScale = SDL.getDisplayContentScale(displayID);
+        var createWindowWidth:Int = Std.int(windowConfig.width * contentScale);
+        var createWindowHeight:Int = Std.int(windowConfig.height * contentScale);
         #else
         var createWindowWidth:Int = windowConfig.width;
         var createWindowHeight:Int = windowConfig.height;
         #end
 
         // Create window
-        window = SDL.createWindow('' + windowConfig.title, windowConfig.x, windowConfig.y, createWindowWidth, createWindowHeight, windowFlags(windowConfig));
+        window = SDL.createWindow(
+            windowConfig.title != null ? windowConfig.title : 'clay app',
+            windowConfig.x, windowConfig.y,
+            createWindowWidth, createWindowHeight,
+            windowFlags(windowConfig)
+        );
 
         if (window == null) {
             throw 'SDL / failed to create window: ${SDL.getError()}';
         }
+
+        untyped __cpp__('SDL_SyncWindow({0})', window);
 
         var windowId:Int = SDL.getWindowID(window);
 
         Log.debug('SDL / created window with id: $windowId');
         Log.debug('SDL / creating render context...');
 
-        if (!createRenderContext(window)) {
+        if (!createRenderContext(window, config.render)) {
             throw 'SDL / failed to create render context: ${SDL.getError()}';
         }
 
         postRenderContext(window);
 
         var actualConfig = app.copyWindowConfig(windowConfig);
-        var actualRender = app.copyRenderConfig(app.config.render);
+        var actualRender = app.copyRenderConfig(config.render);
 
         actualConfig = updateWindowConfig(window, actualConfig);
         actualRender = updateRenderConfig(window, actualRender);
@@ -307,78 +323,82 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         Log.debug('SDL / GL / RBGA / ${render.redBits} ${render.greenBits} ${render.blueBits} ${render.alphaBits}');
 
-        SDL.GL_SetAttribute(SDL_GL_RED_SIZE,     render.redBits);
-        SDL.GL_SetAttribute(SDL_GL_GREEN_SIZE,   render.greenBits);
-        SDL.GL_SetAttribute(SDL_GL_BLUE_SIZE,    render.blueBits);
-        SDL.GL_SetAttribute(SDL_GL_ALPHA_SIZE,   render.alphaBits);
-        SDL.GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL.GL_SetAttribute(SDL.SDL_GL_RED_SIZE, render.redBits);
+        SDL.GL_SetAttribute(SDL.SDL_GL_GREEN_SIZE, render.greenBits);
+        SDL.GL_SetAttribute(SDL.SDL_GL_BLUE_SIZE, render.blueBits);
+        SDL.GL_SetAttribute(SDL.SDL_GL_ALPHA_SIZE, render.alphaBits);
+        SDL.GL_SetAttribute(SDL.SDL_GL_DOUBLEBUFFER, 1);
 
         if (render.depth > 0) {
             Log.debug('SDL / GL / depth / ${render.depth}');
-            SDL.GL_SetAttribute(SDL_GL_DEPTH_SIZE, render.depth);
+            SDL.GL_SetAttribute(SDL.SDL_GL_DEPTH_SIZE, render.depth);
         }
 
         if (render.stencil > 0) {
             Log.debug('SDL / GL / stencil / ${render.stencil}');
-            SDL.GL_SetAttribute(SDL_GL_STENCIL_SIZE, render.stencil);
+            SDL.GL_SetAttribute(SDL.SDL_GL_STENCIL_SIZE, render.stencil);
         }
 
         if (render.antialiasing > 0) {
             Log.debug('SDL / GL / MSAA / ${render.antialiasing}');
-            SDL.GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-            SDL.GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, render.antialiasing);
+            SDL.GL_SetAttribute(SDL.SDL_GL_MULTISAMPLEBUFFERS, 1);
+            SDL.GL_SetAttribute(SDL.SDL_GL_MULTISAMPLESAMPLES, render.antialiasing);
+        }
+
+        var glProfile = switch render.opengl.profile {
+            case COMPATIBILITY: SDL.SDL_GL_CONTEXT_PROFILE_COMPATIBILITY;
+            case CORE: SDL.SDL_GL_CONTEXT_PROFILE_CORE;
+            case GLES: SDL.SDL_GL_CONTEXT_PROFILE_ES;
         }
 
         Log.debug('SDL / GL / profile / ${render.opengl.profile}');
+        SDL.GL_SetAttribute(SDL.SDL_GL_CONTEXT_PROFILE_MASK, glProfile);
 
-        switch render.opengl.profile {
+        if (render.opengl.profile == CORE) {
+            SDL.GL_SetAttribute(SDL.SDL_GL_ACCELERATED_VISUAL, 1);
+        } else if (render.opengl.profile == GLES) {
+            SDL.GL_SetAttribute(SDL.SDL_GL_ACCELERATED_VISUAL, 1);
 
-            case COMPATIBILITY:
-                SDL.GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDLGLprofile.SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-
-            case CORE:
-                SDL.GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-                SDL.GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDLGLprofile.SDL_GL_CONTEXT_PROFILE_CORE);
-
-            case GLES:
-                SDL.GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
-                SDL.GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDLGLprofile.SDL_GL_CONTEXT_PROFILE_ES);
-
-                if (render.opengl.major == 0) {
-                    render.opengl.major = 2;
-                    render.opengl.minor = 0;
-                }
+            if (render.opengl.major == 0) {
+                render.opengl.major = 2;
+                render.opengl.minor = 0;
+            }
         }
 
         if (render.opengl.major != 0) {
             Log.debug('SDL / GL / version / ${render.opengl.major}.${render.opengl.minor}');
-            SDL.GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, render.opengl.major);
-            SDL.GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, render.opengl.minor);
+            SDL.GL_SetAttribute(SDL.SDL_GL_CONTEXT_MAJOR_VERSION, render.opengl.major);
+            SDL.GL_SetAttribute(SDL.SDL_GL_CONTEXT_MINOR_VERSION, render.opengl.minor);
         }
 
     }
 
-    function windowFlags(config:WindowConfig) {
+    function windowFlags(config:WindowConfig):SDLWindowFlags {
 
         var flags:SDLWindowFlags = 0;
 
         #if clay_sdl_headless
-        flags |= SDL_WINDOW_HIDDEN;
+        untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_HIDDEN);
         #end
 
-        flags |= SDL_WINDOW_OPENGL;
-        flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+        #if (gles_angle && ios)
+        untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_METAL);
+        #else
+        untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_OPENGL);
+        #end
 
-        if (config.resizable)  flags |= SDL_WINDOW_RESIZABLE;
-        if (config.borderless) flags |= SDL_WINDOW_BORDERLESS;
+        untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_HIGH_PIXEL_DENSITY);
+
+        if (config.resizable)  untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_RESIZABLE);
+        if (config.borderless) untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_BORDERLESS);
 
         if (config.fullscreen) {
             isSdlFullscreen = true;
             if (!config.trueFullscreen) {
-                flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+                untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_FULLSCREEN);
             } else {
                 #if !mac
-                flags |= SDL_WINDOW_FULLSCREEN;
+                untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_FULLSCREEN);
                 #end
             }
         }
@@ -387,16 +407,107 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function createRenderContext(window:sdl.Window):Bool {
+    function createRenderContext(window:SDLWindowPointer, render:RenderConfig):Bool {
 
+        #if (gles_angle && ios)
+
+        // On iOS, when using ANGLE, we need to use EGL API and explicit METAL view
+        // THANK YOU: https://gist.github.com/SasLuca/307a523d2c6f2900af5823f0792a8a93
+
+        untyped __cpp__('SDL_MetalView metal_view = SDL_Metal_CreateView({0})', window);
+        untyped __cpp__('void* metal_layer = SDL_Metal_GetLayer(metal_view)');
+
+        untyped __cpp__('
+        EGLAttrib egl_display_attribs[] = {
+            EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+            EGL_POWER_PREFERENCE_ANGLE, EGL_HIGH_POWER_ANGLE,
+            EGL_NONE
+        }');
+
+        untyped __cpp__('EGLDisplay egl_display = eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, (void*) EGL_DEFAULT_DISPLAY, egl_display_attribs)');
+        if (untyped __cpp__('egl_display == EGL_NO_DISPLAY')) {
+            Log.error('SDL / failed to get EGL display');
+            return false;
+        }
+
+        if (untyped __cpp__('eglInitialize(egl_display, NULL, NULL) == false')) {
+            Log.error('SDL / failed to initialize EGL');
+            return false;
+        }
+
+        untyped __cpp__('
+        EGLint egl_config_attribs[] = {
+            EGL_RED_SIZE, {0},
+            EGL_GREEN_SIZE, {1},
+            EGL_BLUE_SIZE, {2},
+            EGL_ALPHA_SIZE, {3},
+            EGL_DEPTH_SIZE, {4},
+            EGL_STENCIL_SIZE, {5},
+            EGL_COLOR_BUFFER_TYPE, EGL_RGB_BUFFER,
+            EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+            EGL_SAMPLE_BUFFERS, {6},
+            EGL_SAMPLES, {7},
+            EGL_NONE
+        }',
+        render.redBits,
+        render.greenBits,
+        render.blueBits,
+        render.alphaBites,
+        render.depth,
+        render.stencil,
+        render.antialiasing > 0 ? 1 : 0,
+        render.antialiasing
+        );
+
+        untyped __cpp__('EGLConfig egl_config');
+        untyped __cpp__('EGLint egl_configs_count');
+        if (untyped __cpp__('!eglChooseConfig(egl_display, egl_config_attribs, &egl_config, 1, &egl_configs_count)')) {
+            Log.error('SDL / failed to choose EGL config');
+            return false;
+        }
+
+        untyped __cpp__('
+        EGLint egl_context_attribs[] = {
+            EGL_CONTEXT_CLIENT_VERSION, 3,
+            EGL_NONE
+        }');
+        untyped __cpp__('EGLContext egl_context = eglCreateContext(egl_display, egl_config, EGL_NO_CONTEXT, egl_context_attribs)');
+        if (untyped __cpp__('egl_context == EGL_NO_CONTEXT')) {
+            Log.error('SDL / failed to create EGL contex');
+            return false;
+        }
+
+        untyped __cpp__('EGLSurface egl_surface = eglCreateWindowSurface(egl_display, egl_config, metal_layer, NULL)');
+        if (untyped __cpp__('egl_surface == EGL_NO_SURFACE'))
+        {
+            Log.error('SDL / failed to create EGL surface');
+            return false;
+        }
+
+        if (untyped __cpp__('!eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context)'))
+        {
+            Log.error('SDL / failed to make EGL context current');
+            return false;
+        }
+
+        _eglDisplay = untyped __cpp__('egl_display');
+        _eglSurface = untyped __cpp__('egl_surface');
+        _eglConfig = untyped __cpp__('egl_config');
+
+        var success = true;
+
+        #else
+
+        // Standard SDL GL context creation
         gl = SDL.GL_CreateContext(window);
+        var success = (!gl.isNull());
 
-        var success = (gl.isnull() == false);
+        #end
 
         if (success) {
             Log.success('SDL / GL init success');
-        }
-        else {
+        } else {
             Log.error('SDL / GL init error');
         }
 
@@ -404,9 +515,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function postRenderContext(window:sdl.Window) {
+    function postRenderContext(window:SDLWindowPointer) {
 
-        SDL.GL_MakeCurrent(window, gl);
+        if (gl != null) {
+            SDL.GL_MakeCurrent(window, gl);
+        }
 
         #if clay_use_glew
         var result = GLEW.init();
@@ -416,6 +529,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / GLEW init / ok');
         }
         #end
+
+        // Log OpenGL information
+        var vendor = GL.getParameter(GL.VENDOR);
+        var renderer = GL.getParameter(GL.RENDERER);
+        var version = GL.getParameter(GL.VERSION);
+
+        Log.info('SDL / GL / Vendor: $vendor');
+        Log.info('SDL / GL / Renderer: $renderer');
+        Log.info('SDL / GL / Version: $version');
 
         // Also clear the garbage in both front/back buffer
         #if (!clay_no_initial_gl_clear && linc_opengl)
@@ -435,31 +557,31 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function updateWindowConfig(window:sdl.Window, config:WindowConfig):WindowConfig {
+    function updateWindowConfig(window:SDLWindowPointer, config:WindowConfig):WindowConfig {
 
         if (config.fullscreen) {
             if (config.trueFullscreen) {
                 #if mac
-                SDL.setWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
+                SDL.setWindowFullscreen(window, true);
                 #end
             }
         }
 
-        var size = SDL.GL_GetDrawableSize(window, { w: config.width, h: config.height });
-        var pos = SDL.getWindowPosition(window, { x: config.x, y: config.y });
+        SDL.getWindowSizeInPixels(window, _sdlSize);
+        windowW = _sdlSize.w;
+        windowH = _sdlSize.h;
+        SDL.getWindowPosition(window, _sdlPoint);
+        config.x = _sdlPoint.x;
+        config.y = _sdlPoint.y;
 
         windowDpr = windowDevicePixelRatio();
 
-        config.x = pos.x;
-        config.y = pos.y;
-        windowW = size.w;
-        windowH = size.h;
-        #if android
+        //#if android
         windowW = Math.round(windowW / windowDpr);
         windowH = Math.round(windowH / windowDpr);
-        #end
-        config.width = windowW = size.w;
-        config.height = windowH = size.h;
+        //#end
+        config.width = windowW;
+        config.height = windowH;
 
         Log.debug('SDL / window / x=${config.x} y=${config.y} w=${config.width} h=${config.height} scale=$windowDpr');
 
@@ -467,32 +589,72 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function updateRenderConfig(window:sdl.Window, render:RenderConfig):RenderConfig {
+    function updateRenderConfig(window:SDLWindowPointer, render:RenderConfig):RenderConfig {
 
-        render.antialiasing = SDL.GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES);
-        render.redBits      = SDL.GL_GetAttribute(SDL_GL_RED_SIZE);
-        render.greenBits    = SDL.GL_GetAttribute(SDL_GL_GREEN_SIZE);
-        render.blueBits     = SDL.GL_GetAttribute(SDL_GL_BLUE_SIZE);
-        render.alphaBits    = SDL.GL_GetAttribute(SDL_GL_ALPHA_SIZE);
-        render.depth        = SDL.GL_GetAttribute(SDL_GL_DEPTH_SIZE);
-        render.stencil      = SDL.GL_GetAttribute(SDL_GL_STENCIL_SIZE);
+        #if (gles_angle && ios)
 
-        render.opengl.major = SDL.GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION);
-        render.opengl.minor = SDL.GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION);
+        untyped __cpp__('
+        EGLDisplay egl_display = {0};
+        EGLConfig egl_config = {1};
 
-        var profile:SDLGLprofile = SDL.GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK);
+        EGLint actual_red_size, actual_green_size, actual_blue_size, actual_alpha_size;
+        EGLint actual_depth_size, actual_stencil_size;
+        EGLint actual_surface_type, actual_renderable_type;
+        EGLint actual_sample_buffers, actual_samples;
+
+        eglGetConfigAttrib(egl_display, egl_config, EGL_RED_SIZE, &actual_red_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_GREEN_SIZE, &actual_green_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_BLUE_SIZE, &actual_blue_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_ALPHA_SIZE, &actual_alpha_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_DEPTH_SIZE, &actual_depth_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_STENCIL_SIZE, &actual_stencil_size);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_SURFACE_TYPE, &actual_surface_type);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_RENDERABLE_TYPE, &actual_renderable_type);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_SAMPLE_BUFFERS, &actual_sample_buffers);
+        eglGetConfigAttrib(egl_display, egl_config, EGL_SAMPLES, &actual_samples);
+        ',
+        _eglDisplay, _eglConfig);
+
+        render.antialiasing = untyped __cpp__('actual_samples');
+        render.redBits      = untyped __cpp__('actual_red_size');
+        render.greenBits    = untyped __cpp__('actual_green_size');
+        render.blueBits     = untyped __cpp__('actual_blue_size');
+        render.alphaBits    = untyped __cpp__('actual_alpha_size');
+        render.depth        = untyped __cpp__('actual_depth_size');
+        render.stencil      = untyped __cpp__('actual_stencil_size');
+
+        render.opengl.major = 3;
+        render.opengl.minor = 0;
+        render.opengl.profile = GLES;
+
+        #else
+
+        render.antialiasing = SDL.GL_GetAttribute(SDL.SDL_GL_MULTISAMPLESAMPLES);
+        render.redBits      = SDL.GL_GetAttribute(SDL.SDL_GL_RED_SIZE);
+        render.greenBits    = SDL.GL_GetAttribute(SDL.SDL_GL_GREEN_SIZE);
+        render.blueBits     = SDL.GL_GetAttribute(SDL.SDL_GL_BLUE_SIZE);
+        render.alphaBits    = SDL.GL_GetAttribute(SDL.SDL_GL_ALPHA_SIZE);
+        render.depth        = SDL.GL_GetAttribute(SDL.SDL_GL_DEPTH_SIZE);
+        render.stencil      = SDL.GL_GetAttribute(SDL.SDL_GL_STENCIL_SIZE);
+
+        render.opengl.major = SDL.GL_GetAttribute(SDL.SDL_GL_CONTEXT_MAJOR_VERSION);
+        render.opengl.minor = SDL.GL_GetAttribute(SDL.SDL_GL_CONTEXT_MINOR_VERSION);
+
+        var profile:Int = SDL.GL_GetAttribute(SDL.SDL_GL_CONTEXT_PROFILE_MASK);
         switch profile {
 
-            case SDL_GL_CONTEXT_PROFILE_COMPATIBILITY:
+            case SDL.SDL_GL_CONTEXT_PROFILE_COMPATIBILITY:
                render.opengl.profile = COMPATIBILITY;
 
-            case SDL_GL_CONTEXT_PROFILE_CORE:
+            case SDL.SDL_GL_CONTEXT_PROFILE_CORE:
                render.opengl.profile = CORE;
 
-            case SDL_GL_CONTEXT_PROFILE_ES:
+            case SDL.SDL_GL_CONTEXT_PROFILE_ES:
                render.opengl.profile = GLES;
 
         }
+
+        #end
 
         return render;
 
@@ -512,14 +674,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     #end
 
-    static var _sdlSize:SDLSize = { w:0, h:0 };
-
 /// Public API
 
     #if android
 
     var _didFetchAndroidDPI:Bool = false;
-
     var _computedAndroidDensity:Float = 1.0;
 
     #end
@@ -531,10 +690,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
         if (!_didFetchAndroidDPI) {
             _didFetchAndroidDPI = true;
 
-            var dpiInfo:Array<cpp.Float32> = [];
-            SDL.getDisplayDPI(0, dpiInfo);
-            var dpi:Float = dpiInfo[1];
-            var density = Math.round(dpi / 160);
+            untyped __cpp__('SDL_DisplayID display = SDL_GetPrimaryDisplay()');
+            final scale:Float = untyped __cpp__('(::Float)SDL_GetDisplayContentScale(display)');
+            var density = Math.round(scale);
             if (density < 1) {
                 density = 1;
             }
@@ -545,10 +703,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #else
 
-        _sdlSize = SDL.GL_GetDrawableSize(window, _sdlSize);
+        SDL.getWindowSizeInPixels(window, _sdlSize);
         var pixelHeight = _sdlSize.w;
 
-        _sdlSize = SDL.getWindowSize(window, _sdlSize);
+        SDL.getWindowSize(window, _sdlSize);
         var deviceHeight = _sdlSize.w;
 
         return pixelHeight / deviceHeight;
@@ -572,15 +730,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function setWindowTitle(title:String):Void {
 
         app.config.window.title = title;
-
         SDL.setWindowTitle(window, title);
 
     }
 
-    public function setWindowBorderless(borderless):Void {
+    public function setWindowBorderless(borderless:Bool):Void {
 
         app.config.window.borderless = borderless;
-
         SDL.setWindowBordered(window, !borderless);
 
     }
@@ -590,35 +746,30 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration: Float) {
 
         var _gamepad = gamepads.get(gamepadId);
-        if (!SDL.gameControllerHasRumble(_gamepad)) return;
+        if (_gamepad == null || !SDL.gamepadHasRumble(_gamepad)) return;
 
-        var low = Std.int(0xffff * clamp(lowFrequency));
-        var high = Std.int(0xffff * clamp(highFrequency));
+        var low:UInt16 = Std.int(0xffff * clamp(lowFrequency));
+        var high:UInt16 = Std.int(0xffff * clamp(highFrequency));
 
-        SDL.gameControllerRumble(_gamepad, low, high, Std.int(duration * 1000));
+        SDL.rumbleGamepad(_gamepad, low, high, Std.int(duration * 1000));
 
     }
 
     public function stopGamepadRumble(gamepadId:Int) {
 
         var _gamepad = gamepads.get(gamepadId);
-        if (!SDL.gameControllerHasRumble(_gamepad)) return;
-        SDL.gameControllerRumble(_gamepad, 0, 0, 1);
+        if (_gamepad == null || !SDL.gamepadHasRumble(_gamepad)) return;
+        SDL.rumbleGamepad(_gamepad, 0, 0, 1);
 
     }
 
     public function getGamepadName(index:Int):String {
 
         var deviceIndex = gamepadInstanceIds.exists(index) ? gamepadInstanceIds.get(index) : index;
-        return SDL.gameControllerNameForIndex(deviceIndex);
+        return SDL.getGamepadNameForID(deviceIndex);
 
     }
 
-    /**
-     * Set window fullscreen (true or false)
-     * @param fullscreen
-     * @return Bool `true` if the requested setting is accepted
-     */
     public function setWindowFullscreen(fullscreen:Bool):Bool {
 
         #if mac
@@ -636,25 +787,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
         isSdlFullscreen = fullscreen;
         app.config.window.fullscreen = fullscreen;
 
-        if (fullscreen) {
-            if (app.config.window.trueFullscreen) {
-                SDL.setWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
-            }
-            else {
-                SDL.setWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-            }
-        }
-        else {
-            SDL.setWindowFullscreen(window, 0);
-        }
-
-        return true;
+        return SDL.setWindowFullscreen(window, fullscreen);
 
     }
 
     public function windowSwap() {
 
+        #if (gles_angle && ios)
+        untyped __cpp__('eglSwapBuffers({0}, {1})', _eglDisplay, _eglSurface);
+        #else
         SDL.GL_SwapWindow(window);
+        #end
+
         #if clay_gl_finish
         GL.finish();
         #end
@@ -667,18 +811,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         inline function _loop() {
 
-            while (SDL.hasAnEvent()) {
+            while (SDL.pollEvent(_sdlEvent)) {
 
-                var e = SDL.pollEvent();
-
+                var e = new SDLEvent(_sdlEvent);
                 currentSdlEvent = e;
 
-                app.events.sdlEvent(e);
+                app.events.sdlEvent(cast _sdlEvent);
 
                 handleInputEvent(e);
                 handleWindowEvent(e);
 
-                if (e.type == SDL_QUIT) {
+                if (e.type == SDL.SDL_EVENT_QUIT) {
                     app.emitQuit();
                 }
 
@@ -698,8 +841,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
                 #end
                 #end
-            }
-            else {
+            } else {
                 #if !clay_native_no_tick_sleep
                 Sys.sleep(0.0001);
                 #end
@@ -709,7 +851,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
                 #if ios
                 // iOS doesn't like it when we send GPU commands when app is in background
-                if (!mobileInBackground) {
+                if (!mobileInBackground.load()) {
                 #end
                     if (doUpdate) {
                         windowSwap();
@@ -731,8 +873,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             } catch (e:Dynamic) {
                 app.config.runtime.uncaughtErrorHandler(e);
             }
-        }
-        else {
+        } else {
             _loop();
         }
 
@@ -740,211 +881,211 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Input
 
-    function handleInputEvent(e:sdl.Event) {
+    function handleInputEvent(e:SDLEvent) {
 
         switch e.type {
 
         /// Keys
 
-            case SDL_KEYDOWN:
+            case SDL.SDL_EVENT_KEY_DOWN:
                 if (!skipKeyboardEvents) {
                     app.input.emitKeyDown(
-                        e.key.keysym.sym,
-                        e.key.keysym.scancode,
-                        e.key.repeat,
-                        toKeyMod(e.key.keysym.mod),
-                        e.key.timestamp / 1000.0,
-                        Std.int(e.key.windowID)
+                        e.keycode,
+                        e.keyScancode,
+                        e.keyRepeat,
+                        toKeyMod(e.keymod),
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
-            case SDL_KEYUP:
+            case SDL.SDL_EVENT_KEY_UP:
                 if (!skipKeyboardEvents) {
                     app.input.emitKeyUp(
-                        e.key.keysym.sym,
-                        e.key.keysym.scancode,
-                        e.key.repeat,
-                        toKeyMod(e.key.keysym.mod),
-                        e.key.timestamp / 1000.0,
-                        Std.int(e.key.windowID)
+                        e.keycode,
+                        e.keyScancode,
+                        e.keyRepeat,
+                        toKeyMod(e.keymod),
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
-            case SDL_TEXTEDITING:
+            case SDL.SDL_EVENT_TEXT_EDITING:
                 if (!skipKeyboardEvents) {
                     app.input.emitText(
-                        e.edit.text,
-                        e.edit.start,
-                        e.edit.length,
+                        e.editText,
+                        e.editStart,
+                        e.editLength,
                         TextEventType.EDIT,
-                        e.edit.timestamp / 1000.0,
-                        Std.int(e.edit.windowID)
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
-            case SDL_TEXTINPUT:
+            case SDL.SDL_EVENT_TEXT_INPUT:
                 if (!skipKeyboardEvents) {
                     app.input.emitText(
-                        e.text.text,
+                        e.textText,
                         0,
                         0,
                         TextEventType.INPUT,
-                        e.text.timestamp / 1000.0,
-                        Std.int(e.text.windowID)
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
         /// Mouse
 
-            case SDL_MOUSEMOTION:
+            case SDL.SDL_EVENT_MOUSE_MOTION:
                 if (!skipMouseEvents) {
                     app.input.emitMouseMove(
-                        toPixels(e.motion.x),
-                        toPixels(e.motion.y),
-                        toPixels(e.motion.xrel),
-                        toPixels(e.motion.yrel),
-                        e.motion.timestamp / 1000.0,
-                        Std.int(e.motion.windowID)
+                        toPixels(e.motionX),
+                        toPixels(e.motionY),
+                        toPixels(e.motionXrel),
+                        toPixels(e.motionYrel),
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
-            case SDL_MOUSEBUTTONDOWN:
+            case SDL.SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (!skipMouseEvents) {
                     app.input.emitMouseDown(
-                        toPixels(e.button.x),
-                        toPixels(e.button.y),
-                        e.button.button - 1,
-                        e.button.timestamp / 1000.0,
-                        Std.int(e.button.windowID)
+                        toPixels(e.mouseX),
+                        toPixels(e.mouseY),
+                        e.mouseButton - 1,
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
-            case SDL_MOUSEBUTTONUP:
+            case SDL.SDL_EVENT_MOUSE_BUTTON_UP:
                 if (!skipMouseEvents) {
                     app.input.emitMouseUp(
-                        toPixels(e.button.x),
-                        toPixels(e.button.y),
-                        e.button.button - 1,
-                        e.button.timestamp / 1000.0,
-                        Std.int(e.button.windowID)
+                        toPixels(e.mouseX),
+                        toPixels(e.mouseY),
+                        e.mouseButton - 1,
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
-            case SDL_MOUSEWHEEL:
+            case SDL.SDL_EVENT_MOUSE_WHEEL:
                 if (!skipMouseEvents) {
                     final wheelFactor = -5.0; // Try to have consistent behavior between web and native platforms
                     app.input.emitMouseWheel(
                         #if !clay_no_wheel_round
-                        Math.round(e.wheel.x * wheelFactor),
-                        Math.round(e.wheel.y * wheelFactor),
+                        Math.round(e.wheelX * wheelFactor),
+                        Math.round(e.wheelY * wheelFactor),
                         #else
-                        e.wheel.x * wheelFactor,
-                        e.wheel.y * wheelFactor,
+                        e.wheelX * wheelFactor,
+                        e.wheelY * wheelFactor,
                         #end
-                        e.wheel.timestamp / 1000.0,
-                        Std.int(e.wheel.windowID)
+                        e.timestamp.toInt() / 1000.0,
+                        Std.int(e.windowID)
                     );
                 }
 
         /// Touch
 
-            case SDL_FINGERDOWN:
+            case SDL.SDL_EVENT_FINGER_DOWN:
                 app.input.emitTouchDown(
-                    e.tfinger.x,
-                    e.tfinger.y,
-                    e.tfinger.dx,
-                    e.tfinger.dy,
-                    toFingerId(e.tfinger.fingerId),
-                    e.tfinger.timestamp / 1000.0
+                    e.tfingerX,
+                    e.tfingerY,
+                    e.tfingerDx,
+                    e.tfingerDy,
+                    toFingerId(e.tfingerId.toInt()),
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_FINGERUP:
+            case SDL.SDL_EVENT_FINGER_UP:
                 app.input.emitTouchUp(
-                    e.tfinger.x,
-                    e.tfinger.y,
-                    e.tfinger.dx,
-                    e.tfinger.dy,
-                    toFingerId(e.tfinger.fingerId),
-                    e.tfinger.timestamp / 1000.0
+                    e.tfingerX,
+                    e.tfingerY,
+                    e.tfingerDx,
+                    e.tfingerDy,
+                    toFingerId(e.tfingerId.toInt()),
+                    e.timestamp.toInt() / 1000.0
                 );
-                removeFingerId(e.tfinger.fingerId);
+                removeFingerId(e.tfingerId.toInt());
 
-            case SDL_FINGERMOTION:
+            case SDL.SDL_EVENT_FINGER_MOTION:
                 app.input.emitTouchMove(
-                    e.tfinger.x,
-                    e.tfinger.y,
-                    e.tfinger.dx,
-                    e.tfinger.dy,
-                    toFingerId(e.tfinger.fingerId),
-                    e.tfinger.timestamp / 1000.0
+                    e.tfingerX,
+                    e.tfingerY,
+                    e.tfingerDx,
+                    e.tfingerDy,
+                    toFingerId(e.tfingerId.toInt()),
+                    e.timestamp.toInt() / 1000.0
                 );
 
         #if clay_sdl_joystick_to_gamepad
 
         /// Joystick events
 
-            case SDL_JOYAXISMOTION:
+            case SDL.SDL_EVENT_JOYSTICK_AXIS_MOTION:
 
-                if (!SDL.isGameController(e.jaxis.which)) {
+                if (!SDL.isGamepad(e.jaxisWhich)) {
                     // (range: -32768 to 32767)
-                    var val:Float = (e.jaxis.value+32768)/(32767+32768);
+                    var val:Float = (e.jaxisValue+32768)/(32767+32768);
                     var normalizedVal = (-0.5 + val) * 2.0;
 
                     app.input.emitGamepadAxis(
-                        e.jaxis.which,
-                        e.jaxis.axis,
+                        e.jaxisWhich,
+                        e.jaxisAxis,
                         normalizedVal,
-                        e.jaxis.timestamp / 1000.0
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
-            case SDL_JOYBUTTONDOWN:
+            case SDL.SDL_EVENT_JOYSTICK_BUTTON_DOWN:
 
-                if (!SDL.isGameController(e.jbutton.which)) {
+                if (!SDL.isGamepad(e.jbuttonWhich)) {
                     app.input.emitGamepadDown(
-                        e.jbutton.which,
-                        e.jbutton.button,
+                        e.jbuttonWhich,
+                        e.jbuttonButton,
                         1,
-                        e.jbutton.timestamp / 1000.0
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
-            case SDL_JOYBUTTONUP:
+            case SDL.SDL_EVENT_JOYSTICK_BUTTON_UP:
 
-                if (!SDL.isGameController(e.jbutton.which)) {
+                if (!SDL.isGamepad(e.jbuttonWhich)) {
                     app.input.emitGamepadUp(
-                        e.jbutton.which,
-                        e.jbutton.button,
+                        e.jbuttonWhich,
+                        e.jbuttonButton,
                         0,
-                        e.jbutton.timestamp / 1000.0
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
-            case SDL_JOYDEVICEADDED:
+            case SDL.SDL_EVENT_JOYSTICK_ADDED:
 
-                if (!SDL.isGameController(e.jdevice.which)) {
-                    var joystick = SDL.joystickOpen(e.jdevice.which);
-                    joysticks.set(e.jdevice.which, joystick);
+                if (!SDL.isGamepad(e.jdeviceWhich)) {
+                    var joystick = SDL.openJoystick(e.jdeviceWhich);
+                    joysticks.set(e.jdeviceWhich, joystick);
 
                     app.input.emitGamepadDevice(
-                        e.jdevice.which,
-                        SDL.joystickNameForIndex(e.jdevice.which),
+                        e.jdeviceWhich,
+                        SDL.getJoystickNameForID(e.jdeviceWhich),
                         GamepadDeviceEventType.DEVICE_ADDED,
-                        e.jdevice.timestamp / 1000.0
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
-            case SDL_JOYDEVICEREMOVED:
+            case SDL.SDL_EVENT_JOYSTICK_REMOVED:
 
-                if (!SDL.isGameController(e.jdevice.which)) {
-                    var joystick = joysticks.get(e.jdevice.which);
-                    SDL.joystickClose(joystick);
-                    joysticks.remove(e.jdevice.which);
+                if (!SDL.isGamepad(e.jdeviceWhich)) {
+                    var joystick = joysticks.get(e.jdeviceWhich);
+                    SDL.closeJoystick(joystick);
+                    joysticks.remove(e.jdeviceWhich);
 
                     app.input.emitGamepadDevice(
-                        e.jdevice.which,
-                        SDL.joystickNameForIndex(e.jdevice.which),
+                        e.jdeviceWhich,
+                        SDL.getJoystickNameForID(e.jdeviceWhich),
                         GamepadDeviceEventType.DEVICE_REMOVED,
-                        e.jdevice.timestamp / 1000.0
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
@@ -952,86 +1093,84 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         /// Gamepad
 
-            case SDL_CONTROLLERAXISMOTION:
+            case SDL.SDL_EVENT_GAMEPAD_AXIS_MOTION:
                 // (range: -32768 to 32767)
-                var val:Float = (e.caxis.value+32768)/(32767+32768);
+                var val:Float = (e.gaxisValue+32768)/(32767+32768);
                 var normalizedVal = (-0.5 + val) * 2.0;
                 app.input.emitGamepadAxis(
-                    e.caxis.which,
-                    e.caxis.axis,
+                    e.gaxisWhich,
+                    e.gaxisAxis,
                     normalizedVal,
-                    e.caxis.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERBUTTONDOWN:
+            case SDL.SDL_EVENT_GAMEPAD_BUTTON_DOWN:
                 app.input.emitGamepadDown(
-                    e.cbutton.which,
-                    e.cbutton.button,
+                    e.gbuttonWhich,
+                    e.gbuttonButton,
                     1,
-                    e.cbutton.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERBUTTONUP:
+            case SDL.SDL_EVENT_GAMEPAD_BUTTON_UP:
                 app.input.emitGamepadUp(
-                    e.cbutton.which,
-                    e.cbutton.button,
+                    e.gbuttonWhich,
+                    e.gbuttonButton,
                     0,
-                    e.cbutton.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERDEVICEADDED:
+            case SDL.SDL_EVENT_GAMEPAD_ADDED:
 
-                var _gamepad = SDL.gameControllerOpen(e.cdevice.which);
-                var instanceId = SDL.joystickInstanceID(SDL.gameControllerGetJoystick(_gamepad));
-                gamepads.set(e.cdevice.which, _gamepad);
-                gamepadInstanceIds.set(instanceId, e.cdevice.which);
+                var _gamepad = SDL.openGamepad(e.gdeviceWhich);
+                var instanceId = SDL.getJoystickID(cast _gamepad);
+                gamepads.set(e.gdeviceWhich, _gamepad);
+                gamepadInstanceIds.set(instanceId, e.gdeviceWhich);
 
                 #if !clay_no_gamepad_sensor
-                SDL.gameControllerSetSensorEnabled(_gamepad, SDL_SENSOR_GYRO, true);
+                SDL.setGamepadSensorEnabled(_gamepad, SDL.SDL_SENSOR_GYRO, true);
                 #end
 
                 app.input.emitGamepadDevice(
                     instanceId,
-                    SDL.gameControllerNameForIndex(e.cdevice.which),
+                    SDL.getGamepadNameForID(e.gdeviceWhich),
                     GamepadDeviceEventType.DEVICE_ADDED,
-                    e.cdevice.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERDEVICEREMOVED:
+            case SDL.SDL_EVENT_GAMEPAD_REMOVED:
 
-                var _gamepad = gamepads.get(e.cdevice.which);
-                SDL.gameControllerClose(_gamepad);
-                gamepads.remove(e.cdevice.which);
+                var _gamepad = gamepads.get(e.gdeviceWhich);
+                SDL.closeGamepad(_gamepad);
+                gamepads.remove(e.gdeviceWhich);
 
-                var deviceIndex = gamepadInstanceIds.exists(e.cdevice.which) ? gamepadInstanceIds.get(e.cdevice.which) : e.cdevice.which;
+                var deviceIndex = gamepadInstanceIds.exists(e.gdeviceWhich) ? gamepadInstanceIds.get(e.gdeviceWhich) : e.gdeviceWhich;
 
                 app.input.emitGamepadDevice(
-                    e.cdevice.which,
-                    SDL.gameControllerNameForIndex(deviceIndex),
+                    e.gdeviceWhich,
+                    SDL.getGamepadNameForID(deviceIndex),
                     GamepadDeviceEventType.DEVICE_REMOVED,
-                    e.cdevice.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERDEVICEREMAPPED:
+            case SDL.SDL_EVENT_GAMEPAD_REMAPPED:
 
-                var deviceIndex = gamepadInstanceIds.exists(e.cdevice.which) ? gamepadInstanceIds.get(e.cdevice.which) : e.cdevice.which;
+                var deviceIndex = gamepadInstanceIds.exists(e.gdeviceWhich) ? gamepadInstanceIds.get(e.gdeviceWhich) : e.gdeviceWhich;
 
                 app.input.emitGamepadDevice(
-                    e.cdevice.which,
-                    SDL.gameControllerNameForIndex(deviceIndex),
+                    e.gdeviceWhich,
+                    SDL.getGamepadNameForID(deviceIndex),
                     GamepadDeviceEventType.DEVICE_REMAPPED,
-                    e.cdevice.timestamp / 1000.0
+                    e.timestamp.toInt() / 1000.0
                 );
 
-            case SDL_CONTROLLERSENSORUPDATE:
-                if (e.csensor.sensor == SDL_SENSOR_GYRO) {
-                    var dx:Float = untyped __cpp__('(Float){0}[0]', e.csensor.data);
-                    var dy:Float = untyped __cpp__('(Float){0}[1]', e.csensor.data);
-                    var dz:Float = untyped __cpp__('(Float){0}[2]', e.csensor.data);
+            case SDL.SDL_EVENT_GAMEPAD_SENSOR_UPDATE:
+                if (e.gsensorSensor == SDL.SDL_SENSOR_GYRO) {
+                    var data = e.gsensorData;
                     app.input.emitGamepadGyro(
-                        e.csensor.which,
-                        dx, dy, dz,
-                        e.csensor.timestamp / 1000.0
+                        e.gsensorWhich,
+                        data[0], data[1], data[2],
+                        e.timestamp.toInt() / 1000.0
                     );
                 }
 
@@ -1041,7 +1180,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function toFingerId(value:cpp.Int64):Int {
+    function toFingerId(value:Int64):Int {
 
         if (!fingerIdList.exists(value)) {
             fingerIdList.set(value, nextFingerId);
@@ -1053,9 +1192,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    function removeFingerId(value:cpp.Int64):Void {
+    function removeFingerId(value:Int64):Void {
 
-        if (!fingerIdList.exists(value)) {
+        if (fingerIdList.exists(value)) {
             fingerIdList.remove(value);
         }
 
@@ -1070,22 +1209,22 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         var input = app.input;
 
-        input.modState.none    = (modValue == KMOD_NONE);
-        input.modState.lshift  = (modValue == KMOD_LSHIFT);
-        input.modState.rshift  = (modValue == KMOD_RSHIFT);
-        input.modState.lctrl   = (modValue == KMOD_LCTRL);
-        input.modState.rctrl   = (modValue == KMOD_RCTRL);
-        input.modState.lalt    = (modValue == KMOD_LALT);
-        input.modState.ralt    = (modValue == KMOD_RALT);
-        input.modState.lmeta   = (modValue == KMOD_LGUI);
-        input.modState.rmeta   = (modValue == KMOD_RGUI);
-        input.modState.num     = (modValue == KMOD_NUM);
-        input.modState.caps    = (modValue == KMOD_CAPS);
-        input.modState.mode    = (modValue == KMOD_MODE);
-        input.modState.ctrl    = (modValue == KMOD_CTRL  || modValue == KMOD_LCTRL  || modValue == KMOD_RCTRL);
-        input.modState.shift   = (modValue == KMOD_SHIFT || modValue == KMOD_LSHIFT || modValue == KMOD_RSHIFT);
-        input.modState.alt     = (modValue == KMOD_ALT   || modValue == KMOD_LALT   || modValue == KMOD_RALT);
-        input.modState.meta    = (modValue == KMOD_GUI   || modValue == KMOD_LGUI   || modValue == KMOD_RGUI);
+        input.modState.none    = (modValue == SDL.SDL_KMOD_NONE);
+        input.modState.lshift  = (modValue == SDL.SDL_KMOD_LSHIFT);
+        input.modState.rshift  = (modValue == SDL.SDL_KMOD_RSHIFT);
+        input.modState.lctrl   = (modValue == SDL.SDL_KMOD_LCTRL);
+        input.modState.rctrl   = (modValue == SDL.SDL_KMOD_RCTRL);
+        input.modState.lalt    = (modValue == SDL.SDL_KMOD_LALT);
+        input.modState.ralt    = (modValue == SDL.SDL_KMOD_RALT);
+        input.modState.lmeta   = (modValue == SDL.SDL_KMOD_LGUI);
+        input.modState.rmeta   = (modValue == SDL.SDL_KMOD_RGUI);
+        input.modState.num     = (modValue == SDL.SDL_KMOD_NUM);
+        input.modState.caps    = (modValue == SDL.SDL_KMOD_CAPS);
+        input.modState.mode    = (modValue == SDL.SDL_KMOD_MODE);
+        input.modState.ctrl    = (modValue == SDL.SDL_KMOD_CTRL  || modValue == SDL.SDL_KMOD_LCTRL  || modValue == SDL.SDL_KMOD_RCTRL);
+        input.modState.shift   = (modValue == SDL.SDL_KMOD_SHIFT || modValue == SDL.SDL_KMOD_LSHIFT || modValue == SDL.SDL_KMOD_RSHIFT);
+        input.modState.alt     = (modValue == SDL.SDL_KMOD_ALT   || modValue == SDL.SDL_KMOD_LALT   || modValue == SDL.SDL_KMOD_RALT);
+        input.modState.meta    = (modValue == SDL.SDL_KMOD_GUI   || modValue == SDL.SDL_KMOD_LGUI   || modValue == SDL.SDL_KMOD_RGUI);
 
         return app.input.modState;
 
@@ -1093,90 +1232,87 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Window
 
-    function handleWindowEvent(e:sdl.Event) {
+    function handleWindowEvent(e:SDLEvent) {
 
-        var data1 = e.window.data1;
-        var data2 = e.window.data2;
+        var data1 = e.windowData1;
+        var data2 = e.windowData2;
 
-        if (e.type == SDL_WINDOWEVENT) {
-            var type:WindowEventType = UNKNOWN;
-            switch e.window.event {
+        var type:WindowEventType = UNKNOWN;
+        switch e.type {
 
-                case SDL_WINDOWEVENT_SHOWN:
-                    type = SHOWN;
+            case SDL.SDL_EVENT_WINDOW_SHOWN:
+                type = SHOWN;
 
-                case SDL_WINDOWEVENT_HIDDEN:
-                    type = HIDDEN;
+            case SDL.SDL_EVENT_WINDOW_HIDDEN:
+                type = HIDDEN;
 
-                case SDL_WINDOWEVENT_EXPOSED:
-                    type = EXPOSED;
+            case SDL.SDL_EVENT_WINDOW_EXPOSED:
+                type = EXPOSED;
 
-                case SDL_WINDOWEVENT_MOVED:
-                    type = MOVED;
+            case SDL.SDL_EVENT_WINDOW_MOVED:
+                type = MOVED;
 
-                case SDL_WINDOWEVENT_MINIMIZED:
-                    type = MINIMIZED;
+            case SDL.SDL_EVENT_WINDOW_MINIMIZED:
+                type = MINIMIZED;
 
-                case SDL_WINDOWEVENT_MAXIMIZED:
-                    type = MAXIMIZED;
-                    checkFullscreenState(e);
+            case SDL.SDL_EVENT_WINDOW_MAXIMIZED:
+                type = MAXIMIZED;
+                checkFullscreenState(e);
 
-                case SDL_WINDOWEVENT_RESTORED:
-                    type = RESTORED;
-                    checkFullscreenState(e);
+            case SDL.SDL_EVENT_WINDOW_RESTORED:
+                type = RESTORED;
+                checkFullscreenState(e);
 
-                case SDL_WINDOWEVENT_ENTER:
-                    type = ENTER;
+            case SDL.SDL_EVENT_WINDOW_MOUSE_ENTER:
+                type = ENTER;
 
-                case SDL_WINDOWEVENT_LEAVE:
-                    type = LEAVE;
+            case SDL.SDL_EVENT_WINDOW_MOUSE_LEAVE:
+                type = LEAVE;
 
-                case SDL_WINDOWEVENT_FOCUS_GAINED:
-                    type = FOCUS_GAINED;
+            case SDL.SDL_EVENT_WINDOW_FOCUS_GAINED:
+                type = FOCUS_GAINED;
 
-                case SDL_WINDOWEVENT_FOCUS_LOST:
-                    type = FOCUS_LOST;
+            case SDL.SDL_EVENT_WINDOW_FOCUS_LOST:
+                type = FOCUS_LOST;
 
-                case SDL_WINDOWEVENT_CLOSE:
-                    type = CLOSE;
+            case SDL.SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                type = CLOSE;
 
-                case SDL_WINDOWEVENT_RESIZED:
-                    type = RESIZED;
-                    windowDpr = windowDevicePixelRatio();
-                    windowW = toPixels(data1);
-                    windowH = toPixels(data2);
-                    #if android
-                    windowW = Math.round(windowW / windowDpr);
-                    windowH = Math.round(windowH / windowDpr);
-                    #end
-                    data1 = windowW;
-                    data2 = windowH;
+            case SDL.SDL_EVENT_WINDOW_RESIZED:
+                type = RESIZED;
+                windowDpr = windowDevicePixelRatio();
+                windowW = toPixels(data1);
+                windowH = toPixels(data2);
+                //#if android
+                windowW = Math.round(windowW / windowDpr);
+                windowH = Math.round(windowH / windowDpr);
+                //#end
+                data1 = windowW;
+                data2 = windowH;
 
-                case SDL_WINDOWEVENT_SIZE_CHANGED:
-                    type = SIZE_CHANGED;
-                    windowDpr = windowDevicePixelRatio();
-                    windowW = toPixels(data1);
-                    windowH = toPixels(data2);
-                    #if android
-                    windowW = Math.round(windowW / windowDpr);
-                    windowH = Math.round(windowH / windowDpr);
-                    #end
-                    data1 = windowW;
-                    data2 = windowH;
+            case SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                type = SIZE_CHANGED;
+                windowDpr = windowDevicePixelRatio();
+                windowW = toPixels(data1);
+                windowH = toPixels(data2);
+                //#if android
+                windowW = Math.round(windowW / windowDpr);
+                windowH = Math.round(windowH / windowDpr);
+                //#end
+                data1 = windowW;
+                data2 = windowH;
 
-                case SDL_WINDOWEVENT_NONE:
+            case _:
 
-            }
+        }
 
-            if (type != UNKNOWN) {
-                app.emitWindowEvent(type, e.window.timestamp / 1000.0, Std.int(e.window.windowID), data1, data2);
-            }
+        if (type != UNKNOWN) {
+            app.emitWindowEvent(type, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), data1, data2);
         }
 
     }
 
-
-    function checkFullscreenState(e:sdl.Event):Void {
+    function checkFullscreenState(e:SDLEvent):Void {
 
         #if mac
         var fullscreenSpace = SDL.isWindowInFullscreenSpace(window);
@@ -1189,10 +1325,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
             app.config.window.fullscreen = isFullscreen;
 
             if (isFullscreen) {
-                app.emitWindowEvent(ENTER_FULLSCREEN, e.window.timestamp / 1000.0, Std.int(e.window.windowID), 0, 0);
-            }
-            else {
-                app.emitWindowEvent(EXIT_FULLSCREEN, e.window.timestamp / 1000.0, Std.int(e.window.windowID), 0, 0);
+                app.emitWindowEvent(ENTER_FULLSCREEN, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), 0, 0);
+            } else {
+                app.emitWindowEvent(EXIT_FULLSCREEN, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), 0, 0);
             }
         }
 
@@ -1202,32 +1337,29 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     #if (android || ios || tvos)
 
-    function handleSdlEventWatch(_, e:sdl.Event):Int {
+    function handleSdlEventWatch(type:UInt32):Void {
 
         var type:AppEventType = UNKNOWN;
 
-        switch (e.type) {
-            case SDL_APP_TERMINATING:
+        switch (type) {
+            case SDL.SDL_EVENT_TERMINATING:
                 type = TERMINATING;
-            case SDL_APP_LOWMEMORY:
+            case SDL.SDL_EVENT_LOW_MEMORY:
                 type = LOW_MEMORY;
-            case SDL_APP_WILLENTERBACKGROUND:
+            case SDL.SDL_EVENT_WILL_ENTER_BACKGROUND:
                 type = WILL_ENTER_BACKGROUND;
-            case SDL_APP_DIDENTERBACKGROUND:
+            case SDL.SDL_EVENT_DID_ENTER_BACKGROUND:
                 type = DID_ENTER_BACKGROUND;
-                mobileInBackground = true;
-            case SDL_APP_WILLENTERFOREGROUND:
+                mobileInBackground.store(true);
+            case SDL.SDL_EVENT_WILL_ENTER_FOREGROUND:
                 type = WILL_ENTER_FOREGROUND;
-                mobileInBackground = false;
-            case SDL_APP_DIDENTERFOREGROUND:
+                mobileInBackground.store(false);
+            case SDL.SDL_EVENT_DID_ENTER_FOREGROUND:
                 type = DID_ENTER_FOREGROUND;
             case _:
-                return 0;
         }
 
         app.emitAppEvent(type);
-
-        return 1;
 
     }
 

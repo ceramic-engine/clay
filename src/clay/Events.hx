@@ -4,6 +4,13 @@ import clay.Types;
 import clay.audio.AudioEvent;
 import clay.audio.AudioHandle;
 
+#if clay_sdl
+import clay.sdl.SDL;
+#end
+
+#if clay_sdl
+@:headerCode('#include <SDL3/SDL.h>')
+#end
 class Events {
 
     public function ready():Void {}
@@ -18,7 +25,7 @@ class Events {
 
     #if clay_sdl
 
-    public function sdlEvent(event:sdl.Event):Void {}
+    public function sdlEvent(event:SDLEvent):Void {}
 
     #end
 

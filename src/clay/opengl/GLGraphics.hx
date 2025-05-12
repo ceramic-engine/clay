@@ -417,14 +417,14 @@ class GLGraphics {
             // Setup RBO
             bindRenderbuffer(renderTarget.renderbuffer);
             if (stencil) {
-                #if (ios || tvos || android)
+                #if (ios || tvos || android || gles_angle)
                 GL.renderbufferStorage(GL.RENDERBUFFER, DEPTH24_STENCIL8, width, height);
                 #else
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_STENCIL, width, height);
                 #end
             }
             else if (depth) {
-                #if (web || ios || tvos || android)
+                #if (web || ios || tvos || android || gles_angle)
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT16, width, height);
                 #else
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT, width, height);

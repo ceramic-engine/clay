@@ -3,16 +3,17 @@ package clay.sdl;
 import clay.buffers.ArrayBufferView;
 import clay.buffers.Uint8Array;
 import clay.native.NativeIO;
-import sdl.SDL;
+import clay.sdl.SDL;
 
-typedef FileHandle = sdl.RWops;
+typedef FileHandle = SDLIOStreamPointer;
 
 enum abstract FileSeek(Int) from Int to Int {
-    var SET = 0;
-    var CUR = 1;
-    var END = 2;
+    var SET = SDL.SDL_IO_SEEK_SET;
+    var CUR = SDL.SDL_IO_SEEK_CUR;
+    var END = SDL.SDL_IO_SEEK_END;
 }
 
+@:headerCode('#include <SDL3/SDL.h>')
 class SDLIO extends NativeIO {
 
     override public function isSynchronous():Bool {
@@ -72,7 +73,7 @@ class SDLIO extends NativeIO {
 
     private function _doLoadData(path:String, binary:Bool):Uint8Array {
 
-        var file = SDL.RWFromFile(path, binary ? 'rb' : 'r');
+        var file = SDL.ioFromFile(path, binary ? 'rb' : 'r');
 
         if (file == null) {
             return null;
@@ -81,7 +82,11 @@ class SDLIO extends NativeIO {
         var dest = new Uint8Array(size);
 
         if (size != 0) {
-            fileRead(file, dest, dest.length, 1);
+            // In SDL3, ioRead returns the number of bytes read directly
+            var bytesRead = fileRead(file, dest, 1, size);
+            if (bytesRead != size) {
+                Log.warning('SDLIO / Warning: Expected to read $size bytes but got $bytesRead');
+            }
         }
 
         // close + release the file handle
@@ -95,22 +100,30 @@ class SDLIO extends NativeIO {
 
     public function fileHandle(path:String, mode:String = "rb"):FileHandle {
 
-        return SDL.RWFromFile(path, mode);
+        return SDL.ioFromFile(path, mode);
 
     }
 
     public function fileHandleFromMem(mem:ArrayBufferView, size:Int):FileHandle {
 
-        return SDL.RWFromMem(mem.buffer, size);
+        return SDL.ioFromMem(mem.buffer, size);
 
     }
 
-    public function fileRead(file:FileHandle , dest:ArrayBufferView, size:Int, maxnum:Int):Int {
+    public function fileRead(file:FileHandle, dest:ArrayBufferView, size:Int, maxnum:Int):Int {
 
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return SDL.RWread(file, dest.buffer, size, maxnum);
+        // SDL3's ioRead directly reads total bytes, so we calculate the total bytes to read
+        var totalBytes = size * maxnum;
+        var bytesRead = SDL.ioRead(file, dest.buffer, totalBytes);
+
+        // Return the number of items read (compatible with SDL2 API)
+        if (size > 0) {
+            return Std.int(bytesRead / size);
+        }
+        return 0;
 
     }
 
@@ -119,7 +132,15 @@ class SDLIO extends NativeIO {
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return SDL.RWwrite(file, src.buffer, size, num);
+        // SDL3's ioWrite directly writes total bytes, so we calculate the total bytes to write
+        var totalBytes = size * num;
+        var bytesWritten = SDL.ioWrite(file, src.buffer, totalBytes);
+
+        // Return the number of items written (compatible with SDL2 API)
+        if (size > 0) {
+            return Std.int(bytesWritten / size);
+        }
+        return 0;
 
     }
 
@@ -128,7 +149,7 @@ class SDLIO extends NativeIO {
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return haxe.Int64.toInt(SDL.RWseek(file, offset, whence));
+        return SDL.ioSeek(file, offset, whence);
 
     }
 
@@ -137,7 +158,7 @@ class SDLIO extends NativeIO {
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return haxe.Int64.toInt(SDL.RWtell(file));
+        return SDL.ioTell(file);
 
     }
 
@@ -146,7 +167,9 @@ class SDLIO extends NativeIO {
         if (file == null)
             throw 'Parameter `file` should not be null';
 
-        return SDL.RWclose(file);
+        // SDL3's ioClose returns bool, but the original API expects an int
+        // Return 0 for success (consistent with SDL2 behavior)
+        return SDL.ioClose(file) ? 0 : -1;
 
     }
 

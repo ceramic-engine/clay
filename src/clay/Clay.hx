@@ -374,7 +374,7 @@ class Clay {
             defaultClear: { r:0, g:0, b:0, a:1 },
             #if clay_sdl
             opengl: {
-            #if (ios || android)
+            #if (ios || android || gles_angle)
                 major: 2, minor: 0,
                 profile: OpenGLProfile.GLES
             #else
