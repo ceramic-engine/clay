@@ -13,10 +13,15 @@
 
     <target id="haxe">
 
-        <lib name="-lSDL3" if="windows || linux" />
+        <lib name="-lSDL3" if="linux" />
         <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-mac-universal/lib/libSDL3.dylib" if="mac" />
 
         <vflag name="-framework" value="SDL3" if="ios" />
+
+        <section if="windows">
+           <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-windows-x64/lib/SDL3.lib" unless="HXCPP_ARM64" />
+           <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-windows-arm64/lib/SDL3.lib" if="HXCPP_ARM64" />
+        </section>
 
         <section if="android">
             <lib name="-lOpenSLES" />
