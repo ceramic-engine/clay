@@ -13,7 +13,11 @@
 
     <target id="haxe">
 
-        <lib name="-lSDL3" if="linux" />
+        <section if="linux">
+            <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-linux-x64/lib/libSDL3.so" unless="HXCPP_ARM64" />
+            <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-linux-arm64/lib/libSDL3.so" if="HXCPP_ARM64" />
+        </section>
+
         <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-mac-universal/lib/libSDL3.dylib" if="mac" />
 
         <vflag name="-framework" value="SDL3" if="ios" />
