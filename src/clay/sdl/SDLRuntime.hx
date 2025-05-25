@@ -309,6 +309,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
             throw 'SDL / failed to create render context: ${SDL.getError()}';
         }
 
+        if (setVSync(config.render.vsync)) {
+            Log.info('SDL / vsync ${config.render.vsync ? 'enabled' : 'disabled'}');
+        }
+        else {
+            Log.warning('SDL / failed to ${config.render.vsync ? 'enable' : 'disable'} vsync');
+        }
+
         postRenderContext(window);
 
         var actualConfig = app.copyWindowConfig(windowConfig);
@@ -555,6 +562,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #end
 
+    }
+
+    function setVSync(enabled:Bool):Bool {
+        #if (gles_angle && ios)
+        // EGL path
+        return untyped __cpp__('eglSwapInterval({0}, {1}) == EGL_TRUE', _eglDisplay, enabled ? 1 : 0);
+        #else
+        // Standard SDL path (Windows ANGLE D3D11, Linux, etc.)
+        return SDL.GL_SetSwapInterval(enabled ? 1 : 0);
+        #end
     }
 
     function updateWindowConfig(window:SDLWindowPointer, config:WindowConfig):WindowConfig {
@@ -836,7 +853,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 app.emitRender();
 
                 #if (mac || windows || linux)
-                #if !clay_native_no_tick_sleep
+                #if clay_native_sleep_after_render
                 var spent = Timestamp.now() - lastFrameTime;
                 if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
                 #end

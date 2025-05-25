@@ -46,6 +46,9 @@ class RenderConfig {
         The values are specified as 0..1. default: black, 0,0,0,1  */
     var defaultClear:Color = { r: 0, g: 0, b: 0, a: 1 };
 
+    /** If applicable on the current platform, enables vsync */
+    var vsync:Bool = #if clay_no_vsync false #else true #end;
+
     #if clay_web
 
     /** WebGL render context specific settings */
