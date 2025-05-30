@@ -38,6 +38,14 @@ typedef WindowHandle = UInt32;
 #include <GLES2/gl2.h>
 #include <GLES3/gl3.h>
 ')
+#elseif (clay_dwm_flush && windows)
+@:headerCode('
+#include "linc_sdl.h"
+#ifdef _WIN32
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+#endif
+')
 #else
 @:headerCode('#include "linc_sdl.h"')
 #end
@@ -61,6 +69,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     var windowW:Int;
     var windowH:Int;
     var windowDpr:Float = 1.0;
+    var windowFocused:Bool = true;
 
     #if (ios || tvos || android)
     var mobileInBackground:AtomicBool = new AtomicBool(false);
@@ -82,6 +91,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
     var _eglDisplay:cpp.RawPointer<Void>;
     var _eglSurface:cpp.RawPointer<Void>;
     var _eglConfig:cpp.RawPointer<Void>;
+    #end
+
+    #if (clay_dwm_flush && windows)
+    var dwmFlushAvailable:Bool = false;
     #end
 
 /// Lifecycle
@@ -106,6 +119,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
     override function ready() {
 
         createWindow();
+
+        #if (clay_dwm_flush && windows)
+        initDwmFlush();
+        #end
+
         Log.debug('SDL / ready');
 
     }
@@ -153,6 +171,33 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
 /// Internal
+
+    #if (clay_dwm_flush && windows)
+
+    function initDwmFlush():Void {
+        // Check if DWM composition is available and enabled
+        var dwmEnabled = untyped __cpp__('
+            BOOL enabled = FALSE;
+            HRESULT hr = DwmIsCompositionEnabled(&enabled);
+            (SUCCEEDED(hr) && enabled)
+        ');
+
+        if (dwmEnabled) {
+            dwmFlushAvailable = true;
+            Log.info('SDL / DWM composition enabled - using DwmFlush() for reliable vsync');
+        } else {
+            Log.info('SDL / DWM composition disabled - using standard vsync');
+        }
+    }
+
+    function dwmFlush():Bool {
+        if (!dwmFlushAvailable) return false;
+
+        var result = untyped __cpp__('DwmFlush()');
+        return result == 0; // S_OK
+    }
+
+    #end
 
     function initSDL() {
 
@@ -808,6 +853,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    #if (clay_native_sync_objects || clay_native_unfocused_sync_objects)
+    /// OpenGL ES 3.0 sync object constants
+    static final GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+    static final GL_TIMEOUT_EXPIRED = 0x911B;
+    #end
+
     public function windowSwap() {
 
         #if (gles_angle && ios)
@@ -816,7 +867,37 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.GL_SwapWindow(window);
         #end
 
-        #if clay_gl_finish
+        #if (clay_dwm_flush && windows)
+        // Apply DwmFlush() after SwapBuffers for reliable windowed vsync on Windows
+        if (dwmFlushAvailable && !app.config.window.fullscreen) {
+            dwmFlush();
+        }
+        #end
+
+        #if (clay_native_sync_objects || clay_native_unfocused_sync_objects)
+        #if clay_native_unfocused_sync_objects
+        if (!windowFocused) {
+        #end
+            untyped __cpp__('GLsync fenceSyncResult = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)');
+            if (untyped __cpp__('fenceSyncResult != 0')) {
+                var result:Int = GL_TIMEOUT_EXPIRED;
+                while (result == GL_TIMEOUT_EXPIRED) {
+                    result = untyped __cpp__('glClientWaitSync(fenceSyncResult, 0, 0)'); // Non-blocking poll
+                    if (result == GL_TIMEOUT_EXPIRED) {
+                        Sys.sleep(0.0001); // Sleep 0.1ms between polls
+                    }
+                    // Continue until GL_ALREADY_SIGNALED or GL_CONDITION_SATISFIED
+                }
+                untyped __cpp__('glDeleteSync(fenceSyncResult)');
+            }
+        #if clay_native_unfocused_sync_objects
+        }
+        #end
+        #elseif clay_unfocused_gl_finish
+        if (!windowFocused) {
+            GL.finish();
+        }
+        #elseif clay_gl_finish
         GL.finish();
         #end
 
@@ -853,7 +934,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 app.emitRender();
 
                 #if (mac || windows || linux)
-                #if clay_native_sleep_after_render
+                #if clay_unfocused_native_sleep_after_render
+                if (!windowFocused) {
+                    var spent = Timestamp.now() - lastFrameTime;
+                    if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
+                }
+                #elseif clay_native_sleep_after_render
                 var spent = Timestamp.now() - lastFrameTime;
                 if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
                 #end
@@ -1288,9 +1374,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_FOCUS_GAINED:
                 type = FOCUS_GAINED;
+                windowFocused = true;
 
             case SDL.SDL_EVENT_WINDOW_FOCUS_LOST:
                 type = FOCUS_LOST;
+                windowFocused = false;
 
             case SDL.SDL_EVENT_WINDOW_CLOSE_REQUESTED:
                 type = CLOSE;
