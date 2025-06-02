@@ -48,6 +48,8 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     var suspendedHandles:Array<Int> = [];
 
+    var channelBuses:Array<SoloudBus> = [];
+
     override public function new(app:Clay) {
 
         super(app);
@@ -82,6 +84,15 @@ class SoloudAudio extends clay.base.BaseAudio {
         soloud.deinit();
         soloud.destroy();
         soloud = untyped __cpp__('NULL');
+
+        for (i in 0...channelBuses.length) {
+            final soloudBus = channelBuses[i];
+            if (soloudBus != null) {
+                channelBuses[i] = null;
+                soloudBus.bus.stop();
+                soloudBus.destroy();
+            }
+        }
 
         super.shutdown();
 
@@ -147,19 +158,19 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
-    public function play(source:AudioSource, volume:Float, paused:Bool):AudioHandle {
+    public function play(source:AudioSource, volume:Float, paused:Bool, channel:Int):AudioHandle {
 
-        return _play(source, volume, paused, false);
-
-    }
-
-    public function loop(source:AudioSource, volume:Float, paused:Bool):AudioHandle {
-
-        return _play(source, volume, paused, true);
+        return _play(source, volume, paused, false, channel);
 
     }
 
-    function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool):AudioHandle {
+    public function loop(source:AudioSource, volume:Float, paused:Bool, channel:Int):AudioHandle {
+
+        return _play(source, volume, paused, true, channel);
+
+    }
+
+    function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool, channel:Int):AudioHandle {
 
         var data:SoloudAudioData = cast source.data;
         var handle = handleSeq;
@@ -167,10 +178,12 @@ class SoloudAudio extends clay.base.BaseAudio {
         var inst = source.instance(handle);
         var soloudHandle:Int = -1;
 
+        var bus = resolveBus(channel);
+
         if (data.isStream) {
-            soloudHandle = soloud.play(data.wavStream, volume * VOLUME_FACTOR, 0.0, paused);
+            soloudHandle = bus.play(data.wavStream, volume * VOLUME_FACTOR, 0.0, paused);
         } else {
-            soloudHandle = soloud.play(data.wav, volume * VOLUME_FACTOR, 0.0, paused);
+            soloudHandle = bus.play(data.wav, volume * VOLUME_FACTOR, 0.0, paused);
         }
 
         if (loop)
@@ -187,6 +200,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         sound.timeResume = 0.0;
         sound.timeResumeAppTime = Runtime.timestamp();
         sound.timePause = -1;
+        sound.channel = channel;
         instances.set(handle, sound);
         handles.push(handle);
 
@@ -196,6 +210,23 @@ class SoloudAudio extends clay.base.BaseAudio {
             pause(handle);
 
         return handle;
+
+    }
+
+    function resolveBus(channel:Int):soloud.Bus {
+
+        while (channel >= channelBuses.length) {
+            channelBuses.push(null);
+        }
+
+        var soloudBus = channelBuses[channel];
+        if (soloudBus == null) {
+            soloudBus = new SoloudBus();
+            channelBuses[channel] = soloudBus;
+            final _bus = soloudBus.bus;
+            soloud.play(untyped _bus);
+        }
+        return soloudBus.bus;
 
     }
 

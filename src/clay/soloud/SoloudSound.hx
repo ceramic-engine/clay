@@ -32,6 +32,8 @@ class SoloudSound {
 
     var timePause:Float = -1;
 
+    var channel:Int = -1;
+
     private function new() {
         //
     }
@@ -64,6 +66,7 @@ class SoloudSound {
         timeResume = -1;
         timeResumeAppTime = -1;
         timePause = -1;
+        channel = -1;
         _pool.push(this);
 
     }
