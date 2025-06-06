@@ -170,6 +170,26 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
+    public function createChannelFilter(
+        channel:Int,
+        createFunc:cpp.Callable<(filterId:Int, instanceId:Int)->Void>,
+        destroyFunc:cpp.Callable<(filterId:Int, instanceId:Int)->Void>,
+        filterFunc:cpp.Callable<(filterId:Int, instanceId:Int, aBuffer:cpp.RawPointer<cpp.Float32>, aSamples:cpp.UInt32, aChannels:cpp.UInt32, aSamplerate:cpp.Float32, time:cpp.Float64)->Void>
+    ):Void {
+
+        var bus = resolveBus(channel);
+        var filter = Soloud.createFilterFunction(
+            channel,
+            createFunc,
+            destroyFunc,
+            filterFunc
+        );
+        bus.setFilter(0, filter);
+
+    }
+
+    // TODO destroy channel filter
+
     function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool, channel:Int):AudioHandle {
 
         var data:SoloudAudioData = cast source.data;
