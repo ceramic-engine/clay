@@ -48,7 +48,7 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     var suspendedHandles:Array<Int> = [];
 
-    var channelBuses:Array<SoloudBus> = [];
+    var bussesByIndex:Array<SoloudBus> = [];
 
     override public function new(app:Clay) {
 
@@ -85,10 +85,10 @@ class SoloudAudio extends clay.base.BaseAudio {
         soloud.destroy();
         soloud = untyped __cpp__('NULL');
 
-        for (i in 0...channelBuses.length) {
-            final soloudBus = channelBuses[i];
+        for (i in 0...bussesByIndex.length) {
+            final soloudBus = bussesByIndex[i];
             if (soloudBus != null) {
-                channelBuses[i] = null;
+                bussesByIndex[i] = null;
                 soloudBus.bus.stop();
                 soloudBus.destroy();
             }
@@ -158,28 +158,28 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
-    public function play(source:AudioSource, volume:Float, paused:Bool, channel:Int):AudioHandle {
+    public function play(source:AudioSource, volume:Float, paused:Bool, bus:Int):AudioHandle {
 
-        return _play(source, volume, paused, false, channel);
-
-    }
-
-    public function loop(source:AudioSource, volume:Float, paused:Bool, channel:Int):AudioHandle {
-
-        return _play(source, volume, paused, true, channel);
+        return _play(source, volume, paused, false, bus);
 
     }
 
-    public function createChannelFilter(
-        channel:Int,
-        createFunc:cpp.Callable<(filterId:Int, instanceId:Int)->Void>,
-        destroyFunc:cpp.Callable<(filterId:Int, instanceId:Int)->Void>,
-        filterFunc:cpp.Callable<(filterId:Int, instanceId:Int, aBuffer:cpp.RawPointer<cpp.Float32>, aSamples:cpp.UInt32, aChannels:cpp.UInt32, aSamplerate:cpp.Float32, time:cpp.Float64)->Void>
+    public function loop(source:AudioSource, volume:Float, paused:Bool, bus:Int):AudioHandle {
+
+        return _play(source, volume, paused, true, bus);
+
+    }
+
+    public function createBusFilter(
+        busIndex:Int,
+        createFunc:cpp.Callable<(busIndex:Int, instanceId:Int)->Void>,
+        destroyFunc:cpp.Callable<(busIndex:Int, instanceId:Int)->Void>,
+        filterFunc:cpp.Callable<(busIndex:Int, instanceId:Int, aBuffer:cpp.RawPointer<cpp.Float32>, aSamples:cpp.UInt32, aChannels:cpp.UInt32, aSamplerate:cpp.Float32, time:cpp.Float64)->Void>
     ):Void {
 
-        var bus = resolveBus(channel);
+        var bus = resolveBus(busIndex);
         var filter = Soloud.createFilterFunction(
-            channel,
+            busIndex,
             createFunc,
             destroyFunc,
             filterFunc
@@ -188,9 +188,9 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
-    // TODO destroy channel filter
+    // TODO destroy bus filter
 
-    function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool, channel:Int):AudioHandle {
+    function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool, busIndex:Int):AudioHandle {
 
         var data:SoloudAudioData = cast source.data;
         var handle = handleSeq;
@@ -198,7 +198,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         var inst = source.instance(handle);
         var soloudHandle:Int = -1;
 
-        var bus = resolveBus(channel);
+        var bus = resolveBus(busIndex);
 
         if (data.isStream) {
             soloudHandle = bus.play(data.wavStream, volume * VOLUME_FACTOR, 0.0, paused);
@@ -220,7 +220,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         sound.timeResume = 0.0;
         sound.timeResumeAppTime = Runtime.timestamp();
         sound.timePause = -1;
-        sound.channel = channel;
+        sound.busIndex = busIndex;
         instances.set(handle, sound);
         handles.push(handle);
 
@@ -233,16 +233,16 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
-    function resolveBus(channel:Int):soloud.Bus {
+    function resolveBus(busIndex:Int):soloud.Bus {
 
-        while (channel >= channelBuses.length) {
-            channelBuses.push(null);
+        while (busIndex >= bussesByIndex.length) {
+            bussesByIndex.push(null);
         }
 
-        var soloudBus = channelBuses[channel];
+        var soloudBus = bussesByIndex[busIndex];
         if (soloudBus == null) {
             soloudBus = new SoloudBus();
-            channelBuses[channel] = soloudBus;
+            bussesByIndex[busIndex] = soloudBus;
             final _bus = soloudBus.bus;
             soloud.play(untyped _bus);
         }

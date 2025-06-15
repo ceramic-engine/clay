@@ -11,10 +11,23 @@ import clay.audio.AudioState;
 import clay.buffers.Float32Array;
 import clay.buffers.Uint8Array;
 
+typedef AudioWorkletNode = Dynamic;
+
+// New typedefs for bus system
+private typedef WebAudioBus = {
+    index:Int,
+    gainNode:js.html.audio.GainNode,
+    ?workletNode:AudioWorkletNode,
+    volume:Float,
+    active:Bool,
+    name:String
+}
+
 private typedef WebSound = {
     source: AudioSource,
     handle: AudioHandle,
     instance: AudioInstance,
+    bus: Int,
 
     bufferNode: js.html.audio.AudioBufferSourceNode,
     mediaNode: js.html.audio.MediaElementAudioSourceNode,
@@ -39,37 +52,35 @@ private typedef WebSound = {
 class WebAudio extends clay.base.BaseAudio {
 
     static inline var HALF_PI:Float = 1.5707;
+    static inline var DEFAULT_BUS:Int = 0;
 
     var suspended:Bool = false;
-
     var handleSeq:Int = 0;
 
     var instances:Map<AudioHandle, WebSound>;
     var buffers:Map<AudioSource, js.html.audio.AudioBuffer>;
+    var busses:Map<Int, WebAudioBus>;
+    var workletModules:Map<String, Bool>;
 
     var ignoreEndedSoundsTick0:Array<WebSound> = [];
     var ignoreEndedSoundsTick1:Array<WebSound> = [];
 
     public var context(default, null):js.html.audio.AudioContext;
-
     public var active(default, null):Bool = false;
 
     function new(app:Clay) {
-
         super(app);
-
         instances = new Map();
-
+        busses = new Map();
+        workletModules = new Map();
     }
 
     override function init() {
-
         initWebAudio();
-
+        createDefaultBus();
     }
 
     override function tick(delta:Float) {
-
         for (handle => sound in instances) {
             if (sound.loop) {
                 switch sound.state {
@@ -105,13 +116,13 @@ class WebAudio extends clay.base.BaseAudio {
             var sound = ignoreEndedSoundsTick0.shift();
             ignoreEndedSoundsTick1.push(sound);
         }
-
     }
 
-    function initWebAudio() {
-
+    function initWebAudio(sampleRate:Int = 44100) {
         try {
-            context = new js.html.audio.AudioContext();
+            context = new js.html.audio.AudioContext({
+                sampleRate: 44100
+            });
         } catch(err:Dynamic) {
             try {
                 context = untyped js.Syntax.code('new window.webkitAudioContext()');
@@ -135,43 +146,239 @@ class WebAudio extends clay.base.BaseAudio {
         Log.debug('Audio / webaudio: $context / sampleRate: ${context.sampleRate} / destination: $info');
 
         active = true;
-
     }
 
     override function shutdown():Void {
-
+        // Clean up all busses
+        for (bus in busses) {
+            if (bus.workletNode != null) {
+                bus.workletNode.disconnect();
+            }
+            bus.gainNode.disconnect();
+        }
+        busses.clear();
         context.close();
-
     }
 
+    // Bus Management Functions
+
+    function createDefaultBus():Void {
+        createBus(DEFAULT_BUS, 1.0);
+    }
+
+    public function createBus(index:Int, name:String = "", volume:Float = 1.0):Void {
+        if (busses.exists(index)) {
+            Log.warning('Audio / Bus $index already exists');
+            return;
+        }
+
+        var gainNode = context.createGain();
+        gainNode.gain.value = volume;
+        gainNode.connect(context.destination);
+
+        var bus:WebAudioBus = {
+            index: index,
+            gainNode: gainNode,
+            workletNode: null,
+            volume: volume,
+            active: true,
+            name: name.length > 0 ? name : 'bus-$index'
+        };
+
+        busses.set(index, bus);
+        Log.debug('Audio / Created bus $index: ${bus.name}');
+    }
+
+    public function destroyBus(index:Int):Void {
+        if (index == DEFAULT_BUS) {
+            Log.warning('Audio / Cannot destroy default bus');
+            return;
+        }
+
+        var bus = busses.get(index);
+        if (bus == null) return;
+
+        // Stop all sounds on this bus
+        for (handle => sound in instances) {
+            if (sound.bus == index) {
+                stop(handle);
+            }
+        }
+
+        // Disconnect and cleanup
+        if (bus.workletNode != null) {
+            bus.workletNode.disconnect();
+        }
+        bus.gainNode.disconnect();
+        busses.remove(index);
+
+        Log.debug('Audio / Destroyed bus $index');
+    }
+
+    public function setBusVolume(busIndex:Int, volume:Float):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null) return;
+
+        bus.volume = volume;
+        bus.gainNode.gain.value = volume;
+        Log.debug('Audio / Set bus $busIndex volume to $volume');
+    }
+
+    public function getBusVolume(busIndex:Int):Float {
+        var bus = busses.get(busIndex);
+        return bus != null ? bus.volume : 0.0;
+    }
+
+    public function setBusActive(busIndex:Int, active:Bool):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null) return;
+
+        bus.active = active;
+        bus.gainNode.gain.value = active ? bus.volume : 0.0;
+        Log.debug('Audio / Set bus $busIndex active: $active');
+    }
+
+    // Audio Worklet Functions
+
+    public function loadWorkletModule(name:String, url:String, ?callback:(success:Bool)->Void):Void {
+        if (workletModules.exists(name)) {
+            Log.debug('Audio / Worklet module $name already loaded');
+            if (callback != null) callback(true);
+            return;
+        }
+
+        final promise:js.lib.Promise<Dynamic> = Reflect.field(context, 'audioWorklet').addModule(url).then(function(_) {
+            workletModules.set(name, true);
+            Log.debug('Audio / Loaded worklet module: $name');
+            if (callback != null) callback(true);
+        });
+        promise.catchError(function(error) {
+            Log.error('Audio / Failed to load worklet module $name: $error');
+            if (callback != null) callback(false);
+        });
+    }
+
+    public function attachWorkletToBus(busIndex:Int, workletName:String, ?options:Dynamic, ?onReady:()->Void):Bool {
+        var bus = busses.get(busIndex);
+        if (bus == null) {
+            Log.error('Audio / Bus $busIndex does not exist');
+            return false;
+        }
+
+        if (!workletModules.exists(workletName)) {
+            Log.error('Audio / Worklet module $workletName not loaded');
+            return false;
+        }
+
+        // Remove existing worklet if any
+        if (bus.workletNode != null) {
+            bus.workletNode.disconnect();
+        }
+
+        try {
+            // Create new worklet node
+            var workletNode:AudioWorkletNode = js.Syntax.code('new AudioWorkletNode({0}, {1}, {2})', context, workletName, options);
+
+            // Reconnect the audio chain: sources -> bus.gainNode -> worklet -> destination
+            bus.gainNode.disconnect();
+            bus.gainNode.connect(workletNode);
+            workletNode.connect(context.destination);
+
+            bus.workletNode = workletNode;
+
+            workletNode.port.onmessage = (event) -> {
+                switch event?.data?.type {
+                    case 'trace': trace(event.data);
+                    case 'ready': {
+                        if (onReady != null) {
+                            onReady();
+                            onReady = null;
+                            // Reply back to let worklet stop firing ready
+                            workletNode.port.postMessage({ type: 'ready' });
+                        }
+                    }
+                    case null | _:
+                }
+            };
+
+            Log.debug('Audio / Attached worklet $workletName to bus $busIndex');
+            return true;
+
+        } catch (error:Dynamic) {
+            Log.error('Audio / Failed to create worklet node: $error');
+            // Restore direct connection on failure
+            bus.gainNode.connect(context.destination);
+            return false;
+        }
+    }
+
+    public function detachWorkletFromBus(busIndex:Int):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null) return;
+
+        // Disconnect worklet and restore direct connection
+        bus.workletNode.disconnect();
+        bus.gainNode.disconnect();
+        bus.gainNode.connect(context.destination);
+        bus.workletNode = null;
+
+        Log.debug('Audio / Detached worklet from bus $busIndex');
+    }
+
+    public function sendMessageToWorklet(busIndex:Int, message:Dynamic):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null) return;
+
+        bus.workletNode.port.postMessage(message);
+    }
+
+    public function setWorkletParameter(busIndex:Int, paramName:String, value:Float):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null) return;
+
+        var param = bus.workletNode.parameters.get(paramName);
+        if (param != null) {
+            param.value = value;
+        }
+    }
+
+    // Core Audio Functions
+
     inline function soundOf(handle:AudioHandle):WebSound {
-
         return instances.get(handle);
+    }
 
+    function getBusGainNode(busIndex:Int):js.html.audio.GainNode {
+        var bus = busses.get(busIndex);
+        if (bus == null) {
+            Log.debug('Audio / Bus $busIndex does not exist, creating it automatically');
+            createBus(busIndex); // Auto-create with default parameters
+            bus = busses.get(busIndex);
+        }
+        return bus.gainNode;
     }
 
     function playBuffer(data:WebAudioData):js.html.audio.AudioBufferSourceNode {
-
         var node = context.createBufferSource();
         node.buffer = data.buffer;
-
         return node;
-
     }
 
     function playBufferAgain(handle:AudioHandle, sound:WebSound, startTime:Float) {
-
         sound.bufferNode = playBuffer(cast sound.source.data);
         sound.bufferNode.playbackRate.value = sound.pitch;
         sound.bufferNode.connect(sound.panNode);
         sound.bufferNode.loop = sound.loop;
         sound.panNode.connect(sound.gainNode);
-        sound.gainNode.connect(context.destination);
+
+        // Route to appropriate bus instead of directly to destination
+        var busGain = getBusGainNode(sound.bus);
+        sound.gainNode.connect(busGain);
+
         sound.bufferNode.start(0, startTime);
         sound.bufferNode.onended = function() {
             soundEnded(sound);
         };
-
     }
 
     function playInstance(
@@ -181,13 +388,12 @@ class WebAudio extends clay.base.BaseAudio {
         data:WebAudioData,
         bufferNode:js.html.audio.AudioBufferSourceNode,
         volume:Float,
-        loop:Bool
+        loop:Bool,
+        busIndex:Int = DEFAULT_BUS
     ) {
-
         var gain = context.createGain();
         var pan = context.createPanner();
         var node: js.html.audio.AudioNode = null;
-        var panVal = 0;
 
         gain.gain.value = volume;
         pan.panningModel = js.html.audio.PanningModelType.EQUALPOWER;
@@ -203,15 +409,18 @@ class WebAudio extends clay.base.BaseAudio {
             data.mediaElem.loop = loop;
         }
 
-        // source -> pan -> gain -> output
+        // Route through bus system: source -> pan -> gain -> bus
         node.connect(pan);
         pan.connect(gain);
-        gain.connect(context.destination);
+
+        var busGain = getBusGainNode(busIndex);
+        gain.connect(busGain);
 
         var sound:WebSound = {
             handle     : handle,
             source     : source,
             instance   : inst,
+            bus        : busIndex, // Store bus assignment
 
             bufferNode : bufferNode,
             mediaNode  : data.mediaNode,
@@ -249,11 +458,9 @@ class WebAudio extends clay.base.BaseAudio {
                 soundEnded(sound);
             };
         }
-
     }
 
-    public function play(source:AudioSource, volume:Float, paused:Bool):AudioHandle {
-
+    public function play(source:AudioSource, volume:Float, paused:Bool, busIndex:Int = DEFAULT_BUS):AudioHandle {
         var data:WebAudioData = cast source.data;
         var handle = handleSeq;
         var inst = source.instance(handle);
@@ -261,9 +468,9 @@ class WebAudio extends clay.base.BaseAudio {
         if (source.data.isStream) {
             data.mediaElem.play();
             data.mediaElem.volume = 1.0;
-            playInstance(handle, source, inst, data, null, volume, false);
+            playInstance(handle, source, inst, data, null, volume, false, busIndex);
         } else {
-            playInstance(handle, source, inst, data, playBuffer(data), volume, false);
+            playInstance(handle, source, inst, data, playBuffer(data), volume, false, busIndex);
         }
 
         handleSeq++;
@@ -273,11 +480,9 @@ class WebAudio extends clay.base.BaseAudio {
         }
 
         return handle;
-
     }
 
-    public function loop(source:AudioSource, volume:Float, paused:Bool):AudioHandle {
-
+    public function loop(source:AudioSource, volume:Float, paused:Bool, busIndex:Int = DEFAULT_BUS):AudioHandle {
         var data:WebAudioData = cast source.data;
         var handle = handleSeq;
         var inst = source.instance(handle);
@@ -285,9 +490,9 @@ class WebAudio extends clay.base.BaseAudio {
         if (source.data.isStream) {
             data.mediaElem.play();
             data.mediaElem.volume = 1.0;
-            playInstance(handle, source, inst, data, null, volume, true);
+            playInstance(handle, source, inst, data, null, volume, true, busIndex);
         } else {
-            playInstance(handle, source, inst, data, playBuffer(data), volume, true);
+            playInstance(handle, source, inst, data, playBuffer(data), volume, true, busIndex);
         }
 
         handleSeq++;
@@ -297,7 +502,6 @@ class WebAudio extends clay.base.BaseAudio {
         }
 
         return handle;
-
     }
 
     function stopBuffer(sound:WebSound) {
@@ -309,7 +513,6 @@ class WebAudio extends clay.base.BaseAudio {
     }
 
     public function pause(handle:AudioHandle):Void {
-
         var sound = soundOf(handle);
         if (sound == null)
             return;
@@ -328,11 +531,9 @@ class WebAudio extends clay.base.BaseAudio {
         else if (sound.mediaNode != null) {
             sound.mediaElem.pause();
         }
-
     }
 
     public function unPause(handle:AudioHandle):Void {
-
         var sound = soundOf(handle);
         if (sound == null)
             return;
@@ -352,11 +553,9 @@ class WebAudio extends clay.base.BaseAudio {
         }
 
         sound.state = PLAYING;
-
     }
 
     function soundEnded(sound:WebSound) {
-
         if (sound.ignoreNextEnded > 0) {
             sound.ignoreNextEnded--;
             return;
@@ -364,11 +563,9 @@ class WebAudio extends clay.base.BaseAudio {
         if (sound.state != PAUSED && (sound.state != PLAYING || positionOf(sound.handle) + 0.1 >= sound.source.getDuration())) {
             destroySound(sound);
         }
-
     }
 
     function destroySound(sound:WebSound) {
-
         if (sound.source != null && instances.exists(sound.handle) && positionOf(sound.handle) + 0.1 >= sound.source.getDuration()) {
             emitAudioEvent(END, sound.handle);
         }
@@ -404,11 +601,9 @@ class WebAudio extends clay.base.BaseAudio {
             emitAudioEvent(DESTROYED, sound.handle);
         }
         sound = null;
-
     }
 
     public function stop(handle:AudioHandle):Void {
-
         var sound = soundOf(handle);
         if (sound == null) return;
 
@@ -418,22 +613,18 @@ class WebAudio extends clay.base.BaseAudio {
         destroySound(sound);
 
         sound.state = STOPPED;
-
     }
 
     public function volume(handle:AudioHandle, volume:Float):Void {
-
         var sound = soundOf(handle);
         if (sound == null) return;
 
         Log.debug('Audio / volume=$volume handle=$handle, ' + sound.source.data.id);
 
         sound.gainNode.gain.value = volume;
-
     }
 
     public function pan(handle:AudioHandle, pan:Float):Void {
-
         var sound = soundOf(handle);
         if (sound == null)
             return;
@@ -446,11 +637,9 @@ class WebAudio extends clay.base.BaseAudio {
             0,
             Math.sin((pan+1) * HALF_PI)
         );
-
     }
 
     public function pitch(handle:AudioHandle, pitch:Float):Void {
-
         var sound = soundOf(handle);
         if (sound == null) return;
 
@@ -471,11 +660,9 @@ class WebAudio extends clay.base.BaseAudio {
         else if (sound.mediaNode != null) {
             // Pitch not supported on streamed sounds
         }
-
     }
 
     public function position(handle:AudioHandle, time:Float):Void {
-
         var sound = soundOf(handle);
         if (sound == null) return;
 
@@ -498,38 +685,30 @@ class WebAudio extends clay.base.BaseAudio {
                 sound.mediaElem.currentTime = time;
             }
         }
-
     }
 
     public function volumeOf(handle:AudioHandle):Float {
-
         var sound = soundOf(handle);
         if (sound == null) return 0.0;
 
         return sound.gainNode.gain.value;
-
     }
 
     public function panOf(handle:AudioHandle):Float {
-
         var sound = soundOf(handle);
         if (sound == null) return 0.0;
 
         return sound.pan;
-
     }
 
     public function pitchOf(handle:AudioHandle):Float {
-
         var sound = soundOf(handle);
         if (sound == null) return 1.0;
 
         return sound.pitch;
-
     }
 
     public function positionOf(handle:AudioHandle):Float {
-
         var sound = soundOf(handle);
         if (sound == null) return 0.0;
 
@@ -560,39 +739,30 @@ class WebAudio extends clay.base.BaseAudio {
         }
 
         return 0.0;
-
     }
 
     public function stateOf(handle:AudioHandle):AudioState {
-
         var sound = soundOf(handle);
         if (sound == null) return INVALID;
 
         return sound.state;
-
     }
 
     public function loopOf(handle:AudioHandle):Bool {
-
         var sound = soundOf(handle);
         if (sound == null) return false;
 
         return sound.loop;
-
     }
 
     public function instanceOf(handle:AudioHandle):AudioInstance {
-
         var sound = soundOf(handle);
         if (sound == null) return null;
 
         return sound.instance;
-
     }
 
-
     public function suspend():Void {
-
         if (!active)
             return;
         if (suspended)
@@ -601,11 +771,9 @@ class WebAudio extends clay.base.BaseAudio {
         suspended = true;
         active = false;
         context.suspend();
-
     }
 
     public function resume():Void {
-
         if (active)
             return;
         if (!suspended)
@@ -614,13 +782,128 @@ class WebAudio extends clay.base.BaseAudio {
         suspended = false;
         active = true;
         context.resume();
+    }
 
+    // Additional utility methods for bus system
+    public function getSoundBus(handle:AudioHandle):Int {
+        var sound = soundOf(handle);
+        return sound != null ? sound.bus : -1;
+    }
+
+    public function moveSoundToBus(handle:AudioHandle, newBusIndex:Int):Bool {
+        var sound = soundOf(handle);
+        if (sound == null) return false;
+
+        var newBus = busses.get(newBusIndex);
+        if (newBus == null) return false;
+
+        // Reconnect to new bus
+        sound.gainNode.disconnect();
+        sound.gainNode.connect(newBus.gainNode);
+        sound.bus = newBusIndex;
+
+        Log.debug('Audio / Moved sound $handle to bus $newBusIndex');
+        return true;
+    }
+
+    public function listBusses():Array<Int> {
+        return [for (busIndex in busses.keys()) busIndex];
+    }
+
+    public function getBusName(busIndex:Int):String {
+        var bus = busses.get(busIndex);
+        return bus != null ? bus.name : "";
+    }
+
+    public function createBusFilter(
+        uri:String,
+        busIndex:Int,
+        createFunc:(busIndex:Int, instanceId:Int)->Void,
+        destroyFunc:(busIndex:Int, instanceId:Int)->Void
+    ):Void {
+        // Ensure bus exists before creating filter
+        if (!busses.exists(busIndex)) {
+            Log.debug('Audio / Bus $busIndex does not exist for filter, creating it automatically');
+            createBus(busIndex);
+        }
+
+        loadWorkletModule('bus-worklet', uri, success -> {
+            if (success) {
+                if (attachWorkletToBus(busIndex, 'bus-worklet', {}, () -> {
+                    Log.debug('Audio / Worklet attached to bus #$busIndex is now ready!');
+                    createFunc(busIndex, busIndex);
+                })) {
+                }
+                else {
+                    Log.error('Audio / Failed to attach worklet to bus #$busIndex');
+                }
+            }
+            else {
+                Log.error('Audio / Failed to load create bus filter #$busIndex');
+            }
+        });
+
+        // TODO destroy?
+    }
+
+    public function addBusFilterWorklet(busIndex:Int, filterId:Int, workletClass:Class<Any>, workletReady:()->Void):Void {
+        // Ensure bus exists before adding filter worklet
+        if (!busses.exists(busIndex)) {
+            Log.debug('Audio / Bus $busIndex does not exist for filter worklet, creating it automatically');
+            createBus(busIndex);
+        }
+
+        final bus = busses.get(busIndex);
+        if (bus == null) {
+            Log.error('Audio / Cannot add bus filter worklet: bus #$busIndex creation failed');
+            return;
+        }
+        if (bus.workletNode == null) {
+            Log.error('Audio / Cannot add bus filter worklet: bus #$busIndex has no worklet node');
+            return;
+        }
+
+        final message = {
+            type: "addBusFilterWorklet",
+            bus: busIndex,
+            filterId: filterId,
+            workletClass: Type.getClassName(workletClass),
+        };
+        bus.workletNode.port.postMessage(message);
+    }
+
+    public function destroyBusFilterWorklet(busIndex:Int, filterId:Int):Void {
+        final bus = busses.get(busIndex);
+        if (bus == null) {
+            Log.warning('Audio / Cannot destroy bus filter worklet: bus #$busIndex does not exist');
+            return;
+        }
+        if (bus.workletNode == null) {
+            Log.warning('Audio / Cannot destroy bus filter worklet: bus #$busIndex has no worklet node');
+            return;
+        }
+
+        final message = {
+            type: "destroyBusFilterWorklet",
+            bus: busIndex,
+            filterId: filterId
+        };
+        bus.workletNode.port.postMessage(message);
+    }
+
+    // Optional: Helper function to ensure a bus exists
+    private function ensureBusExists(busIndex:Int):Bool {
+        if (!busses.exists(busIndex)) {
+            Log.debug('Audio / Auto-creating bus $busIndex');
+            createBus(busIndex);
+            return busses.exists(busIndex);
+        }
+        return true;
     }
 
 /// Data API
 
     override function loadData(path:String, isStream:Bool, format:AudioFormat, async:Bool = false, ?callback:(data:AudioData)->Void):AudioData {
-
         if (path == null)
             throw 'path is null!';
 
@@ -632,7 +915,6 @@ class WebAudio extends clay.base.BaseAudio {
                 });
             }
             return null;
-
         }
 
         if (isStream) {
@@ -642,11 +924,9 @@ class WebAudio extends clay.base.BaseAudio {
 
         loadDataFromSound(path, format, callback);
         return null;
-
     }
 
     public function dataFromBytes(id:String, bytes:Uint8Array, ?format:AudioFormat, ?callback:(data:AudioData)->Void):Void {
-
         if (!active) {
             if (callback != null) {
                 Immediate.push(() -> {
@@ -662,7 +942,6 @@ class WebAudio extends clay.base.BaseAudio {
             throw 'bytes is null!';
 
         context.decodeAudioData(bytes.buffer, function(buffer:js.html.audio.AudioBuffer) {
-
             var data = new WebAudioData(app, buffer, null, null, {
                 id         : id,
                 isStream   : false,
@@ -679,38 +958,28 @@ class WebAudio extends clay.base.BaseAudio {
                     callback(data);
                 });
             }
-
         }, function() {
-
             Log.error('Audio / failed to decode audio for `$id`');
             if (callback != null) {
                 Immediate.push(() -> {
                     callback(null);
                 });
             }
-
         });
-
     }
 
     function handleSourceDestroyed(source:AudioSource):Void {
-
         //
-
     }
 
     function handleInstanceDestroyed(handle:AudioHandle):Void {
-
         stop(handle);
-
     }
 
 /// Internal
 
     function loadDataFromSound(path:String, format:AudioFormat, ?callback:(data:AudioData)->Void):Void {
-
         app.io.loadData(path, true, function(bytes) {
-
             if (bytes != null) {
                 dataFromBytes(path, bytes, format, callback);
             }
@@ -721,13 +990,10 @@ class WebAudio extends clay.base.BaseAudio {
                     });
                 }
             }
-
         });
-
     }
 
     function loadDataFromStream(path:String, format:AudioFormat, ?callback:(data:AudioData)->Void):Void {
-
         // Create audio element
         var element = new js.html.Audio(path);
         element.autoplay = false;
@@ -735,7 +1001,6 @@ class WebAudio extends clay.base.BaseAudio {
         element.preload = 'auto';
 
         element.onerror = function(err) {
-
             var error = switch(element.error.code) {
                 case 1: 'MEDIA_ERR_ABORTED';
                 case 2: 'MEDIA_ERR_NETWORK';
@@ -751,11 +1016,9 @@ class WebAudio extends clay.base.BaseAudio {
                     callback(null);
                 });
             }
-
         };
 
         element.onloadedmetadata = function(_) {
-
             var node = context.createMediaElementSource(element);
 
             // Web Audio works with 32 bit IEEE float samples
@@ -782,12 +1045,8 @@ class WebAudio extends clay.base.BaseAudio {
                     callback(data);
                 });
             }
-
         };
-
     }
-
-
 }
 
 private class WebAudioData extends AudioData {
@@ -803,25 +1062,20 @@ private class WebAudioData extends AudioData {
         ?mediaElem:js.html.Audio,
         options:AudioDataOptions
     ) {
-
         this.buffer = buffer;
         this.mediaNode = mediaNode;
         this.mediaElem = mediaElem;
 
         super(app, options);
-
     }
 
     override public function destroy() {
-
         buffer = null;
         mediaNode = null;
         mediaElem = null;
 
         super.destroy();
-
     }
-
 }
 
 #end
