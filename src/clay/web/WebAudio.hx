@@ -18,6 +18,7 @@ private typedef WebAudioBus = {
     index:Int,
     gainNode:js.html.audio.GainNode,
     ?workletNode:AudioWorkletNode,
+    ?silentSource:js.html.audio.ConstantSourceNode,
     volume:Float,
     active:Bool,
     name:String
@@ -154,6 +155,12 @@ class WebAudio extends clay.base.BaseAudio {
             if (bus.workletNode != null) {
                 bus.workletNode.disconnect();
             }
+
+            if (bus.silentSource != null) {
+                bus.silentSource.stop();
+                bus.silentSource.disconnect();
+            }
+
             bus.gainNode.disconnect();
         }
         busses.clear();
@@ -180,6 +187,7 @@ class WebAudio extends clay.base.BaseAudio {
             index: index,
             gainNode: gainNode,
             workletNode: null,
+            silentSource: null,
             volume: volume,
             active: true,
             name: name.length > 0 ? name : 'bus-$index'
@@ -205,10 +213,16 @@ class WebAudio extends clay.base.BaseAudio {
             }
         }
 
-        // Disconnect and cleanup
+        // Disconnect and cleanup worklet and silent source
         if (bus.workletNode != null) {
             bus.workletNode.disconnect();
         }
+
+        if (bus.silentSource != null) {
+            bus.silentSource.stop();
+            bus.silentSource.disconnect();
+        }
+
         bus.gainNode.disconnect();
         busses.remove(index);
 
@@ -273,18 +287,42 @@ class WebAudio extends clay.base.BaseAudio {
         // Remove existing worklet if any
         if (bus.workletNode != null) {
             bus.workletNode.disconnect();
+            // Also disconnect the silent source if it exists
+            if (bus.silentSource != null) {
+                bus.silentSource.stop();
+                bus.silentSource.disconnect();
+                bus.silentSource = null;
+            }
         }
 
         try {
             // Create new worklet node
             var workletNode:AudioWorkletNode = js.Syntax.code('new AudioWorkletNode({0}, {1}, {2})', context, workletName, options);
 
-            // Reconnect the audio chain: sources -> bus.gainNode -> worklet -> destination
+            // Create a silent constant source to keep the worklet processing
+            var silentSource = context.createConstantSource();
+            silentSource.offset.value = 0.0; // Silent
+
+            // Create a gain node to sum the bus audio with the silent source
+            // This preserves the channel configuration of the bus audio
+            var sumGain = context.createGain();
+            sumGain.gain.value = 1.0;
+
+            // Connect the audio chain:
+            // 1. Bus gain node -> sumGain
+            // 2. Silent source -> sumGain (will be mixed in)
+            // 3. sumGain -> worklet -> destination
             bus.gainNode.disconnect();
-            bus.gainNode.connect(workletNode);
+            bus.gainNode.connect(sumGain);
+            silentSource.connect(sumGain);
+            sumGain.connect(workletNode);
             workletNode.connect(context.destination);
 
+            // Start the silent source to keep worklet active
+            silentSource.start();
+
             bus.workletNode = workletNode;
+            bus.silentSource = silentSource; // Store reference for cleanup
 
             workletNode.port.onmessage = (event) -> {
                 switch event?.data?.type {
@@ -301,7 +339,7 @@ class WebAudio extends clay.base.BaseAudio {
                 }
             };
 
-            Log.debug('Audio / Attached worklet $workletName to bus $busIndex');
+            Log.debug('Audio / Attached worklet $workletName to bus $busIndex with silent source');
             return true;
 
         } catch (error:Dynamic) {
@@ -316,8 +354,16 @@ class WebAudio extends clay.base.BaseAudio {
         var bus = busses.get(busIndex);
         if (bus == null || bus.workletNode == null) return;
 
-        // Disconnect worklet and restore direct connection
+        // Disconnect worklet and silent source
         bus.workletNode.disconnect();
+
+        if (bus.silentSource != null) {
+            bus.silentSource.stop();
+            bus.silentSource.disconnect();
+            bus.silentSource = null;
+        }
+
+        // Restore direct connection
         bus.gainNode.disconnect();
         bus.gainNode.connect(context.destination);
         bus.workletNode = null;
