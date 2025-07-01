@@ -304,17 +304,26 @@ class WebAudio extends clay.base.BaseAudio {
             silentSource.offset.value = 0.0; // Silent
 
             // Create a gain node to sum the bus audio with the silent source
-            // This preserves the channel configuration of the bus audio
             var sumGain = context.createGain();
             sumGain.gain.value = 1.0;
 
+            // Configure the sumGain to preserve stereo
+            sumGain.channelCount = 2;
+            sumGain.channelCountMode = js.html.audio.ChannelCountMode.EXPLICIT;
+            sumGain.channelInterpretation = js.html.audio.ChannelInterpretation.SPEAKERS;
+
+            // Create a channel merger to ensure the silent source is stereo
+            var merger = context.createChannelMerger(2);
+            silentSource.connect(merger, 0, 0); // Connect mono to left channel
+            silentSource.connect(merger, 0, 1); // Connect mono to right channel
+
             // Connect the audio chain:
             // 1. Bus gain node -> sumGain
-            // 2. Silent source -> sumGain (will be mixed in)
+            // 2. Silent source -> merger -> sumGain (stereo)
             // 3. sumGain -> worklet -> destination
             bus.gainNode.disconnect();
             bus.gainNode.connect(sumGain);
-            silentSource.connect(sumGain);
+            merger.connect(sumGain);
             sumGain.connect(workletNode);
             workletNode.connect(context.destination);
 
@@ -339,7 +348,7 @@ class WebAudio extends clay.base.BaseAudio {
                 }
             };
 
-            Log.debug('Audio / Attached worklet $workletName to bus $busIndex with silent source');
+            Log.debug('Audio / Attached worklet $workletName to bus $busIndex with stereo silent source');
             return true;
 
         } catch (error:Dynamic) {
