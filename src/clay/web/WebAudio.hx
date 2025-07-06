@@ -15,13 +15,15 @@ typedef AudioWorkletNode = Dynamic;
 
 // New typedefs for bus system
 private typedef WebAudioBus = {
+    ready:Bool,
     index:Int,
     gainNode:js.html.audio.GainNode,
     ?workletNode:AudioWorkletNode,
     ?silentSource:js.html.audio.ConstantSourceNode,
     volume:Float,
     active:Bool,
-    name:String
+    name:String,
+    ?parameterValues:Array<Float> // Store current parameter values
 }
 
 private typedef WebSound = {
@@ -54,6 +56,7 @@ class WebAudio extends clay.base.BaseAudio {
 
     static inline var HALF_PI:Float = 1.5707;
     static inline var DEFAULT_BUS:Int = 0;
+    public static inline var MAX_WORKLET_PARAMS:Int = 128;
 
     var suspended:Bool = false;
     var handleSeq:Int = 0;
@@ -65,6 +68,10 @@ class WebAudio extends clay.base.BaseAudio {
 
     var ignoreEndedSoundsTick0:Array<WebSound> = [];
     var ignoreEndedSoundsTick1:Array<WebSound> = [];
+
+    var pendingBusWorkletCallbacks:Array<Array<()->Void>> = [];
+
+    var workletMessageCallbacks:Array<Dynamic> = [];
 
     public var context(default, null):js.html.audio.AudioContext;
     public var active(default, null):Bool = false;
@@ -184,13 +191,15 @@ class WebAudio extends clay.base.BaseAudio {
         gainNode.connect(context.destination);
 
         var bus:WebAudioBus = {
+            ready: false,
             index: index,
             gainNode: gainNode,
             workletNode: null,
             silentSource: null,
             volume: volume,
             active: true,
-            name: name.length > 0 ? name : 'bus-$index'
+            name: name.length > 0 ? name : 'bus-$index',
+            parameterValues: [for (i in 0...MAX_WORKLET_PARAMS) 0.0]
         };
 
         busses.set(index, bus);
@@ -299,6 +308,16 @@ class WebAudio extends clay.base.BaseAudio {
             // Create new worklet node
             var workletNode:AudioWorkletNode = js.Syntax.code('new AudioWorkletNode({0}, {1}, {2})', context, workletName, options);
 
+            // Initialize parameters with stored values
+            if (bus.parameterValues != null) {
+                for (i in 0...MAX_WORKLET_PARAMS) {
+                    var param = workletNode.parameters.get('param$i');
+                    if (param != null) {
+                        param.value = bus.parameterValues[i];
+                    }
+                }
+            }
+
             // Create a silent constant source to keep the worklet processing
             var silentSource = context.createConstantSource();
             silentSource.offset.value = 0.0; // Silent
@@ -337,6 +356,8 @@ class WebAudio extends clay.base.BaseAudio {
                 switch event?.data?.type {
                     case 'trace': trace(event.data);
                     case 'ready': {
+                        bus.ready = true;
+                        flushBusWorkletReadyCallbacks(busIndex);
                         if (onReady != null) {
                             onReady();
                             onReady = null;
@@ -344,6 +365,16 @@ class WebAudio extends clay.base.BaseAudio {
                             workletNode.port.postMessage({ type: 'ready' });
                         }
                     }
+                    case 'addBusFilterWorklet':
+                        var i = workletMessageCallbacks.length - 1;
+                        while (i >= 0) {
+                            final info = workletMessageCallbacks[i];
+                            if (info.type == 'addBusFilterWorklet' && info.bus == event.data.bus && info.filterId == event.data.filterId) {
+                                workletMessageCallbacks.splice(i, 1);
+                                info.callback();
+                            }
+                            i--;
+                        }
                     case null | _:
                 }
             };
@@ -361,7 +392,7 @@ class WebAudio extends clay.base.BaseAudio {
 
     public function detachWorkletFromBus(busIndex:Int):Void {
         var bus = busses.get(busIndex);
-        if (bus == null || bus.workletNode == null) return;
+        if (bus == null || bus.workletNode == null || !bus.ready) return;
 
         // Disconnect worklet and silent source
         bus.workletNode.disconnect();
@@ -382,19 +413,103 @@ class WebAudio extends clay.base.BaseAudio {
 
     public function sendMessageToWorklet(busIndex:Int, message:Dynamic):Void {
         var bus = busses.get(busIndex);
-        if (bus == null || bus.workletNode == null) return;
+        if (bus == null || bus.workletNode == null || !bus.ready) return;
 
         bus.workletNode.port.postMessage(message);
     }
 
+    function flushBusWorkletReadyCallbacks(busIndex:Int):Void {
+
+        var cbs:Array<()->Void> = pendingBusWorkletCallbacks[busIndex];
+        if (cbs != null) {
+            pendingBusWorkletCallbacks[busIndex] = null;
+            for (i in 0...cbs.length) {
+                final cb = cbs[i];
+                cb();
+            }
+        }
+
+    }
+
+    public function scheduleWhenBusWorkletReady(busIndex:Int, ready:()->Void):Void {
+
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null || !bus.ready) {
+            var cbs:Array<()->Void> = pendingBusWorkletCallbacks[busIndex];
+            if (cbs == null) {
+                cbs = [];
+                pendingBusWorkletCallbacks[busIndex] = cbs;
+            }
+            cbs.push(ready);
+        }
+        else {
+            ready();
+        }
+
+    }
+
+    public function setWorkletParameterWhenReady(busIndex:Int, paramName:String, value:Float):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null || !bus.ready) {
+            scheduleWhenBusWorkletReady(busIndex, () -> {
+                setWorkletParameter(busIndex, paramName, value);
+            });
+        }
+        else {
+            setWorkletParameter(busIndex, paramName, value);
+        }
+    }
+
     public function setWorkletParameter(busIndex:Int, paramName:String, value:Float):Void {
         var bus = busses.get(busIndex);
-        if (bus == null || bus.workletNode == null) return;
+        if (bus == null || bus.workletNode == null || !bus.ready) return;
 
         var param = bus.workletNode.parameters.get(paramName);
         if (param != null) {
             param.value = value;
+
+            // Also store the value if it's one of our numbered parameters
+            if (StringTools.startsWith(paramName, 'param')) {
+                var index = Std.parseInt(paramName.substr(5));
+                if (index != null && index >= 0 && index < MAX_WORKLET_PARAMS) {
+                    bus.parameterValues[index] = value;
+                }
+            }
         }
+        else {
+            Log.warning('Audio / Unknown worklet parameter named "$paramName" for bus $busIndex');
+        }
+    }
+
+    public function setWorkletParameterByIndexWhenReady(busIndex:Int, paramIndex:Int, value:Float):Void {
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.workletNode == null || !bus.ready) {
+            scheduleWhenBusWorkletReady(busIndex, () -> {
+                setWorkletParameterByIndex(busIndex, paramIndex, value);
+            });
+        }
+        else {
+            setWorkletParameterByIndex(busIndex, paramIndex, value);
+        }
+    }
+
+    public function setWorkletParameterByIndex(busIndex:Int, paramIndex:Int, value:Float):Void {
+        if (paramIndex < 0 || paramIndex >= MAX_WORKLET_PARAMS) {
+            Log.warning('Audio / Parameter index $paramIndex out of range (0-${MAX_WORKLET_PARAMS-1})');
+            return;
+        }
+        setWorkletParameter(busIndex, 'param$paramIndex', value);
+    }
+
+    public function getWorkletParameterByIndex(busIndex:Int, paramIndex:Int):Float {
+        if (paramIndex < 0 || paramIndex >= MAX_WORKLET_PARAMS) {
+            return 0.0;
+        }
+
+        var bus = busses.get(busIndex);
+        if (bus == null || bus.parameterValues == null) return 0.0;
+
+        return bus.parameterValues[paramIndex];
     }
 
     // Core Audio Functions
@@ -924,7 +1039,17 @@ class WebAudio extends clay.base.BaseAudio {
             filterId: filterId,
             workletClass: Type.getClassName(workletClass),
         };
+
+        if (workletReady != null) {
+            workletMessageCallbacks.push({
+                type: "addBusFilterWorklet",
+                bus: busIndex,
+                filterId: filterId,
+                callback: workletReady
+            });
+        }
         bus.workletNode.port.postMessage(message);
+
     }
 
     public function destroyBusFilterWorklet(busIndex:Int, filterId:Int):Void {
