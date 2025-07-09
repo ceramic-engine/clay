@@ -12,7 +12,6 @@ class AudioDataOptions {
     public var channels:Null<Int> = null;
     public var bitsPerSample:Null<Int> = null;
     public var format:AudioFormat = null;
-    public var samples:Uint8Array = null;
     public var isStream:Null<Bool> = null;
 
 }
@@ -30,9 +29,6 @@ class AudioData {
 
     /** The associated id for the data */
     public var id:String = 'AudioData';
-
-    /** The sample data bytes, if any (streams don't populate this) */
-    public var samples:Uint8Array;
 
     /** The sample rate in samples per second */
     public var rate:Int = 44100;
@@ -83,9 +79,6 @@ class AudioData {
         if (options.isStream != null)
             this.isStream = options.isStream;
 
-        if (options.samples != null)
-            this.samples = options.samples;
-
         if (options.duration != null)
             this.duration = options.duration;
 
@@ -103,12 +96,6 @@ class AudioData {
         destroyed = true;
 
         id = null;
-        #if clay_native
-        if (samples != null) {
-            samples.buffer = null;
-        }
-        #end
-        samples = null;
 
     }
 

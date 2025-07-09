@@ -1126,7 +1126,6 @@ class WebAudio extends clay.base.BaseAudio {
                 id         : id,
                 isStream   : false,
                 format     : format,
-                samples    : null,
                 length     : buffer.length,
                 channels   : buffer.numberOfChannels,
                 duration   : buffer.duration,
@@ -1146,6 +1145,109 @@ class WebAudio extends clay.base.BaseAudio {
                 });
             }
         });
+    }
+
+    /**
+     * Creates AudioData from raw PCM Float32 samples.
+     *
+     * @param id Unique identifier for this audio data
+     * @param pcmData Float32Array containing the raw PCM samples
+     * @param sampleFrames Number of sample frames (samples per channel)
+     * @param channels Number of audio channels (1 = mono, 2 = stereo, etc.)
+     * @param sampleRate Sample rate in Hz (e.g., 44100)
+     * @param interleaved Whether the PCM data is interleaved (LRLRLR...) or planar (LLL...RRR...)
+     * @param format Optional audio format information
+     * @param callback Optional callback when AudioData is ready
+     */
+    public function dataFromPCM(
+        id:String,
+        pcmData:Float32Array,
+        sampleFrames:Int,
+        channels:Int,
+        sampleRate:Float,
+        interleaved:Bool = true,
+        ?format:AudioFormat,
+        ?callback:(data:AudioData)->Void
+    ):AudioData {
+        if (!active) {
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(null);
+                });
+            }
+            return null;
+        }
+
+        if (id == null) throw 'id is null!';
+        if (pcmData == null) throw 'pcmData is null!';
+        if (sampleFrames <= 0) throw 'sampleFrames must be positive!';
+        if (sampleRate <= 0) throw 'sampleRate must be positive!';
+        if (channels <= 0) throw 'channels must be positive!';
+
+        try {
+            // Create AudioBuffer with the specified parameters
+            var buffer = context.createBuffer(channels, sampleFrames, sampleRate);
+
+            if (interleaved) {
+                // Handle interleaved data: LRLRLR... for stereo
+                for (channel in 0...channels) {
+                    var channelData = buffer.getChannelData(channel);
+                    for (frame in 0...sampleFrames) {
+                        var sampleIndex = frame * channels + channel;
+                        if (sampleIndex < pcmData.length) {
+                            channelData[frame] = pcmData[sampleIndex];
+                        } else {
+                            channelData[frame] = 0.0; // Fill with silence if not enough data
+                        }
+                    }
+                }
+            } else {
+                // Handle planar data: LLL...RRR... for stereo
+                var samplesPerChannel = Std.int(pcmData.length / channels);
+                for (channel in 0...channels) {
+                    var channelData = buffer.getChannelData(channel);
+                    var channelOffset = channel * samplesPerChannel;
+                    for (frame in 0...sampleFrames) {
+                        var sampleIndex = channelOffset + frame;
+                        if (sampleIndex < pcmData.length) {
+                            channelData[frame] = pcmData[sampleIndex];
+                        } else {
+                            channelData[frame] = 0.0; // Fill with silence if not enough data
+                        }
+                    }
+                }
+            }
+
+            var data = new WebAudioData(app, buffer, null, null, {
+                id         : id,
+                isStream   : false,
+                format     : format,
+                length     : buffer.length,
+                channels   : buffer.numberOfChannels,
+                duration   : buffer.duration,
+                rate       : Std.int(buffer.sampleRate)
+            });
+
+            Log.debug('Audio / Created AudioData from PCM: $id ($channels channels, $sampleFrames frames, ${sampleRate}Hz, ${interleaved ? "interleaved" : "planar"})');
+
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(data);
+                });
+            }
+
+            return data;
+
+        } catch (error:Dynamic) {
+            Log.error('Audio / Failed to create audio buffer from PCM data for `$id`: $error');
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(null);
+                });
+            }
+        }
+
+        return null;
     }
 
     function handleSourceDestroyed(source:AudioSource):Void {
@@ -1213,7 +1315,6 @@ class WebAudio extends clay.base.BaseAudio {
                 id         : path,
                 isStream   : true,
                 format     : format,
-                samples    : null,
                 length     : length,
                 channels   : channels,
                 rate       : rate,

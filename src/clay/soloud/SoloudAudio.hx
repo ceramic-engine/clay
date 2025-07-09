@@ -9,6 +9,7 @@ import clay.audio.AudioHandle;
 import clay.audio.AudioInstance;
 import clay.audio.AudioSource;
 import clay.audio.AudioState;
+import clay.buffers.Float32Array;
 import clay.buffers.Uint8Array;
 import haxe.io.Path;
 import soloud.Soloud;
@@ -578,6 +579,123 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
+    /**
+     * Creates AudioData from raw PCM Float32 samples.
+     *
+     * @param id Unique identifier for this audio data
+     * @param pcmData Float32Array containing the raw PCM samples
+     * @param sampleFrames Number of sample frames (samples per channel)
+     * @param channels Number of audio channels (1 = mono, 2 = stereo, etc.)
+     * @param sampleRate Sample rate in Hz (e.g., 44100)
+     * @param interleaved Whether the PCM data is interleaved (LRLRLR...) or planar (LLL...RRR...)
+     * @param format Optional audio format information
+     * @param callback Optional callback when AudioData is ready
+     */
+    public function dataFromPCM(
+        id:String,
+        pcmData:Float32Array,
+        sampleFrames:Int,
+        channels:Int,
+        sampleRate:Float,
+        interleaved:Bool = true,
+        ?format:AudioFormat,
+        ?callback:(data:AudioData)->Void
+    ):AudioData {
+        if (!active) {
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(null);
+                });
+            }
+            return null;
+        }
+
+        if (id == null) throw 'id is null!';
+        if (pcmData == null) throw 'pcmData is null!';
+        if (sampleFrames <= 0) throw 'sampleFrames must be positive!';
+        if (sampleRate <= 0) throw 'sampleRate must be positive!';
+        if (channels <= 0) throw 'channels must be positive!';
+
+        try {
+            var wav = Wav.create();
+
+            // Soloud expects interleaved data, so convert if needed
+            var soloudData:Float32Array;
+            if (interleaved) {
+                soloudData = pcmData;
+            } else {
+                // Convert planar to interleaved format
+                soloudData = new Float32Array(sampleFrames * channels);
+                var samplesPerChannel = Std.int(pcmData.length / channels);
+                for (frame in 0...sampleFrames) {
+                    for (channel in 0...channels) {
+                        var planarIndex = channel * samplesPerChannel + frame;
+                        var interleavedIndex = frame * channels + channel;
+                        if (planarIndex < pcmData.length) {
+                            soloudData[interleavedIndex] = pcmData[planarIndex];
+                        } else {
+                            soloudData[interleavedIndex] = 0.0; // Fill with silence if not enough data
+                        }
+                    }
+                }
+            }
+
+            // Load the raw wave data into Soloud
+            // aLength parameter is total number of samples (frames * channels)
+            var result = wav.loadRawWave(
+                untyped __cpp__('(float*)&{0}[0]', soloudData.buffer),
+                sampleFrames * channels, // Total samples
+                sampleRate,
+                channels,
+                true, // Copy the data so we don't have to worry about ownership
+                false // Don't take ownership since we're copying
+            );
+
+            if (result != 0) {
+                var error:SoloudErrors = result;
+                Log.error('Audio / Failed to load PCM data into Soloud for `$id`: $error');
+                wav.destroy();
+                if (callback != null) {
+                    Immediate.push(() -> {
+                        callback(null);
+                    });
+                }
+                return null;
+            }
+
+            var data = new SoloudAudioData(app, {
+                id: id,
+                isStream: false,
+                format: format,
+                length: wav.mSampleCount,
+                channels: channels,
+                duration: wav.getLength(),
+                rate: Std.int(sampleRate)
+            });
+            data.wav = wav;
+
+            Log.debug('Audio / Created AudioData from PCM: $id ($channels channels, $sampleFrames frames, ${sampleRate}Hz, ${interleaved ? "interleaved" : "planar"})');
+
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(data);
+                });
+            }
+
+            return data;
+
+        } catch (error:Dynamic) {
+            Log.error('Audio / Failed to create audio data from PCM for `$id`: $error');
+            if (callback != null) {
+                Immediate.push(() -> {
+                    callback(null);
+                });
+            }
+        }
+
+        return null;
+    }
+
     static function audioDataFromFile(app:Clay, path:String, isStream:Bool, format:AudioFormat):AudioData {
 
         var wav:Wav = untyped __cpp__('NULL');
@@ -668,7 +786,6 @@ class SoloudAudio extends clay.base.BaseAudio {
                 id: path,
                 isStream: isStream,
                 format: format,
-                samples: null,
                 length: length,
                 channels: numChannels,
                 duration: duration,
@@ -706,7 +823,6 @@ class SoloudAudio extends clay.base.BaseAudio {
                 id: id,
                 isStream: false,
                 format: format,
-                samples: null,
                 length: length,
                 channels: numChannels,
                 duration: duration,
