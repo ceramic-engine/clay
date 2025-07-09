@@ -10,4 +10,3 @@
 -lib linc_ogg
 -lib linc_stb
 -lib linc_timestamp
--lib linc_openal
