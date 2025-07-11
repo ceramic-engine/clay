@@ -637,9 +637,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         config.y = _sdlPoint.y;
 
         windowDpr = windowDevicePixelRatio();
-
-        windowW = Math.round(_windowW / windowDpr);
-        windowH = Math.round(_windowH / windowDpr);
+        windowW = toPixels(_windowW);
+        windowH = toPixels(_windowH);
         config.width = windowW;
         config.height = windowH;
 
@@ -1302,7 +1301,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     inline function toPixels(value:Float):Int {
-        return Math.round(value);
+        return Math.floor(value);
     }
 
     /** Helper to return a `ModState` (shift, ctrl etc) from a given `InputEvent` */
