@@ -630,18 +630,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
 
         SDL.getWindowSizeInPixels(window, _sdlSize);
-        windowW = _sdlSize.w;
-        windowH = _sdlSize.h;
+        var _windowW = _sdlSize.w;
+        var _windowH = _sdlSize.h;
         SDL.getWindowPosition(window, _sdlPoint);
         config.x = _sdlPoint.x;
         config.y = _sdlPoint.y;
 
         windowDpr = windowDevicePixelRatio();
 
-        //#if android
-        windowW = Math.round(windowW / windowDpr);
-        windowH = Math.round(windowH / windowDpr);
-        //#end
+        windowW = Math.round(_windowW / windowDpr);
+        windowH = Math.round(_windowH / windowDpr);
         config.width = windowW;
         config.height = windowH;
 
@@ -738,30 +736,30 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Public API
 
-    #if android
+    #if !clay_no_compute_density
 
-    var _didFetchAndroidDPI:Bool = false;
-    var _computedAndroidDensity:Float = 1.0;
+    var _didFetchDPI:Bool = false;
+    var _computedDensity:Float = 1.0;
 
     #end
 
     override function windowDevicePixelRatio():Float {
 
-        #if android
+        #if !clay_no_compute_density
 
-        if (!_didFetchAndroidDPI) {
-            _didFetchAndroidDPI = true;
+        if (!_didFetchDPI) {
+            _didFetchDPI = true;
 
             untyped __cpp__('SDL_DisplayID display = SDL_GetPrimaryDisplay()');
             final scale:Float = untyped __cpp__('(::Float)SDL_GetDisplayContentScale(display)');
-            var density = Math.round(scale);
+            var density = Math.round(scale * 2) / 2;
             if (density < 1) {
                 density = 1;
             }
-            _computedAndroidDensity = density;
+            _computedDensity = density;
         }
 
-        return _computedAndroidDensity;
+        return _computedDensity;
 
         #else
 
@@ -1385,25 +1383,27 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_RESIZED:
                 type = RESIZED;
+                #if !clay_no_compute_density
+                _didFetchDPI = false;
+                #end
                 windowDpr = windowDevicePixelRatio();
-                windowW = toPixels(data1);
-                windowH = toPixels(data2);
-                //#if android
-                windowW = Math.round(windowW / windowDpr);
-                windowH = Math.round(windowH / windowDpr);
-                //#end
+                var _windowW = toPixels(data1);
+                var _windowH = toPixels(data2);
+                windowW = Math.round(_windowW / windowDpr);
+                windowH = Math.round(_windowH / windowDpr);
                 data1 = windowW;
                 data2 = windowH;
 
             case SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 type = SIZE_CHANGED;
+                #if !clay_no_compute_density
+                _didFetchDPI = false;
+                #end
                 windowDpr = windowDevicePixelRatio();
-                windowW = toPixels(data1);
-                windowH = toPixels(data2);
-                //#if android
-                windowW = Math.round(windowW / windowDpr);
-                windowH = Math.round(windowH / windowDpr);
-                //#end
+                var _windowW = toPixels(data1);
+                var _windowH = toPixels(data2);
+                windowW = Math.round(_windowW / windowDpr);
+                windowH = Math.round(_windowH / windowDpr);
                 data1 = windowW;
                 data2 = windowH;
 
