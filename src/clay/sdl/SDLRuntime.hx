@@ -1302,7 +1302,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     inline function toPixels(value:Float):Int {
-        return Math.floor(windowDpr * value);
+        return Math.round(value);
     }
 
     /** Helper to return a `ModState` (shift, ctrl etc) from a given `InputEvent` */
@@ -1387,10 +1387,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 _didFetchDPI = false;
                 #end
                 windowDpr = windowDevicePixelRatio();
-                var _windowW = toPixels(data1);
-                var _windowH = toPixels(data2);
-                windowW = Math.round(_windowW / windowDpr);
-                windowH = Math.round(_windowH / windowDpr);
+                windowW = toPixels(data1);
+                windowH = toPixels(data2);
                 data1 = windowW;
                 data2 = windowH;
 
@@ -1400,10 +1398,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 _didFetchDPI = false;
                 #end
                 windowDpr = windowDevicePixelRatio();
-                var _windowW = toPixels(data1);
-                var _windowH = toPixels(data2);
-                windowW = Math.round(_windowW / windowDpr);
-                windowH = Math.round(_windowH / windowDpr);
+                windowW = toPixels(data1);
+                windowH = toPixels(data2);
                 data1 = windowW;
                 data2 = windowH;
 
