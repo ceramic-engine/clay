@@ -215,6 +215,7 @@ class Clay {
         Log.debug('Clay / shutdown');
 
         hasShutdown = true;
+        shuttingDown = false;
 
     }
 
