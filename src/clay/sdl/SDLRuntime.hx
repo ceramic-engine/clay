@@ -630,15 +630,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
 
         SDL.getWindowSizeInPixels(window, _sdlSize);
-        var _windowW = _sdlSize.w;
-        var _windowH = _sdlSize.h;
+        windowW = _sdlSize.w;
+        windowH = _sdlSize.h;
         SDL.getWindowPosition(window, _sdlPoint);
         config.x = _sdlPoint.x;
         config.y = _sdlPoint.y;
 
         windowDpr = windowDevicePixelRatio();
-        windowW = toPixels(_windowW);
-        windowH = toPixels(_windowH);
+
+        //#if android
+        windowW = Math.round(windowW / windowDpr);
+        windowH = Math.round(windowH / windowDpr);
+        //#end
         config.width = windowW;
         config.height = windowH;
 
@@ -735,30 +738,30 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Public API
 
-    #if !clay_no_compute_density
+    #if android
 
-    var _didFetchDPI:Bool = false;
-    var _computedDensity:Float = 1.0;
+    var _didFetchAndroidDPI:Bool = false;
+    var _computedAndroidDensity:Float = 1.0;
 
     #end
 
     override function windowDevicePixelRatio():Float {
 
-        #if !clay_no_compute_density
+        #if android
 
-        if (!_didFetchDPI) {
-            _didFetchDPI = true;
+        if (!_didFetchAndroidDPI) {
+            _didFetchAndroidDPI = true;
 
-            untyped __cpp__('SDL_DisplayID display = SDL_GetDisplayForWindow({0})', window);
+            untyped __cpp__('SDL_DisplayID display = SDL_GetPrimaryDisplay()');
             final scale:Float = untyped __cpp__('(::Float)SDL_GetDisplayContentScale(display)');
-            var density = Math.round(scale * 2) / 2;
+            var density = Math.round(scale);
             if (density < 1) {
                 density = 1;
             }
-            _computedDensity = density;
+            _computedAndroidDensity = density;
         }
 
-        return _computedDensity;
+        return _computedAndroidDensity;
 
         #else
 
@@ -1301,7 +1304,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     inline function toPixels(value:Float):Int {
-        return Math.floor(value);
+        return Math.floor(windowDpr * value);
     }
 
     /** Helper to return a `ModState` (shift, ctrl etc) from a given `InputEvent` */
@@ -1382,34 +1385,25 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_RESIZED:
                 type = RESIZED;
-                #if !clay_no_compute_density
-                _didFetchDPI = false;
-                #end
                 windowDpr = windowDevicePixelRatio();
                 windowW = toPixels(data1);
                 windowH = toPixels(data2);
+                //#if android
+                windowW = Math.round(windowW / windowDpr);
+                windowH = Math.round(windowH / windowDpr);
+                //#end
                 data1 = windowW;
                 data2 = windowH;
 
-            case SDL.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-                #if !clay_no_compute_density
-                _didFetchDPI = false;
-                #end
-                windowDpr = windowDevicePixelRatio();
-                SDL.getWindowSizeInPixels(window, _sdlSize);
-                var _windowW = _sdlSize.w;
-                var _windowH = _sdlSize.h;
-                windowW = toPixels(_windowW);
-                windowH = toPixels(_windowH);
-
             case SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 type = SIZE_CHANGED;
-                #if !clay_no_compute_density
-                _didFetchDPI = false;
-                #end
                 windowDpr = windowDevicePixelRatio();
                 windowW = toPixels(data1);
                 windowH = toPixels(data2);
+                //#if android
+                windowW = Math.round(windowW / windowDpr);
+                windowH = Math.round(windowH / windowDpr);
+                //#end
                 data1 = windowW;
                 data2 = windowH;
 
