@@ -749,7 +749,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         if (!_didFetchDPI) {
             _didFetchDPI = true;
 
-            untyped __cpp__('SDL_DisplayID display = SDL_GetPrimaryDisplay()');
+            untyped __cpp__('SDL_DisplayID display = SDL_GetDisplayForWindow({0})', window);
             final scale:Float = untyped __cpp__('(::Float)SDL_GetDisplayContentScale(display)');
             var density = Math.round(scale * 2) / 2;
             if (density < 1) {
@@ -1390,6 +1390,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 windowH = toPixels(data2);
                 data1 = windowW;
                 data2 = windowH;
+
+            case SDL.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+                #if !clay_no_compute_density
+                _didFetchDPI = false;
+                #end
+                windowDpr = windowDevicePixelRatio();
+                SDL.getWindowSizeInPixels(window, _sdlSize);
+                var _windowW = _sdlSize.w;
+                var _windowH = _sdlSize.h;
+                windowW = toPixels(_windowW);
+                windowH = toPixels(_windowH);
 
             case SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 type = SIZE_CHANGED;
