@@ -107,13 +107,13 @@ package clay.buffers;
 
         @:noCompletion
         @:arrayAccess extern
-        public inline function __get(idx:Int) : Float {
+        public inline function __get(idx:Int) : cpp.Float32 {
             return ArrayBufferIO.getFloat32(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT) );
         }
 
         @:noCompletion
         @:arrayAccess extern
-        public inline function __set(idx:Int, val:Float) : Void {
+        public inline function __set(idx:Int, val:cpp.Float32) : Void {
             ArrayBufferIO.setFloat32(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT), val);
         }
 

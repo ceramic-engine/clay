@@ -162,28 +162,28 @@ class ArrayBufferIO {
     //Float
 
         #if !clay_no_inline_buffers extern inline #end
-        public static function getFloat32( buffer:ArrayBuffer, byteOffset:Int ) : Float {
+        public static function getFloat32( buffer:ArrayBuffer, byteOffset:Int ) : cpp.Float32 {
 
             untyped return __global__.__hxcpp_memory_get_float(buffer, byteOffset);
 
         }
 
         #if !clay_no_inline_buffers extern inline #end
-        public static function getFloat32_BE( buffer:ArrayBuffer, byteOffset:Int ) : Float {
+        public static function getFloat32_BE( buffer:ArrayBuffer, byteOffset:Int ) : cpp.Float32 {
 
             untyped return __global__.__hxcpp_memory_get_float(buffer, byteOffset);
 
         }
 
         #if !clay_no_inline_buffers extern inline #end
-        public static function setFloat32( buffer:ArrayBuffer, byteOffset:Int, value:Float ) : Void {
+        public static function setFloat32( buffer:ArrayBuffer, byteOffset:Int, value:cpp.Float32 ) : Void {
 
             untyped __global__.__hxcpp_memory_set_float(buffer, byteOffset, value);
 
         }
 
         #if !clay_no_inline_buffers extern inline #end
-        public static function setFloat32_BE( buffer:ArrayBuffer, byteOffset:Int, value:Float ) : Void {
+        public static function setFloat32_BE( buffer:ArrayBuffer, byteOffset:Int, value:cpp.Float32 ) : Void {
 
             untyped __global__.__hxcpp_memory_set_float(buffer, byteOffset, value);
 
