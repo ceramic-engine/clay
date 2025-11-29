@@ -400,6 +400,8 @@ class Clay {
         #elseif clay_web
         return {
         };
+        #else
+        return Runtime.defaultConfig();
         #end
 
     }

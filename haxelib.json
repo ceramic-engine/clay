@@ -9,9 +9,5 @@
     "releasenote": "",
     "contributors": ["jeremyfa"],
     "dependencies": {
-      "linc_ogg": "git:https://github.com/ceramic-engine/linc_ogg.git",
-      "linc_opengl": "git:https://github.com/ceramic-engine/linc_opengl.git",
-      "linc_stb": "git:https://github.com/ceramic-engine/linc_stb.git",
-      "linc_timestamp": "git:https://github.com/ceramic-engine/linc_timestamp.git"
     }
   }

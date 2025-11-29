@@ -13,7 +13,7 @@ package clay.opengl;
     typedef GLTexture           = clay.opengl.web.GL.GLTexture;
     typedef GLUniformLocation   = clay.opengl.web.GL.GLUniformLocation;
 
-#elseif clay_native
+#elseif (clay_native && linc_opengl)
 
     typedef GL                  = opengl.WebGL;
     typedef GLActiveInfo        = opengl.WebGL.GLActiveInfo;
