@@ -1,8 +1,14 @@
 package clay;
 
 import clay.opengl.GL;
-import clay.opengl.GLGraphics;
+import clay.opengl.GL.GLBuffer;
+import clay.opengl.GL.GLFramebuffer;
+import clay.opengl.GL.GLProgram;
+import clay.opengl.GL.GLRenderbuffer;
+import clay.opengl.GL.GLShader;
 import clay.opengl.GL.GLTexture;
+import clay.opengl.GL.GLUniformLocation;
+import clay.opengl.GLGraphicsDriver;
 
 /** A gamepad device event type */
 enum abstract GamepadDeviceEventType(Int) from Int to Int {
@@ -257,9 +263,32 @@ enum abstract AppEventType(Int) from Int to Int {
 
 // For now, all targets are using GL api
 
+/** Cross-platform texture identifier */
 typedef TextureId = GLTexture;
-typedef RenderTarget = GLGraphics_RenderTarget;
-typedef GpuShader = GLGraphics_GpuShader;
+
+/** Cross-platform render target */
+typedef RenderTarget = GLGraphicsDriver_RenderTarget;
+
+/** Cross-platform compiled shader program */
+typedef GpuShader = GLGraphicsDriver_GpuShader;
+
+/** Cross-platform uniform location handle */
+typedef UniformLocation = GLUniformLocation;
+
+/** Cross-platform framebuffer handle */
+typedef Framebuffer = GLFramebuffer;
+
+/** Cross-platform renderbuffer handle */
+typedef Renderbuffer = GLRenderbuffer;
+
+/** Cross-platform shader handle (vertex or fragment) */
+typedef ShaderHandle = GLShader;
+
+/** Cross-platform shader program handle */
+typedef ProgramHandle = GLProgram;
+
+/** Cross-platform GPU buffer handle */
+typedef BufferHandle = GLBuffer;
 
 enum abstract TextureFormat(Int) from Int to Int {
 

@@ -68,7 +68,7 @@ class Uniforms {
 
     public function setInt(name:String, value:Int):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         ints.set(name, value);
@@ -82,7 +82,7 @@ class Uniforms {
 
     public function setIntArray(name:String, value:Int32Array):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         intArrays.set(name, value);
@@ -96,7 +96,7 @@ class Uniforms {
 
     public function setFloat(name:String, value:Float):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         floats.set(name, value);
@@ -110,7 +110,7 @@ class Uniforms {
 
     public function setFloatArray(name:String, value:Float32Array):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         floatArrays.set(name, value);
@@ -124,7 +124,7 @@ class Uniforms {
 
     public function setVector2(name:String, x:Float, y:Float):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         var existing = vector2s.get(name);
@@ -152,7 +152,7 @@ class Uniforms {
 
     public function setVector3(name:String, x:Float, y:Float, z:Float):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         var existing = vector3s.get(name);
@@ -182,7 +182,7 @@ class Uniforms {
 
     public function setVector4(name:String, x:Float, y:Float, z:Float, w:Float):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         var existing = vector4s.get(name);
@@ -214,7 +214,7 @@ class Uniforms {
 
     public function setMatrix4(name:String, value:Float32Array):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         var existing = matrix4s.get(name);
@@ -242,7 +242,7 @@ class Uniforms {
 
     public function setColor(name:String, r:Float, g:Float, b:Float, a:Float):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
         
         #if web
         var existing = colors.get(name);
@@ -274,7 +274,7 @@ class Uniforms {
 
     public function setTexture(name:String, slot:Int, texture:Texture):Void {
 
-        var location = Graphics.getUniformLocation(gpuShader, name);
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
 
         #if web
         var existing = textures.get(name);
@@ -304,119 +304,119 @@ class Uniforms {
 
     public function apply():Void {
 
-        Graphics.useShader(gpuShader);
+        Clay.app.graphics.useShader(gpuShader);
 
         while (dirtyInts.length > 0) {
             #if web
             var name = dirtyInts.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
-            Graphics.setIntUniform(gpuShader, location, ints.get(name));
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setIntUniform(gpuShader, location, ints.get(name));
             #else
             var location = dirtyInts.pop();
-            Graphics.setIntUniform(gpuShader, location, ints.get(location));
+            Clay.app.graphics.setIntUniform(gpuShader, location, ints.get(location));
             #end
         }
 
         while (dirtyIntArrays.length > 0) {
             #if web
             var name = dirtyIntArrays.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
-            Graphics.setIntArrayUniform(gpuShader, location, intArrays.get(name));
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setIntArrayUniform(gpuShader, location, intArrays.get(name));
             #else
             var location = dirtyIntArrays.pop();
-            Graphics.setIntArrayUniform(gpuShader, location, intArrays.get(location));
+            Clay.app.graphics.setIntArrayUniform(gpuShader, location, intArrays.get(location));
             #end
         }
 
         while (dirtyFloats.length > 0) {
             #if web
             var name = dirtyFloats.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
-            Graphics.setFloatUniform(gpuShader, location, floats.get(name));
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setFloatUniform(gpuShader, location, floats.get(name));
             #else
             var location = dirtyFloats.pop();
-            Graphics.setFloatUniform(gpuShader, location, floats.get(location));
+            Clay.app.graphics.setFloatUniform(gpuShader, location, floats.get(location));
             #end
         }
 
         while (dirtyFloatArrays.length > 0) {
             #if web
             var name = dirtyFloatArrays.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
-            Graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(name));
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(name));
             #else
             var location = dirtyFloatArrays.pop();
-            Graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(location));
+            Clay.app.graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(location));
             #end
         }
 
         while (dirtyVector2s.length > 0) {
             #if web
             var name = dirtyVector2s.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             var value = vector2s.get(name);
-            Graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
+            Clay.app.graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
             #else
             var location = dirtyVector2s.pop();
             var value = vector2s.get(location);
-            Graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
+            Clay.app.graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
             #end
         }
 
         while (dirtyVector3s.length > 0) {
             #if web
             var name = dirtyVector3s.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             var value = vector3s.get(name);
-            Graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
+            Clay.app.graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
             #else
             var location = dirtyVector3s.pop();
             var value = vector3s.get(location);
-            Graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
+            Clay.app.graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
             #end
         }
 
         while (dirtyVector4s.length > 0) {
             #if web
             var name = dirtyVector4s.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             var value = vector4s.get(name);
-            Graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
+            Clay.app.graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
             #else
             var location = dirtyVector4s.pop();
             var value = vector4s.get(location);
-            Graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
+            Clay.app.graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
             #end
         }
 
         while (dirtyMatrix4s.length > 0) {
             #if web
             var name = dirtyMatrix4s.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
-            Graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(name));
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(name));
             #else
             var location = dirtyMatrix4s.pop();
-            Graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(location));
+            Clay.app.graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(location));
             #end
         }
 
         while (dirtyColors.length > 0) {
             #if web
             var name = dirtyColors.pop();
-            var location = Graphics.getUniformLocation(gpuShader, name);
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             var value = colors.get(name);
             #else
             var location = dirtyColors.pop();
             var value = colors.get(location);
             #end
-            Graphics.setColorUniform(gpuShader, location, value.r, value.g, value.b, value.a);
+            Clay.app.graphics.setColorUniform(gpuShader, location, value.r, value.g, value.b, value.a);
         }
 
         // Textures are always kept 'dirty' as they should always be bound to the correct slot again
         for (i in 0...dirtyTextures.length) {
             #if web
             var name = dirtyTextures.unsafeGet(i);
-            var location = Graphics.getUniformLocation(gpuShader, name);
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             var value = textures.get(name);
             #else
             var location = dirtyTextures.unsafeGet(i);
@@ -424,7 +424,7 @@ class Uniforms {
             #end
             switch value.texture.type {
                 case TEXTURE_2D:
-                    Graphics.setTexture2dUniform(gpuShader, location, value.slot, value.texture.textureId);
+                    Clay.app.graphics.setTexture2dUniform(gpuShader, location, value.slot, value.texture.textureId);
             }
         }
 

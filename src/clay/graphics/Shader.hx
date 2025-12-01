@@ -4,15 +4,25 @@ import clay.Types;
 
 class Shader extends Resource {
 
+    #if clay_shader_from_source
     /**
-     * Source code of vertex shader (glsl language on GL targets)
+     * Source code of vertex shader (glsl language on GL targets).
+     * Only available when clay_shader_from_source is defined.
      */
     public var vertSource:String = null;
 
     /**
-     * Source code of fragment shader (glsl language on GL targets)
+     * Source code of fragment shader (glsl language on GL targets).
+     * Only available when clay_shader_from_source is defined.
      */
     public var fragSource:String = null;
+    #else
+    /**
+     * Identifier for the precompiled shader (e.g., asset path or name).
+     * Only available when clay_shader_from_source is NOT defined.
+     */
+    public var shaderId:String = null;
+    #end
 
     /**
      * A list of ordered attribute names that will
@@ -42,13 +52,14 @@ class Shader extends Resource {
 
     }
 
+    #if clay_shader_from_source
     /**
      * Call `init()` after you have set `vertSource` and `fragSource` properties.
      * (and optionally: `attributes` and `textures` properties)
      */
     public function init():Void {
 
-        gpuShader = Graphics.createShader(vertSource, fragSource, attributes, textures);
+        gpuShader = Clay.app.graphics.createShader(vertSource, fragSource, attributes, textures);
 
         if (gpuShader == null) {
             throw 'Failed to create shader (id=$id)';
@@ -57,10 +68,27 @@ class Shader extends Resource {
         uniforms = new Uniforms(gpuShader);
 
     }
+    #else
+    /**
+     * Call `init()` after you have set `shaderId` property.
+     * (and optionally: `attributes` and `textures` properties)
+     */
+    public function init():Void {
+
+        gpuShader = Clay.app.graphics.loadShader(shaderId, attributes, textures);
+
+        if (gpuShader == null) {
+            throw 'Failed to load shader (id=$id)';
+        }
+
+        uniforms = new Uniforms(gpuShader);
+
+    }
+    #end
 
     public function activate():Void {
 
-        Graphics.useShader(gpuShader);
+        Clay.app.graphics.useShader(gpuShader);
 
         if (uniforms != null) {
             uniforms.apply();
@@ -70,7 +98,7 @@ class Shader extends Resource {
 
     public function destroy():Void {
 
-        Graphics.deleteShader(gpuShader);
+        Clay.app.graphics.deleteShader(gpuShader);
 
     }
 

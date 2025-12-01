@@ -12,7 +12,7 @@ class Texture extends Resource {
 
     public var index(default, null):Int;
 
-    public var textureId(default, null):TextureId = Graphics.NO_TEXTURE;
+    public var textureId(default, null):TextureId;
 
     /**
      * Is `true` if image has been processed to be stored as premultiplied alpha in GPU memory.
@@ -70,9 +70,9 @@ class Texture extends Resource {
      */
     public var filterMin(default, set):TextureFilter = LINEAR;
     function set_filterMin(filterMin:TextureFilter):TextureFilter {
-        if (textureId != Graphics.NO_TEXTURE) {
+        if (textureId != Clay.app.graphics.noTexture) {
             bind();
-            Graphics.setTexture2dMinFilter(filterMin);
+            Clay.app.graphics.setTexture2dMinFilter(filterMin);
         }
         return this.filterMin = filterMin;
     }
@@ -82,9 +82,9 @@ class Texture extends Resource {
      */
     public var filterMag(default, set):TextureFilter = LINEAR;
     function set_filterMag(filterMag:TextureFilter):TextureFilter {
-        if (textureId != Graphics.NO_TEXTURE) {
+        if (textureId != Clay.app.graphics.noTexture) {
             bind();
-            Graphics.setTexture2dMagFilter(filterMag);
+            Clay.app.graphics.setTexture2dMagFilter(filterMag);
         }
         return this.filterMag = filterMag;
     }
@@ -94,9 +94,9 @@ class Texture extends Resource {
      */
     public var wrapS(default, set):TextureWrap = CLAMP_TO_EDGE;
     function set_wrapS(wrapS:TextureWrap):TextureWrap {
-        if (textureId != Graphics.NO_TEXTURE) {
+        if (textureId != Clay.app.graphics.noTexture) {
             bind();
-            Graphics.setTexture2dWrapS(wrapS);
+            Clay.app.graphics.setTexture2dWrapS(wrapS);
         }
         return this.wrapS = wrapS;
     }
@@ -106,9 +106,9 @@ class Texture extends Resource {
      */
     public var wrapT(default, set):TextureWrap = CLAMP_TO_EDGE;
     function set_wrapT(wrapT:TextureWrap):TextureWrap {
-        if (textureId != Graphics.NO_TEXTURE) {
+        if (textureId != Clay.app.graphics.noTexture) {
             bind();
-            Graphics.setTexture2dWrapT(wrapT);
+            Clay.app.graphics.setTexture2dWrapT(wrapT);
         }
         return this.wrapT = wrapT;
     }
@@ -116,6 +116,7 @@ class Texture extends Resource {
     public function new() {
 
         this.index = _nextIndex++;
+        this.textureId = Clay.app.graphics.noTexture;
 
     }
 
@@ -126,7 +127,7 @@ class Texture extends Resource {
         texture.premultiplyAlpha = premultiplyAlpha;
 
         // Preprocess pixels premultiplied alpha if needed (platform dependant)
-        if (premultiplyAlpha && Graphics.needsPreprocessedPremultipliedAlpha()) {
+        if (premultiplyAlpha && Clay.app.graphics.needsPreprocessedPremultipliedAlpha()) {
             image.premultiplyAlpha();
         }
 
@@ -150,7 +151,7 @@ class Texture extends Resource {
      */
     public function init() {
 
-        textureId = Graphics.createTextureId();
+        textureId = Clay.app.graphics.createTextureId();
 
         if (width > 0 && widthActual <= 0) {
             widthActual = width;
@@ -161,10 +162,10 @@ class Texture extends Resource {
         }
 
         bind();
-        Graphics.setTexture2dMinFilter(filterMin);
-        Graphics.setTexture2dMagFilter(filterMag);
-        Graphics.setTexture2dWrapT(wrapT);
-        Graphics.setTexture2dWrapS(wrapS);
+        Clay.app.graphics.setTexture2dMinFilter(filterMin);
+        Clay.app.graphics.setTexture2dMagFilter(filterMag);
+        Clay.app.graphics.setTexture2dWrapT(wrapT);
+        Clay.app.graphics.setTexture2dWrapS(wrapS);
 
         if (pixels != null) {
             if (width <= 0 || height <= 0) {
@@ -178,9 +179,9 @@ class Texture extends Resource {
 
     public function destroy() {
 
-        if (textureId != Graphics.NO_TEXTURE) {
-            Graphics.deleteTexture(textureId);
-            textureId = Graphics.NO_TEXTURE;
+        if (textureId != Clay.app.graphics.noTexture) {
+            Clay.app.graphics.deleteTexture(textureId);
+            textureId = Clay.app.graphics.noTexture;
         }
 
     }
@@ -191,11 +192,11 @@ class Texture extends Resource {
     public function bind(slot:Int = 0) {
 
         if (slot != -1)
-            Graphics.setActiveTexture(slot);
+            Clay.app.graphics.setActiveTexture(slot);
 
         switch type {
             case TEXTURE_2D:
-                Graphics.bindTexture2d(textureId);
+                Clay.app.graphics.bindTexture2d(textureId);
         }
 
     }
@@ -206,7 +207,7 @@ class Texture extends Resource {
      */
     public function submit(?pixels:Uint8Array) {
 
-        var max = Graphics.maxTextureSize();
+        var max = Clay.app.graphics.maxTextureSize();
 
         if (pixels == null) {
             pixels = this.pixels;
@@ -225,10 +226,10 @@ class Texture extends Resource {
         switch type {
             case TEXTURE_2D:
                 if (compressed) {
-                    Graphics.submitCompressedTexture2dPixels(0, format, widthActual, heightActual, pixels, premultiplyAlpha);
+                    Clay.app.graphics.submitCompressedTexture2dPixels(0, format, widthActual, heightActual, pixels, premultiplyAlpha);
                 }
                 else {
-                    Graphics.submitTexture2dPixels(0, format, widthActual, heightActual, dataType, pixels, premultiplyAlpha);
+                    Clay.app.graphics.submitTexture2dPixels(0, format, widthActual, heightActual, dataType, pixels, premultiplyAlpha);
                 }
         }
 
@@ -250,7 +251,7 @@ class Texture extends Resource {
 
         switch type {
             case TEXTURE_2D:
-                Graphics.fetchTexture2dPixels(into, x, y, w, h);
+                Clay.app.graphics.fetchTexture2dPixels(into, x, y, w, h);
         }
 
         return into;

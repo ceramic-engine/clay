@@ -266,8 +266,11 @@ class WebRuntime extends clay.base.BaseRuntime {
             preserveDrawingBuffer: config.webgl.preserveDrawingBuffer,
         };
 
+        // Override webgl config based on render config values
         if (config.antialiasing > 0)
             attr.antialias = true;
+        else
+            attr.antialias = false;
 
         if (config.depth > 0)
             attr.depth = true;
@@ -289,6 +292,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         GL.clearStencil(0);
         GL.clearColor(color.r, color.g, color.b, color.a);
         GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT | GL.STENCIL_BUFFER_BIT);
+
+        Clay.app.graphics.setup();
 
         #end
 

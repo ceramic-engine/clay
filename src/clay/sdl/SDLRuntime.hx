@@ -2,7 +2,6 @@ package clay.sdl;
 
 import clay.Config;
 import clay.Types;
-import clay.opengl.GLGraphics;
 import clay.sdl.SDL;
 import cpp.Float32;
 import cpp.Int16;
@@ -603,7 +602,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         windowSwap();
         GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT | GL.STENCIL_BUFFER_BIT);
 
-        GLGraphics.setup();
+        Clay.app.graphics.setup();
 
         #end
 

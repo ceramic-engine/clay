@@ -55,6 +55,21 @@ class Clay {
      */
     public var runtime(default, null):Runtime;
 
+    /**
+     * Clay graphics driver for GPU resource management.
+     * (implementation varies depending on the target)
+     */
+    public var graphics(get, set):GraphicsDriver;
+    // This is stored as a static field because we know there will only
+    // be one instance ever, so let's skip the indirect access entirely.
+    static var _graphics:GraphicsDriver = null;
+    inline function get_graphics():GraphicsDriver {
+        return _graphics;
+    }
+    inline function set_graphics(graphics:GraphicsDriver):GraphicsDriver {
+        return _graphics = graphics;
+    }
+
     /** `true` if shut down has begun */
     public var shuttingDown(default, null):Bool = false;
 
@@ -147,6 +162,9 @@ class Clay {
         Immediate.flush();
 
         @:privateAccess runtime = new Runtime(this);
+        Immediate.flush();
+
+        @:privateAccess graphics = new GraphicsDriver();
         Immediate.flush();
 
         backgroundQueue = new BackgroundQueue();

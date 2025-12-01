@@ -36,7 +36,7 @@ class RenderTexture extends Texture {
 
         super.init();
 
-        var max = Graphics.maxTextureSize();
+        var max = Clay.app.graphics.maxTextureSize();
 
         if (widthActual > max)
             throw 'RenderTexture actual width bigger than maximum hardware size (width=$widthActual max=$max)';
@@ -45,7 +45,7 @@ class RenderTexture extends Texture {
 
         // Create render target
         bind();
-        renderTarget = Graphics.createRenderTarget(
+        renderTarget = Clay.app.graphics.createRenderTarget(
             textureId, width, height, depth, stencil, antialiasing,
             0, format, dataType
         );
@@ -58,7 +58,7 @@ class RenderTexture extends Texture {
 
         // Delete render target
         if (renderTarget != null) {
-            Graphics.deleteRenderTarget(renderTarget);
+            Clay.app.graphics.deleteRenderTarget(renderTarget);
             renderTarget = null;
         }
 
