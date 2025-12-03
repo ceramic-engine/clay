@@ -294,6 +294,13 @@ interface GraphicsDriver {
     function useShader(shader:GpuShader):Void;
 
     /**
+     * Synchronizes projectionMatrix and modelViewMatrix
+     * with the given shader, as this is needed on some graphics backend.
+     * @param shader Shader program to synchronize
+     */
+    function synchronizeShaderMatrices(shader:GpuShader):Void;
+
+    /**
      * Gets the location of a uniform variable in a shader.
      *
      * @param shader Shader program

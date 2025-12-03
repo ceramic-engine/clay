@@ -276,6 +276,12 @@ interface GraphicsBatcher {
     // ========================================================================
 
     /**
+     * Returns `true` if render target
+     * MVP matrix should be flipped vertically.
+     */
+    function shouldFlipRenderTargetY():Bool;
+
+    /**
      * Sets the render target for subsequent draw operations.
      *
      * @param renderTarget Render target to draw into, or null for main framebuffer

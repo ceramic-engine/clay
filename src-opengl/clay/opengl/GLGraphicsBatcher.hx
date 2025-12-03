@@ -727,6 +727,14 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     // ========================================================================
 
     /**
+     * Returns `true` if render target
+     * MVP matrix should be flipped vertically.
+     */
+    public inline function shouldFlipRenderTargetY():Bool {
+        return true;
+    }
+
+    /**
      * Sets the render target for subsequent draw operations.
      *
      * @param renderTarget Render target to draw into, or null for main framebuffer
@@ -767,7 +775,8 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      * @param matrix 4x4 projection matrix as Float32Array (16 elements)
      */
     public inline function setProjectionMatrix(matrix:Float32Array):Void {
-        GL.uniformMatrix4fv(GL.getUniformLocation(_currentShader.program, "projectionMatrix"), false, matrix);
+        // Keep the value around in order to assign it on the next shader
+        @:privateAccess Clay.app.graphics.projectionMatrix = matrix;
     }
 
     /**
@@ -776,7 +785,8 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      * @param matrix 4x4 model-view matrix as Float32Array (16 elements)
      */
     public inline function setModelViewMatrix(matrix:Float32Array):Void {
-        GL.uniformMatrix4fv(GL.getUniformLocation(_currentShader.program, "modelViewMatrix"), false, matrix);
+        // Keep the value around in order to assign it on the next shader
+        @:privateAccess Clay.app.graphics.modelViewMatrix = matrix;
     }
 
     // ========================================================================

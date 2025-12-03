@@ -949,6 +949,25 @@ void main() {
     }
 
     /**
+     * Synchronizes projectionMatrix and modelViewMatrix
+     * with the given shader, as this is needed on some graphics backend.
+     * @param shader Shader program to synchronize
+     */
+    public inline function synchronizeShaderMatrices(shader:GpuShader):Void {
+        // Update this shader the the latest known projection and modelView matrices
+        setMatrix4Uniform(
+            shader,
+            getUniformLocation(shader, 'projectionMatrix'),
+            projectionMatrix
+        );
+        setMatrix4Uniform(
+            shader,
+            getUniformLocation(shader, 'modelViewMatrix'),
+            modelViewMatrix
+        );
+    }
+
+    /**
      * Gets the location of a uniform variable in a shader.
      *
      * @param shader Shader program
@@ -1095,6 +1114,20 @@ void main() {
     // ========================================================================
     // OpenGL-Specific Helpers (Internal)
     // ========================================================================
+
+    var projectionMatrix = clay.buffers.Float32Array.fromArray([
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]);
+
+    var modelViewMatrix = clay.buffers.Float32Array.fromArray([
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    ]);
 
     /**
      * Links vertex and fragment shaders into a program.

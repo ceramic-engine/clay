@@ -90,6 +90,8 @@ class Shader extends Resource {
 
         Clay.app.graphics.useShader(gpuShader);
 
+        Clay.app.graphics.synchronizeShaderMatrices(gpuShader);
+
         if (uniforms != null) {
             uniforms.apply();
         }
