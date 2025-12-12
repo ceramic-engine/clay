@@ -1070,18 +1070,27 @@ void main() {
     }
 
     /**
-     * Sets a color uniform value (RGBA).
+     * Sets a 2x2 matrix uniform value.
      *
      * @param shader Shader program
      * @param location Uniform location
-     * @param r Red component (0.0 to 1.0)
-     * @param g Green component (0.0 to 1.0)
-     * @param b Blue component (0.0 to 1.0)
-     * @param a Alpha component (0.0 to 1.0)
+     * @param value Matrix as Float32Array (4 elements, column-major)
      */
-    public inline function setColorUniform(shader:GpuShader, location:UniformLocation, r:Float, g:Float, b:Float, a:Float):Void {
+    public inline function setMatrix2Uniform(shader:GpuShader, location:UniformLocation, value:Float32Array):Void {
         useShader(shader);
-        GL.uniform4f(location, r, g, b, a);
+        GL.uniformMatrix2fv(location, false, value);
+    }
+
+    /**
+     * Sets a 3x3 matrix uniform value.
+     *
+     * @param shader Shader program
+     * @param location Uniform location
+     * @param value Matrix as Float32Array (9 elements, column-major)
+     */
+    public inline function setMatrix3Uniform(shader:GpuShader, location:UniformLocation, value:Float32Array):Void {
+        useShader(shader);
+        GL.uniformMatrix3fv(location, false, value);
     }
 
     /**

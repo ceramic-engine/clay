@@ -379,16 +379,22 @@ interface GraphicsDriver {
     function setVector4Uniform(shader:GpuShader, location:UniformLocation, x:Float, y:Float, z:Float, w:Float):Void;
 
     /**
-     * Sets a color uniform value (RGBA).
+     * Sets a 2x2 matrix uniform value.
      *
      * @param shader Shader program
      * @param location Uniform location
-     * @param r Red component (0.0 to 1.0)
-     * @param g Green component (0.0 to 1.0)
-     * @param b Blue component (0.0 to 1.0)
-     * @param a Alpha component (0.0 to 1.0)
+     * @param value Matrix as Float32Array (4 elements, column-major)
      */
-    function setColorUniform(shader:GpuShader, location:UniformLocation, r:Float, g:Float, b:Float, a:Float):Void;
+    function setMatrix2Uniform(shader:GpuShader, location:UniformLocation, value:Float32Array):Void;
+
+    /**
+     * Sets a 3x3 matrix uniform value.
+     *
+     * @param shader Shader program
+     * @param location Uniform location
+     * @param value Matrix as Float32Array (9 elements, column-major)
+     */
+    function setMatrix3Uniform(shader:GpuShader, location:UniformLocation, value:Float32Array):Void;
 
     /**
      * Sets a 4x4 matrix uniform value.

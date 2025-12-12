@@ -18,8 +18,9 @@ class Uniforms {
     var vector2s    :Map<String,Vector2> = new Map();
     var vector3s    :Map<String,Vector3> = new Map();
     var vector4s    :Map<String,Vector4> = new Map();
+    var matrix2s    :Map<String,Float32Array> = new Map();
+    var matrix3s    :Map<String,Float32Array> = new Map();
     var matrix4s    :Map<String,Float32Array> = new Map();
-    var colors      :Map<String,Color> = new Map();
     var textures    :Map<String,TextureAndSlot> = new Map();
 
     var dirtyInts          :Array<String> = [];
@@ -29,8 +30,9 @@ class Uniforms {
     var dirtyVector2s      :Array<String> = [];
     var dirtyVector3s      :Array<String> = [];
     var dirtyVector4s      :Array<String> = [];
+    var dirtyMatrix2s      :Array<String> = [];
+    var dirtyMatrix3s      :Array<String> = [];
     var dirtyMatrix4s      :Array<String> = [];
-    var dirtyColors        :Array<String> = [];
     var dirtyTextures      :Array<String> = [];
 #else
     // On native, we can identify uniforms with integers: better
@@ -42,8 +44,9 @@ class Uniforms {
     var vector2s    :IntMap<Vector2> = new IntMap();
     var vector3s    :IntMap<Vector3> = new IntMap();
     var vector4s    :IntMap<Vector4> = new IntMap();
+    var matrix2s    :IntMap<Float32Array> = new IntMap();
+    var matrix3s    :IntMap<Float32Array> = new IntMap();
     var matrix4s    :IntMap<Float32Array> = new IntMap();
-    var colors      :IntMap<Color> = new IntMap();
     var textures    :IntMap<TextureAndSlot> = new IntMap();
 
     var dirtyInts          :Array<Int> = [];
@@ -53,8 +56,9 @@ class Uniforms {
     var dirtyVector2s      :Array<Int> = [];
     var dirtyVector3s      :Array<Int> = [];
     var dirtyVector4s      :Array<Int> = [];
+    var dirtyMatrix2s      :Array<Int> = [];
+    var dirtyMatrix3s      :Array<Int> = [];
     var dirtyMatrix4s      :Array<Int> = [];
-    var dirtyColors        :Array<Int> = [];
     var dirtyTextures      :Array<Int> = [];
 #end
 
@@ -212,6 +216,62 @@ class Uniforms {
 
     }
 
+    public function setMatrix2(name:String, value:Float32Array):Void {
+
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+
+        #if web
+        var existing = matrix2s.get(name);
+        if (existing == null) {
+            existing = new Float32Array(4);
+            matrix2s.set(name, existing);
+        }
+        for (i in 0...4) {
+            existing[i] = value[i];
+        }
+        dirtyMatrix2s.push(name);
+        #else
+        var existing = matrix2s.get(location);
+        if (existing == null) {
+            existing = new Float32Array(4);
+            matrix2s.set(location, existing);
+        }
+        for (i in 0...4) {
+            existing[i] = value[i];
+        }
+        dirtyMatrix2s.push(location);
+        #end
+
+    }
+
+    public function setMatrix3(name:String, value:Float32Array):Void {
+
+        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+
+        #if web
+        var existing = matrix3s.get(name);
+        if (existing == null) {
+            existing = new Float32Array(9);
+            matrix3s.set(name, existing);
+        }
+        for (i in 0...9) {
+            existing[i] = value[i];
+        }
+        dirtyMatrix3s.push(name);
+        #else
+        var existing = matrix3s.get(location);
+        if (existing == null) {
+            existing = new Float32Array(9);
+            matrix3s.set(location, existing);
+        }
+        for (i in 0...9) {
+            existing[i] = value[i];
+        }
+        dirtyMatrix3s.push(location);
+        #end
+
+    }
+
     public function setMatrix4(name:String, value:Float32Array):Void {
 
         var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
@@ -236,38 +296,6 @@ class Uniforms {
             existing[i] = value[i];
         }
         dirtyMatrix4s.push(location);
-        #end
-
-    }
-
-    public function setColor(name:String, r:Float, g:Float, b:Float, a:Float):Void {
-
-        var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
-        
-        #if web
-        var existing = colors.get(name);
-        if (existing != null) {
-            existing.r = r;
-            existing.g = g;
-            existing.b = b;
-            existing.a = a;
-        }
-        else {
-            colors.set(name, { r: r, g: g, b: b, a: a });
-        }
-        dirtyColors.push(name);
-        #else
-        var existing = colors.get(location);
-        if (existing != null) {
-            existing.r = r;
-            existing.g = g;
-            existing.b = b;
-            existing.a = a;
-        }
-        else {
-            colors.set(location, { r: r, g: g, b: b, a: a });
-        }
-        dirtyColors.push(location);
         #end
 
     }
@@ -389,6 +417,28 @@ class Uniforms {
             #end
         }
 
+        while (dirtyMatrix2s.length > 0) {
+            #if web
+            var name = dirtyMatrix2s.pop();
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setMatrix2Uniform(gpuShader, location, matrix2s.get(name));
+            #else
+            var location = dirtyMatrix2s.pop();
+            Clay.app.graphics.setMatrix2Uniform(gpuShader, location, matrix2s.get(location));
+            #end
+        }
+
+        while (dirtyMatrix3s.length > 0) {
+            #if web
+            var name = dirtyMatrix3s.pop();
+            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
+            Clay.app.graphics.setMatrix3Uniform(gpuShader, location, matrix3s.get(name));
+            #else
+            var location = dirtyMatrix3s.pop();
+            Clay.app.graphics.setMatrix3Uniform(gpuShader, location, matrix3s.get(location));
+            #end
+        }
+
         while (dirtyMatrix4s.length > 0) {
             #if web
             var name = dirtyMatrix4s.pop();
@@ -398,18 +448,6 @@ class Uniforms {
             var location = dirtyMatrix4s.pop();
             Clay.app.graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(location));
             #end
-        }
-
-        while (dirtyColors.length > 0) {
-            #if web
-            var name = dirtyColors.pop();
-            var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
-            var value = colors.get(name);
-            #else
-            var location = dirtyColors.pop();
-            var value = colors.get(location);
-            #end
-            Clay.app.graphics.setColorUniform(gpuShader, location, value.r, value.g, value.b, value.a);
         }
 
         // Textures are always kept 'dirty' as they should always be bound to the correct slot again
