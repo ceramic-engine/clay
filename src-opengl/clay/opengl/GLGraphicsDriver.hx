@@ -868,6 +868,10 @@ void main() {
     /**
      * Creates and compiles a shader program.
      *
+     * Automatically patches GLSL version for platform compatibility:
+     * - Desktop GL (non-ANGLE): converts `#version 300 es` to `#version 330`
+     * - Mobile/WebGL (GLES/ANGLE): keeps `#version 300 es`
+     *
      * @param vertSource Vertex shader source code
      * @param fragSource Fragment shader source code
      * @param attributes Optional array of attribute names in binding order
@@ -879,6 +883,10 @@ void main() {
             throw 'Cannot create shader: vertSource is null!';
         if (fragSource == null)
             throw 'Cannot create shader: fragSource is null!';
+
+        // Apply GLSL version patching for platform compatibility
+        vertSource = patchGlslVersion(vertSource);
+        fragSource = patchGlslVersion(fragSource);
 
         var shader = new GLGraphicsDriver_GpuShader();
 
@@ -905,6 +913,25 @@ void main() {
         }
 
         return shader;
+    }
+
+    /**
+     * Patches GLSL version directive for platform compatibility.
+     *
+     * Shade compiler outputs GLES 3.0 syntax (`#version 300 es`).
+     * Desktop GL (non-ANGLE) requires `#version 330` instead.
+     *
+     * @param source Shader source code
+     * @return Patched source code
+     */
+    function patchGlslVersion(source:String):String {
+        #if !(ios || android || tvos || web || gles_angle)
+        // Desktop GL needs version 330 instead of 300 es
+        if (source.substr(0, 15) == '#version 300 es') {
+            return '#version 330' + source.substr(15);
+        }
+        #end
+        return source;
     }
 
     /**
