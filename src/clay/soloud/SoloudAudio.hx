@@ -24,8 +24,8 @@ using StringTools;
 import clay.sdl.SDL;
 #end
 
-#if clay_ps5
-@:headerCode('#include "soloud_ps5.h"')
+#if soloud_custom_backend
+@:headerCode('#include "soloud_custom_backend.h"')
 #elseif clay_sdl
 @:headerCode('#include <SDL3/SDL.h>')
 #end
