@@ -133,7 +133,7 @@ class WebIO extends BaseIO {
                     });
                 }
             } else {
-                Log.error('Request status was ${request.status} / ${request.statusText}');
+                Log.error('Request status for path $path was ${request.status} / ${request.statusText}');
                 if (callback != null) {
                     Immediate.push(() -> {
                         callback(data);
