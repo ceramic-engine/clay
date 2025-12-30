@@ -1,11 +1,11 @@
 package clay.opengl;
 
+import clay.Config;
 import clay.Types;
 import clay.buffers.Float32Array;
 import clay.buffers.Int32Array;
 import clay.buffers.Uint8Array;
 import clay.opengl.GL;
-import clay.Config.OpenGLProfile;
 
 using clay.Extensions;
 
@@ -927,6 +927,7 @@ void main() {
      * @return Patched source code
      */
     function patchGlslVersion(source:String):String {
+        #if clay_sdl
         var render = Clay.app.config.render;
         // Convert to #version 330 for Desktop GL 3.3+, keep #version 300 es otherwise
         if (render.opengl.profile != OpenGLProfile.GLES) {
@@ -937,6 +938,7 @@ void main() {
                 }
             }
         }
+        #end
         return source;
     }
 
