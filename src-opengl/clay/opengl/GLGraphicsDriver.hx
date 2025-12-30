@@ -920,18 +920,21 @@ void main() {
      * Patches GLSL version directive for platform compatibility.
      *
      * Shade compiler outputs GLES 3.0 syntax (`#version 300 es`).
-     * Desktop GL (CORE or COMPATIBILITY profile) requires `#version 330` instead.
-     * GLES contexts (including ANGLE and WebGL) keep the ES version.
+     * Desktop GL 3.3+ requires `#version 330` instead.
+     * All other contexts keep `#version 300 es`.
      *
      * @param source Shader source code
      * @return Patched source code
      */
     function patchGlslVersion(source:String):String {
-        // Check runtime GL profile - GLES contexts keep ES version, Desktop GL needs 330
-        if (Clay.app.config.render.opengl.profile != OpenGLProfile.GLES) {
-            // Desktop GL (CORE or COMPATIBILITY) needs version 330 instead of 300 es
-            if (source.substr(0, 15) == '#version 300 es') {
-                return '#version 330' + source.substr(15);
+        var render = Clay.app.config.render;
+        // Convert to #version 330 for Desktop GL 3.3+, keep #version 300 es otherwise
+        if (render.opengl.profile != OpenGLProfile.GLES) {
+            var glVersion = render.opengl.major + render.opengl.minor * 0.1;
+            if (glVersion >= 3.3) {
+                if (source.substr(0, 15) == '#version 300 es') {
+                    return '#version 330' + source.substr(15);
+                }
             }
         }
         return source;
