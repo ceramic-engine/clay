@@ -169,6 +169,11 @@ class WebRuntime extends clay.base.BaseRuntime {
         window.id = app.config.runtime.windowId;
         app.config.runtime.windowParent.appendChild(window);
 
+        // Make the canvas focusable so it can hold keyboard focus
+        // (required when embedded in an iframe, e.g. itch.io)
+        window.tabIndex = -1; // focusable via .focus(), without adding a Tab stop
+        window.style.outline = 'none'; // but don't show a focus ring around the canvas
+
         if (config.title != null) {
             js.Browser.document.title = config.title;
         }
@@ -340,7 +345,31 @@ class WebRuntime extends clay.base.BaseRuntime {
         js.Browser.window.addEventListener("gamepadconnected",    handleGamepadConnected);
         js.Browser.window.addEventListener("gamepaddisconnected", handleGamepadDisconnected);
 
+        // Keyboard focus
+
+        // Grab keyboard focus on user interaction and around fullscreen/resize changes,
+        // so keyboard input works when the game is embedded in an iframe (e.g. itch.io)
+        js.Browser.window.addEventListener('pointerdown', _ -> grabKeyboardFocus());
+        js.Browser.window.addEventListener('resize',      _ -> grabKeyboardFocus());
+        grabKeyboardFocus(); // best-effort on startup (if the browser allows it)
+
         // Orientation events (TODO)
+
+    }
+
+    function grabKeyboardFocus():Void {
+
+        // Don't steal focus while the user is typing into a DOM element.
+        // Concretely: EditText creates a hidden <input> and focuses it to show the
+        // virtual keyboard on mobile web (runtime/src/ceramic/EditText.hx); opening
+        // that keyboard fires a `resize`, so without this guard we'd close it.
+        final active = js.Browser.document.activeElement;
+        if (active != null && untyped (active.isContentEditable || active.matches('input, textarea, select'))) {
+            return;
+        }
+
+        js.Browser.window.focus(); // focus the iframe browsing context
+        window.focus();            // focus the canvas
 
     }
 
@@ -399,6 +428,9 @@ class WebRuntime extends clay.base.BaseRuntime {
             app.config.window.fullscreen = false;
             app.emitWindowEvent(EXIT_FULLSCREEN, timestamp(), webWindowId, 0, 0);
         }
+
+        // Keyboard focus is easily lost when toggling fullscreen, grab it back
+        grabKeyboardFocus();
 
     }
 
