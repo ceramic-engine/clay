@@ -12,6 +12,7 @@ package clay.opengl;
     typedef GLShader            = clay.opengl.web.GL.GLShader;
     typedef GLTexture           = clay.opengl.web.GL.GLTexture;
     typedef GLUniformLocation   = clay.opengl.web.GL.GLUniformLocation;
+    typedef GLVertexArray       = clay.opengl.web.GL.GLVertexArray;
 
 #elseif (clay_native && linc_opengl)
 
@@ -25,5 +26,6 @@ package clay.opengl;
     typedef GLShader            = opengl.WebGL.GLShader;
     typedef GLTexture           = opengl.WebGL.GLTexture;
     typedef GLUniformLocation   = opengl.WebGL.GLUniformLocation;
+    typedef GLVertexArray       = opengl.WebGL.GLVertexArray;
 
 #end

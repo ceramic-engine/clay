@@ -19,6 +19,7 @@ typedef GLShader                    = js.html.webgl.Shader;
 typedef GLTexture                   = js.html.webgl.Texture;
 typedef GLUniformLocation           = js.html.webgl.UniformLocation;
 typedef GLShaderPrecisionFormat     = js.html.webgl.ShaderPrecisionFormat;
+typedef GLVertexArray               = js.html.webgl.VertexArrayObject;
 
 class GL {
 
@@ -118,6 +119,26 @@ class GL {
     inline public static function createBuffer():GLBuffer
         return gl.createBuffer();
 
+    // Vertex Array Objects (WebGL2 core) (GLGraphics3D)
+    inline public static function createVertexArray():GLVertexArray
+        return (cast gl : js.html.webgl.WebGL2RenderingContext).createVertexArray();
+
+    inline public static function bindVertexArray(vao:GLVertexArray):Void
+        (cast gl : js.html.webgl.WebGL2RenderingContext).bindVertexArray(vao);
+
+    inline public static function unbindVertexArray():Void
+        (cast gl : js.html.webgl.WebGL2RenderingContext).bindVertexArray(null);
+
+    inline public static function deleteVertexArray(vao:GLVertexArray):Void
+        (cast gl : js.html.webgl.WebGL2RenderingContext).deleteVertexArray(vao);
+
+    // Instanced rendering (WebGL2 core)
+    inline public static function vertexAttribDivisor(index:Int, divisor:Int):Void
+        (cast gl : js.html.webgl.WebGL2RenderingContext).vertexAttribDivisor(index, divisor);
+
+    inline public static function drawElementsInstanced(mode:Int, count:Int, type:Int, offset:Int, instanceCount:Int):Void
+        (cast gl : js.html.webgl.WebGL2RenderingContext).drawElementsInstanced(mode, count, type, offset, instanceCount);
+
     inline public static function createFramebuffer():GLFramebuffer
         return gl.createFramebuffer();
 
@@ -177,6 +198,10 @@ class GL {
 
     inline public static function drawElements(mode:Int, count:Int, type:Int, offset:Int):Void
         gl.drawElements(mode, count, type, offset);
+
+    /** WebGL2 draw buffer selection (depth-only passes). */
+    inline public static function drawBuffers(buffers:Array<Int>):Void
+        untyped gl.drawBuffers(buffers);
 
     inline public static function enable(cap:Int):Void
         gl.enable(cap);
@@ -749,6 +774,13 @@ class GL {
     public static inline var TEXTURE_CUBE_MAP_POSITIVE_Z    = 0x8519;
     public static inline var TEXTURE_CUBE_MAP_NEGATIVE_Z    = 0x851A;
     public static inline var MAX_CUBE_MAP_TEXTURE_SIZE      = 0x851C;
+
+    /* Float texture formats + mip control (WebGL2/GLES3 core) */
+    public static inline var HALF_FLOAT                     = 0x140B;
+    public static inline var RGBA16F                        = 0x881A;
+    public static inline var RGB16F                         = 0x881B;
+    public static inline var TEXTURE_MAX_LEVEL              = 0x813D;
+    public static inline var DEPTH_COMPONENT24              = 0x81A6;
 
     /* TextureUnit */
     public static inline var TEXTURE0                       = 0x84C0;
