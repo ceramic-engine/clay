@@ -167,6 +167,39 @@ class GLGraphicsDriver #if !completion implements clay.spec.GraphicsDriver #end 
         _defaultFramebuffer = GL.getParameter(GL.FRAMEBUFFER_BINDING);
         _defaultRenderbuffer = GL.getParameter(GL.RENDERBUFFER_BINDING);
         _didFetchDefaultBuffers = true;
+
+        #if clay_sdl
+        // Core profile contexts have no default vertex array object: any draw without a
+        // bound VAO is invalid. The 2D pipeline (re)configures its vertex attributes with
+        // glVertexAttribPointer before each batch, which is perfectly fine inside a single
+        // permanently-bound VAO — so create one and keep it bound. Code that binds its own
+        // VAOs (e.g. a 3D pass) must restore it afterwards via bindDefaultVertexArray().
+        if (Clay.app.config.render.opengl.profile == OpenGLProfile.CORE) {
+            _defaultVertexArray = GL.createVertexArray();
+            _hasDefaultVertexArray = true;
+            GL.bindVertexArray(_defaultVertexArray);
+        }
+        #end
+    }
+
+    #if clay_sdl
+    var _defaultVertexArray:clay.opengl.GL.GLVertexArray;
+    var _hasDefaultVertexArray:Bool = false;
+    #end
+
+    /**
+     * Re-binds the driver's default vertex array object, when one exists (core profile
+     * contexts only — a no-op everywhere else). Call this after binding custom VAOs so
+     * the 2D pipeline's subsequent draws stay valid.
+     */
+    public function bindDefaultVertexArray():Void {
+        #if clay_sdl
+        if (_hasDefaultVertexArray) {
+            GL.bindVertexArray(_defaultVertexArray);
+            return;
+        }
+        #end
+        GL.unbindVertexArray();
     }
 
     // ========================================================================
@@ -226,6 +259,9 @@ void main() {
         while (maxIfs > 0) {
             var conditions = _generateIfStatements(maxIfs);
             var frag = StringTools.replace(fragTpl, '{{CONDITIONS}}', conditions);
+            // Same platform patching as real shaders (a core context rejects the
+            // legacy template outright, which would collapse the result to 0).
+            frag = patchGlslVersion(frag, true);
 
             GL.shaderSource(shader, frag);
             GL.compileShader(shader);
@@ -886,8 +922,8 @@ void main() {
             throw 'Cannot create shader: fragSource is null!';
 
         // Apply GLSL version patching for platform compatibility
-        vertSource = patchGlslVersion(vertSource);
-        fragSource = patchGlslVersion(fragSource);
+        vertSource = patchGlslVersion(vertSource, false);
+        fragSource = patchGlslVersion(fragSource, true);
 
         var shader = new GLGraphicsDriver_GpuShader();
 
@@ -917,24 +953,48 @@ void main() {
     }
 
     /**
-     * Patches GLSL version directive for platform compatibility.
+     * Patches GLSL sources for platform compatibility.
      *
-     * Shade compiler outputs GLES 3.0 syntax (`#version 300 es`).
-     * Desktop GL 3.3+ requires `#version 330` instead.
-     * All other contexts keep `#version 300 es`.
+     * - GLES3-style shaders (`#version 300 es`, e.g. shade compiler output): on desktop
+     *   GL 3.3+ the version tag becomes `#version 330`; kept as-is on GLES/ANGLE contexts.
+     * - Legacy version-less shaders (GLSL 1.10 style: `attribute`/`varying`/`gl_FragColor`,
+     *   the ceramic 2D shaders): a CORE profile context rejects them, so they get a
+     *   `#version 330` header plus keyword mappings at load time. Compatibility and GLES
+     *   contexts accept them untouched.
      *
      * @param source Shader source code
+     * @param isFragment True for fragment shaders (their legacy mapping differs)
      * @return Patched source code
      */
-    function patchGlslVersion(source:String):String {
+    function patchGlslVersion(source:String, isFragment:Bool):String {
         #if clay_sdl
         var render = Clay.app.config.render;
-        // Convert to #version 330 for Desktop GL 3.3+, keep #version 300 es otherwise
         if (render.opengl.profile != OpenGLProfile.GLES) {
             var glVersion = render.opengl.major + render.opengl.minor * 0.1;
             if (glVersion >= 3.3) {
                 if (source.substr(0, 15) == '#version 300 es') {
+                    // Convert to #version 330 for Desktop GL 3.3+
                     return '#version 330' + source.substr(15);
+                }
+                else if (render.opengl.profile == OpenGLProfile.CORE && source.indexOf('#version') == -1) {
+                    // Legacy version-less shader on a core context: prepend a 330 header
+                    // and map the removed GLSL 1.10 keywords. (The `#ifdef GL_ES` precision
+                    // blocks these shaders carry are inert on desktop already.)
+                    if (isFragment) {
+                        return '#version 330\n'
+                            + '#define varying in\n'
+                            + '#define texture2D texture\n'
+                            + 'out vec4 clayFragColor;\n'
+                            + '#define gl_FragColor clayFragColor\n'
+                            + source;
+                    }
+                    else {
+                        return '#version 330\n'
+                            + '#define attribute in\n'
+                            + '#define varying out\n'
+                            + '#define texture2D texture\n'
+                            + source;
+                    }
                 }
             }
         }

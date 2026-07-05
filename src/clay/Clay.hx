@@ -396,8 +396,15 @@ class Clay {
                 major: 2, minor: 0,
                 profile: OpenGLProfile.GLES
             #else
-                major: 0, minor: 0,
-                profile: OpenGLProfile.COMPATIBILITY
+                // Desktop GL without ANGLE (any OS): request a CORE 3.3+ context. 3.3 is
+                // the minimum for the `#version 300 es` → `#version 330` shader patching
+                // (see GLGraphicsDriver.patchGlslVersion); the created context may report
+                // higher (macOS core answers 4.1). The default COMPATIBILITY profile is
+                // not an option: macOS caps it at GL 2.1, which cannot run GLES3-style
+                // shaders at all. Legacy version-less shaders are adapted to core at
+                // load time (same patching function).
+                major: 3, minor: 3,
+                profile: OpenGLProfile.CORE
             #end
             },
             #elseif clay_web
