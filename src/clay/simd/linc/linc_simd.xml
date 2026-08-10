@@ -1,0 +1,17 @@
+<xml>
+
+    <files id="haxe">
+
+        <compilerflag value="-I${LINC_SIMD_PATH}linc/" />
+
+        <!-- Compile the plain C++ path everywhere, to compare batching alone vs batching + vectorization -->
+        <compilerflag value="-DLINC_SIMD_FORCE_SCALAR" if="linc_simd_force_scalar" />
+
+        <!-- 32-bit ARM needs an explicit flag for vector instructions (baseline on arm64) -->
+        <compilerflag value="-mfpu=neon" if="HXCPP_ARMV7" unless="linc_simd_force_scalar" />
+
+        <file name="${LINC_SIMD_PATH}linc/linc_simd.cpp" />
+
+    </files>
+
+</xml>

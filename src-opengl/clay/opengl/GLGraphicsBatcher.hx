@@ -98,6 +98,56 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     var _indiceBuffer:clay.buffers.ArrayBuffer;
     var _uvBuffer:clay.buffers.ArrayBuffer;
     var _colorBuffer:clay.buffers.ArrayBuffer;
+
+    #if !clay_no_typed_cursors
+    // ------------------------------------------------------------------
+    // Cached typed base pointers (native targets)
+    // ------------------------------------------------------------------
+    //
+    // The per-scalar write path used to go through
+    // `ArrayBufferIO.setFloat32(buffer, byteOffset, value)`, which compiles
+    // to `*(float*)(buffer->mBase + byteOffset) = value`: the store itself
+    // is fine, but every element re-pays a double indirection
+    // (field -> array object -> mBase) and a byte-offset computation, and
+    // the surrounding emission loops interleave enough of these that the
+    // C++ optimizer can neither hoist the base loads nor recognize an
+    // affine store pattern it could vectorize. Holding typed base pointers
+    // here removes all of that: stores become `base[index] = value`.
+    //
+    // Why caching these raw pointers in fields is safe (facts verified in
+    // the hxcpp sources, re-check them when upgrading hxcpp):
+    //
+    // - hx::InternalNew routes any allocation >= IMMIX_LARGE_OBJ_SIZE
+    //   (4000 bytes, hxcpp src/hx/gc/Immix.cpp) to AllocLarge, a plain
+    //   malloc tracked in a dedicated large-object list. The only two
+    //   mechanisms that ever relocate memory - MoveBlocks (defrag, only
+    //   with HXCPP_GC_MOVING) and MoveSurvivors (only with
+    //   HXCPP_GC_GENERATIONAL) - iterate the small-object Immix blocks
+    //   exclusively; the large list is only swept. A large buffer thus
+    //   keeps a stable address for its entire lifetime, including across
+    //   __hxcpp_gc_compact() and generational collections. Enabling a
+    //   generational or moving GC later does not break this: the size
+    //   check happens before any nursery logic.
+    // - The dangerous combination is a buffer *under* 4000 bytes together
+    //   with one of those defines. Our buffers are 64-256 KB, fixed size:
+    //   16-64x above the threshold.
+    // - Invariants maintained by this class: (1) buffers are >= 4000
+    //   bytes; (2) the underlying arrays stay referenced by the
+    //   _posListArray/_uvListArray/_colorListArray/_indiceListArray fields
+    //   (a raw pointer keeps nothing alive by itself, and interior
+    //   pointers are invisible to the conservative stack scan); (3) the
+    //   pointers are refreshed in prepareNextBuffers(), the only place
+    //   where the buffers change. A debug-only assertion in flush()
+    //   re-derives the base pointer and compares, so any future violation
+    //   fails loudly instead of corrupting memory.
+    //
+    // Define `clay_no_typed_cursors` to compile the previous
+    // ArrayBufferIO-based path instead (useful to measure the difference).
+    var _posBase:cpp.RawPointer<cpp.Float32>;
+    var _uvBase:cpp.RawPointer<cpp.Float32>;
+    var _colorBase:cpp.RawPointer<cpp.Float32>;
+    var _indexBase:cpp.RawPointer<cpp.UInt16>;
+    #end
     #end
 
     // ========================================================================
@@ -206,6 +256,16 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         _uvBuffer = (_uvList:clay.buffers.ArrayBufferView).buffer;
         _colorBuffer = (_colorList:clay.buffers.ArrayBufferView).buffer;
         _indiceBuffer = (_indiceList:clay.buffers.ArrayBufferView).buffer;
+
+        #if !clay_no_typed_cursors
+        // Refresh the cached typed base pointers (see the safety notes on
+        // the fields). Side-effect free acquisition: GetBase() is a plain
+        // field read, unlike NativeArray.address() which can grow the array.
+        _posBase = untyped __cpp__('(float*)({0}->GetBase())', _posBuffer);
+        _uvBase = untyped __cpp__('(float*)({0}->GetBase())', _uvBuffer);
+        _colorBase = untyped __cpp__('(float*)({0}->GetBase())', _colorBuffer);
+        _indexBase = untyped __cpp__('(unsigned short*)({0}->GetBase())', _indiceBuffer);
+        #end
         #end
     }
 
@@ -314,9 +374,15 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putVertex(x:Float, y:Float, z:Float):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, _posIndex * Float32Array.BYTES_PER_ELEMENT, x);
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + 1) * Float32Array.BYTES_PER_ELEMENT, y);
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + 2) * Float32Array.BYTES_PER_ELEMENT, z);
+        #else
+        _posBase[_posIndex] = x;
+        _posBase[_posIndex + 1] = y;
+        _posBase[_posIndex + 2] = z;
+        #end
         #else
         _posList[_posIndex] = x;
         _posList[_posIndex + 1] = y;
@@ -336,10 +402,17 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putVertexWithTextureSlot(x:Float, y:Float, z:Float, textureSlot:Float):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, _posIndex * Float32Array.BYTES_PER_ELEMENT, x);
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + 1) * Float32Array.BYTES_PER_ELEMENT, y);
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + 2) * Float32Array.BYTES_PER_ELEMENT, z);
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + 3) * Float32Array.BYTES_PER_ELEMENT, textureSlot);
+        #else
+        _posBase[_posIndex] = x;
+        _posBase[_posIndex + 1] = y;
+        _posBase[_posIndex + 2] = z;
+        _posBase[_posIndex + 3] = textureSlot;
+        #end
         #else
         _posList[_posIndex] = x;
         _posList[_posIndex + 1] = y;
@@ -358,8 +431,13 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putUVs(u:Float, v:Float):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setFloat32(_uvBuffer, _uvIndex * Float32Array.BYTES_PER_ELEMENT, u);
         clay.buffers.ArrayBufferIO.setFloat32(_uvBuffer, (_uvIndex + 1) * Float32Array.BYTES_PER_ELEMENT, v);
+        #else
+        _uvBase[_uvIndex] = u;
+        _uvBase[_uvIndex + 1] = v;
+        #end
         #else
         _uvList[_uvIndex] = u;
         _uvList[_uvIndex + 1] = v;
@@ -381,10 +459,17 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putColor(r:Float, g:Float, b:Float, a:Float):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setFloat32(_colorBuffer, _colorIndex * Float32Array.BYTES_PER_ELEMENT, r);
         clay.buffers.ArrayBufferIO.setFloat32(_colorBuffer, (_colorIndex + 1) * Float32Array.BYTES_PER_ELEMENT, g);
         clay.buffers.ArrayBufferIO.setFloat32(_colorBuffer, (_colorIndex + 2) * Float32Array.BYTES_PER_ELEMENT, b);
         clay.buffers.ArrayBufferIO.setFloat32(_colorBuffer, (_colorIndex + 3) * Float32Array.BYTES_PER_ELEMENT, a);
+        #else
+        _colorBase[_colorIndex] = r;
+        _colorBase[_colorIndex + 1] = g;
+        _colorBase[_colorIndex + 2] = b;
+        _colorBase[_colorIndex + 3] = a;
+        #end
         #else
         _colorList[_colorIndex] = r;
         _colorList[_colorIndex + 1] = g;
@@ -403,7 +488,11 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putIndex(i:Int):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setUint16(_indiceBuffer, _numIndices * Uint16Array.BYTES_PER_ELEMENT, i);
+        #else
+        _indexBase[_numIndices] = i;
+        #end
         #else
         _indiceList[_numIndices] = i;
         #end
@@ -419,7 +508,11 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      */
     public inline function putFloatAttribute(index:Int, value:Float):Void {
         #if cpp
+        #if clay_no_typed_cursors
         clay.buffers.ArrayBufferIO.setFloat32(_posBuffer, (_posIndex + index) * Float32Array.BYTES_PER_ELEMENT, value);
+        #else
+        _posBase[_posIndex + index] = value;
+        #end
         #else
         _posList[_posIndex + index] = value;
         #end
@@ -432,6 +525,94 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     public inline function endFloatAttributes():Void {
         _posIndex += _floatAttributesSize;
     }
+
+    #if cpp
+
+    // ========================================================================
+    // Direct Write Access (native)
+    // ========================================================================
+    //
+    // Raw pointer access to the CPU-side vertex buffers, at the current
+    // write cursors — the CPU equivalent of mapping a GPU buffer. This
+    // lets callers fill whole blocks of vertices at once instead of going
+    // through the per-scalar put* methods, then advance the cursors in
+    // one step.
+    //
+    // Contract: pointers must be acquired right before use and never
+    // cached (the underlying buffers are managed memory); no allocation
+    // must happen between acquisition and the matching advance*() call;
+    // callers are responsible for checking remaining capacity first
+    // (shouldFlush()/remainingVertices()/remainingIndices()).
+
+    /** Raw pointer to the position buffer at the current write cursor. */
+    public inline function posWritePointer():cpp.Pointer<cpp.Float32> {
+        #if clay_no_typed_cursors
+        var ptr:cpp.Pointer<cpp.Float32> = cpp.NativeArray.address(_posBuffer, _posIndex * 4).reinterpret();
+        return ptr;
+        #else
+        return cpp.Pointer.fromRaw(_posBase).add(_posIndex);
+        #end
+    }
+
+    /** Raw pointer to the uv buffer at the current write cursor. */
+    public inline function uvWritePointer():cpp.Pointer<cpp.Float32> {
+        #if clay_no_typed_cursors
+        var ptr:cpp.Pointer<cpp.Float32> = cpp.NativeArray.address(_uvBuffer, _uvIndex * 4).reinterpret();
+        return ptr;
+        #else
+        return cpp.Pointer.fromRaw(_uvBase).add(_uvIndex);
+        #end
+    }
+
+    /** Raw pointer to the color buffer at the current write cursor. */
+    public inline function colorWritePointer():cpp.Pointer<cpp.Float32> {
+        #if clay_no_typed_cursors
+        var ptr:cpp.Pointer<cpp.Float32> = cpp.NativeArray.address(_colorBuffer, _colorIndex * 4).reinterpret();
+        return ptr;
+        #else
+        return cpp.Pointer.fromRaw(_colorBase).add(_colorIndex);
+        #end
+    }
+
+    /** Raw pointer to the index buffer at the current write cursor. */
+    public inline function indexWritePointer():cpp.Pointer<cpp.UInt16> {
+        #if clay_no_typed_cursors
+        var ptr:cpp.Pointer<cpp.UInt16> = cpp.NativeArray.address(_indiceBuffer, _numIndices * 2).reinterpret();
+        return ptr;
+        #else
+        return cpp.Pointer.fromRaw(_indexBase).add(_numIndices);
+        #end
+    }
+
+    /** Current position vertex stride, in number of floats. */
+    public inline function posStrideFloats():Int {
+        return _posSize;
+    }
+
+    /** Advances position cursors after `count` vertices were written directly. */
+    public inline function advanceVertices(count:Int):Void {
+        _posIndex += count * _posSize;
+        _numPos += count;
+    }
+
+    /** Advances uv cursors after `count` uv pairs were written directly. */
+    public inline function advanceUVs(count:Int):Void {
+        _uvIndex += count * 2;
+        _numUVs += count;
+    }
+
+    /** Advances color cursors after `count` colors were written directly. */
+    public inline function advanceColors(count:Int):Void {
+        _colorIndex += count * 4;
+        _numColors += count;
+    }
+
+    /** Advances the index cursor after `count` indices were written directly. */
+    public inline function advanceIndices(count:Int):Void {
+        _numIndices += count;
+    }
+
+    #end
 
     // ========================================================================
     // Batch State Queries
@@ -509,6 +690,18 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      * STREAM_DRAW for optimal performance with dynamic geometry.
      */
     public function flush():Void {
+
+        #if (cpp && !clay_no_typed_cursors && debug)
+        // Safety net for the cached typed base pointers: the guarantee they
+        // rely on (large GC allocations never move) is an hxcpp
+        // implementation detail. Re-derive the base and compare, so any
+        // future violation fails loudly instead of corrupting memory.
+        var checkPosBase:cpp.RawPointer<cpp.Float32> = untyped __cpp__('(float*)({0}->GetBase())', _posBuffer);
+        if (checkPosBase != _posBase) {
+            throw 'GLGraphicsBatcher: cached buffer base pointer became stale (GC moved a large allocation?)';
+        }
+        #end
+
         var batchMultiTexture = _batchMultiTexture;
 
         // fromBuffer takes byte length, so floats * 4

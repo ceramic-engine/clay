@@ -115,6 +115,15 @@ package clay.buffers;
             ArrayBufferIO.setUint8(this.buffer, this.byteOffset+idx, val);
         }
 
+        #if cpp
+        /** Raw typed pointer to this array's data, for hot loops.
+            See `ArrayBufferView.unsafeBytePointer` for the safety contract. */
+        public inline function unsafePointer() : cpp.Pointer<cpp.UInt8> {
+            var raw:cpp.RawPointer<cpp.UInt8> = untyped __cpp__('(unsigned char*)({0}->GetBase() + {1})', this.buffer, this.byteOffset);
+            return cpp.Pointer.fromRaw(raw);
+        }
+        #end
+
     }
 
     typedef Uint8Array = Uint8ArrayImpl;

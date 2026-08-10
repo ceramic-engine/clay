@@ -117,6 +117,15 @@ package clay.buffers;
             ArrayBufferIO.setFloat32(this.buffer, this.byteOffset+(idx*BYTES_PER_ELEMENT), val);
         }
 
+        #if cpp
+        /** Raw typed pointer to this array's data, for hot loops.
+            See `ArrayBufferView.unsafeBytePointer` for the safety contract. */
+        public inline function unsafePointer() : cpp.Pointer<cpp.Float32> {
+            var raw:cpp.RawPointer<cpp.Float32> = untyped __cpp__('(float*)({0}->GetBase() + {1})', this.buffer, this.byteOffset);
+            return cpp.Pointer.fromRaw(raw);
+        }
+        #end
+
     }
 
     typedef Float32Array = Float32ArrayImpl;

@@ -127,6 +127,34 @@ package clay.buffers;
 
     //Public shared APIs
 
+    #if cpp
+
+        /** Raw byte pointer to this view's data (native targets only).
+
+            Opt-in escape hatch for hot loops: the per-element accessors are
+            already inline typed stores, but they re-pay a double indirection
+            (view -> buffer -> data) on every access, which prevents the C++
+            optimizer from hoisting and vectorizing. Holding this pointer for
+            the duration of a tight loop removes that cost.
+
+            Safety contract (the caller is responsible for all of these):
+            - acquire right before use; never cache across frames or in fields.
+              Data blocks of at least 4000 bytes are malloc'd by the GC and
+              never move, but smaller ones may move if a moving/generational
+              GC is enabled, so a cached pointer is only safe for large,
+              field-referenced buffers;
+            - keep this view (or its buffer) referenced somewhere for as long
+              as the pointer is used - a raw pointer keeps nothing alive;
+            - no allocation between acquisition and last use (a collection
+              can only happen at allocation points). */
+        #if !clay_no_inline_buffers inline #end
+        public function unsafeBytePointer() : cpp.Pointer<cpp.UInt8> {
+            var raw:cpp.RawPointer<cpp.UInt8> = untyped __cpp__('(unsigned char*)({0}->GetBase() + {1})', buffer, byteOffset);
+            return cpp.Pointer.fromRaw(raw);
+        }
+
+    #end
+
     //T is required because it can translate [0,0] as Int array
         #if !clay_no_inline_buffers inline #end
     public function set( ?view:ArrayBufferView, ?array:Array<Float>, offset:Int = 0 ) : Void {
