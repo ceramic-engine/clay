@@ -88,6 +88,15 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     var _uvListArray:Array<Float32Array> = [];
     var _colorListArray:Array<Float32Array> = [];
 
+    #if js
+    // Wasm-backed staging bookkeeping: byte offsets of each buffer
+    // generation inside the wasm kernels memory, and the memory generation
+    // its views were derived from (growing the wasm memory detaches views,
+    // so they are re-derived lazily when the generation changes).
+    var _wasmOffsetsArray:Array<Array<Int>> = [];
+    var _wasmViewGenArray:Array<Int> = [];
+    #end
+
     var _posList:Float32Array;
     var _indiceList:Uint16Array;
     var _uvList:Float32Array;
@@ -201,6 +210,11 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      * rendering operations begin.
      */
     public inline function initBuffers():Void {
+        #if js
+        // Start loading the wasm emission kernels (async): staging buffers
+        // switch to wasm-backed views once available
+        clay.simd.wasm.WasmSimd.init();
+        #end
         _buffersIndex = -1;
         prepareNextBuffers();
     }
@@ -240,6 +254,37 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
             _viewIndicesBufferViewArray[_buffersIndex] = @:privateAccess new clay.buffers.ArrayBufferView(Uint8);
             #end
         }
+
+        #if js
+        // Wasm-backed staging: once the kernels module is ready, this
+        // generation's arrays become views over the wasm memory, so the
+        // kernels write in place and gl.bufferData uploads them directly.
+        if (clay.simd.wasm.WasmSimd.ready) {
+            if (_wasmOffsetsArray.length <= _buffersIndex || _wasmOffsetsArray[_buffersIndex] == null) {
+                var offs = [
+                    clay.simd.wasm.WasmSimd.alloc(MAX_VERTS_SIZE * 4),
+                    clay.simd.wasm.WasmSimd.alloc(Std.int(Math.ceil(MAX_VERTS_SIZE * 2.0 / 3.0)) * 4),
+                    clay.simd.wasm.WasmSimd.alloc(MAX_VERTS_SIZE * 4),
+                    clay.simd.wasm.WasmSimd.alloc(MAX_INDICES * 2 * 2)
+                ];
+                // Keep the plain js arrays if the wasm memory limit was hit
+                if (offs[0] >= 0 && offs[1] >= 0 && offs[2] >= 0 && offs[3] >= 0) {
+                    _wasmOffsetsArray[_buffersIndex] = offs;
+                    _wasmViewGenArray[_buffersIndex] = -1;
+                }
+            }
+            if (_wasmOffsetsArray.length > _buffersIndex && _wasmOffsetsArray[_buffersIndex] != null
+                && _wasmViewGenArray[_buffersIndex] != clay.simd.wasm.WasmSimd.memoryGeneration) {
+                _wasmViewGenArray[_buffersIndex] = clay.simd.wasm.WasmSimd.memoryGeneration;
+                var wasmBuf = clay.simd.wasm.WasmSimd.memoryBuffer;
+                var offs = _wasmOffsetsArray[_buffersIndex];
+                _posListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[0], MAX_VERTS_SIZE);
+                _uvListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[1], Std.int(Math.ceil(MAX_VERTS_SIZE * 2.0 / 3.0)));
+                _colorListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[2], MAX_VERTS_SIZE);
+                _indiceListArray[_buffersIndex] = new js.lib.Uint16Array(wasmBuf, offs[3], MAX_INDICES * 2);
+            }
+        }
+        #end
 
         _posList = _posListArray[_buffersIndex];
         _uvList = _uvListArray[_buffersIndex];
@@ -584,6 +629,48 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         #end
     }
 
+    #end
+
+    #if js
+
+    // ========================================================================
+    // Direct Write Access (js)
+    // ========================================================================
+    //
+    // Typed-array equivalent of the native direct write access: expose the
+    // staging arrays and current cursors so callers can fill whole blocks
+    // of vertices in tight loops instead of going through the per-scalar
+    // put* methods, then advance the cursors in one step. Callers are
+    // responsible for checking remaining capacity first.
+
+    /** The position staging array (write at `posIndexValue()`). */
+    public inline function posArray():Float32Array return _posList;
+
+    /** The uv staging array (write at `uvIndexValue()`). */
+    public inline function uvArray():Float32Array return _uvList;
+
+    /** The color staging array (write at `colorIndexValue()`). */
+    public inline function colorArray():Float32Array return _colorList;
+
+    /** The index staging array (write at `indexCountValue()`). */
+    public inline function indexArray():Uint16Array return _indiceList;
+
+    /** Current write cursor in the position staging array, in floats. */
+    public inline function posIndexValue():Int return _posIndex;
+
+    /** Current write cursor in the uv staging array, in floats. */
+    public inline function uvIndexValue():Int return _uvIndex;
+
+    /** Current write cursor in the color staging array, in floats. */
+    public inline function colorIndexValue():Int return _colorIndex;
+
+    /** Current write cursor in the index staging array, in indices. */
+    public inline function indexCountValue():Int return _numIndices;
+
+    #end
+
+    #if (cpp || js)
+
     /** Current position vertex stride, in number of floats. */
     public inline function posStrideFloats():Int {
         return _posSize;
@@ -689,7 +776,19 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
      * rendering to avoid memory leaks. Buffer data is uploaded as
      * STREAM_DRAW for optimal performance with dynamic geometry.
      */
+    #if ceramic_debug_render_timing
+    /** Accumulated wall time spent inside flush() (GL calls), in seconds. Reset externally. */
+    public static var debugFlushTime:Float = 0;
+    /** Number of flush() calls since last reset. */
+    public static var debugFlushCount:Int = 0;
+    #end
+
     public function flush():Void {
+
+        #if ceramic_debug_render_timing
+        var debugFlushT0 = haxe.Timer.stamp();
+        debugFlushCount++;
+        #end
 
         #if (cpp && !clay_no_typed_cursors && debug)
         // Safety net for the cached typed base pointers: the guarantee they
@@ -812,6 +911,10 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         resetIndexes();
 
         prepareNextBuffers();
+
+        #if ceramic_debug_render_timing
+        debugFlushTime += haxe.Timer.stamp() - debugFlushT0;
+        #end
     }
 
     // ========================================================================
