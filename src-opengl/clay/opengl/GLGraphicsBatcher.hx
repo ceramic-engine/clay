@@ -273,16 +273,7 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
                     _wasmViewGenArray[_buffersIndex] = -1;
                 }
             }
-            if (_wasmOffsetsArray.length > _buffersIndex && _wasmOffsetsArray[_buffersIndex] != null
-                && _wasmViewGenArray[_buffersIndex] != clay.simd.wasm.WasmSimd.memoryGeneration) {
-                _wasmViewGenArray[_buffersIndex] = clay.simd.wasm.WasmSimd.memoryGeneration;
-                var wasmBuf = clay.simd.wasm.WasmSimd.memoryBuffer;
-                var offs = _wasmOffsetsArray[_buffersIndex];
-                _posListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[0], MAX_VERTS_SIZE);
-                _uvListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[1], Std.int(Math.ceil(MAX_VERTS_SIZE * 2.0 / 3.0)));
-                _colorListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[2], MAX_VERTS_SIZE);
-                _indiceListArray[_buffersIndex] = new js.lib.Uint16Array(wasmBuf, offs[3], MAX_INDICES * 2);
-            }
+            deriveWasmBuffers();
         }
         #end
 
@@ -313,6 +304,60 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         #end
         #end
     }
+
+    #if js
+    /**
+     * Re-derives the wasm-backed staging views of the current buffer
+     * generation when the wasm memory grew since they were created.
+     *
+     * Growing the wasm memory preserves its contents but detaches every
+     * view derived from the previous `ArrayBuffer`: reads return 0, writes
+     * are silently dropped and `flush()` would fail to upload (or throw,
+     * the detached buffer having a zero byte length). Because growth keeps
+     * the bytes, re-deriving the views from the stored offsets gives back
+     * the data already emitted into the current batch.
+     *
+     * Called from `prepareNextBuffers()` (where `alloc` may grow) and from
+     * the emission path right after `WasmSimd.requireScratch()`, the only
+     * other place that can grow the memory. Cheap no-op otherwise.
+     */
+    public inline function syncWasmBuffers():Void {
+        if (_wasmViewGenArray[_buffersIndex] != clay.simd.wasm.WasmSimd.memoryGeneration) {
+            refreshWasmBuffers();
+        }
+    }
+
+    /** Slow path of `syncWasmBuffers()`, also re-binding the active arrays. */
+    function refreshWasmBuffers():Void {
+        if (deriveWasmBuffers()) {
+            _posList = _posListArray[_buffersIndex];
+            _uvList = _uvListArray[_buffersIndex];
+            _colorList = _colorListArray[_buffersIndex];
+            _indiceList = _indiceListArray[_buffersIndex];
+        }
+    }
+
+    /**
+     * Derives the current generation's staging arrays as views over the
+     * wasm memory, when it has allocated offsets and its views are older
+     * than the current memory generation.
+     * @return `true` when the views were (re-)derived
+     */
+    function deriveWasmBuffers():Bool {
+        if (_wasmOffsetsArray.length > _buffersIndex && _wasmOffsetsArray[_buffersIndex] != null
+            && _wasmViewGenArray[_buffersIndex] != clay.simd.wasm.WasmSimd.memoryGeneration) {
+            _wasmViewGenArray[_buffersIndex] = clay.simd.wasm.WasmSimd.memoryGeneration;
+            var wasmBuf = clay.simd.wasm.WasmSimd.memoryBuffer;
+            var offs = _wasmOffsetsArray[_buffersIndex];
+            _posListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[0], MAX_VERTS_SIZE);
+            _uvListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[1], Std.int(Math.ceil(MAX_VERTS_SIZE * 2.0 / 3.0)));
+            _colorListArray[_buffersIndex] = new js.lib.Float32Array(wasmBuf, offs[2], MAX_VERTS_SIZE);
+            _indiceListArray[_buffersIndex] = new js.lib.Uint16Array(wasmBuf, offs[3], MAX_INDICES * 2);
+            return true;
+        }
+        return false;
+    }
+    #end
 
     /**
      * Begins a rendering pass by enabling vertex attributes.
@@ -810,10 +855,14 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         var colors = Float32Array.fromBuffer(_colorBuffer, 0, _colorIndex * 4, _viewColorsBufferView);
         var indices = Uint16Array.fromBuffer(_indiceBuffer, 0, _numIndices * 2, _viewIndicesBufferView);
         #else
-        var pos = Float32Array.fromBuffer(_posList.buffer, 0, _posIndex * 4);
-        var uvs = Float32Array.fromBuffer(_uvList.buffer, 0, _uvIndex * 4);
-        var colors = Float32Array.fromBuffer(_colorList.buffer, 0, _colorIndex * 4);
-        var indices = Uint16Array.fromBuffer(_indiceList.buffer, 0, _numIndices * 2);
+        // The staging arrays are not necessarily at the start of their
+        // underlying buffer: on js they become views into the wasm memory
+        // at their bump-allocated offsets (see prepareNextBuffers()), so the
+        // upload views must start from each array's own byteOffset.
+        var pos = Float32Array.fromBuffer(_posList.buffer, _posList.byteOffset, _posIndex * 4);
+        var uvs = Float32Array.fromBuffer(_uvList.buffer, _uvList.byteOffset, _uvIndex * 4);
+        var colors = Float32Array.fromBuffer(_colorList.buffer, _colorList.byteOffset, _colorIndex * 4);
+        var indices = Uint16Array.fromBuffer(_indiceList.buffer, _indiceList.byteOffset, _numIndices * 2);
         #end
 
         // Begin submit
