@@ -753,7 +753,10 @@ class SoloudAudio extends clay.base.BaseAudio {
                 // On android, soloud is not capable of directly reading the assets folder files,
                 // so we first read the file via clay/sdl and give soloud the raw data directly
                 var bytes = app.io.loadData(path, true);
-                result = wav.loadMem(untyped __cpp__('(unsigned char*)&{0}[0]', bytes.buffer), bytes.length);
+                // Copy the data (and don't hand over ownership): the pointer
+                // targets gc-managed memory that soloud must neither keep
+                // long-term nor free itself
+                result = wav.loadMem(untyped __cpp__('(unsigned char*)&{0}[0]', bytes.buffer), bytes.length, true, false);
             }
             else {
                 result = wav.load(path);
@@ -805,7 +808,10 @@ class SoloudAudio extends clay.base.BaseAudio {
         var sampleRate:Float = 0;
 
         wav = Wav.create();
-        wav.loadMem(untyped __cpp__('(unsigned char*)&{0}[0]', bytes.buffer), bytes.length);
+        // Copy the data (and don't hand over ownership): the pointer targets
+        // gc-managed memory that soloud must neither keep long-term nor free
+        // itself
+        wav.loadMem(untyped __cpp__('(unsigned char*)&{0}[0]', bytes.buffer), bytes.length, true, false);
 
         length = wav.mSampleCount;
         duration = wav.getLength();
