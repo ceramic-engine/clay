@@ -6,6 +6,8 @@ import ceramic.Path;
 import haxe.io.Path;
 #end
 
+using StringTools;
+
 class BaseAssets {
 
     /**
@@ -31,13 +33,32 @@ class BaseAssets {
             return path;
         }
         else {
+            var appPath = app.io.appPath();
+
+            // Scheme-style base paths (e.g. SDL3 returns `assets://` for the
+            // app's assets on android) must not go through Path.join, which
+            // would collapse their double slash and make the scheme
+            // unrecognizable to the underlying IO
+            var schemeIndex = appPath != null ? appPath.indexOf('://') : -1;
+            if (schemeIndex != -1) {
+                var prefix = appPath;
+                if (!prefix.endsWith('/')) {
+                    prefix += '/';
+                }
+                #if (ios || tvos)
+                return prefix + 'assets/' + path;
+                #else
+                return prefix + path;
+                #end
+            }
+
             #if (ios || tvos)
             // This is because of how the files are put into the xcode project
             // for the iOS builds, it stores them inside of /assets to avoid
             // including the root in the project in the Resources/ folder
-            return Path.join([app.io.appPath(), 'assets', path]);
+            return Path.join([appPath, 'assets', path]);
             #else
-            return Path.join([app.io.appPath(), path]);
+            return Path.join([appPath, path]);
             #end
         }
 

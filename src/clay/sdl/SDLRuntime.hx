@@ -292,7 +292,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
         var appPath = app.io.appPath();
 
         Log.debug('Runtime / init with app path $appPath');
-        if (appPath != null && appPath != '') {
+        if (appPath != null && appPath != '' && appPath.indexOf('://') == -1) {
+            // (scheme-style paths like SDL3's android `assets://` are not
+            // actual filesystem directories: don't try to cwd into them)
             Sys.setCwd(appPath);
         } else {
             Log.debug('Runtime / no need to change cwd');

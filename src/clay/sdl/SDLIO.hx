@@ -76,6 +76,10 @@ class SDLIO extends NativeIO {
         var file = SDL.ioFromFile(path, binary ? 'rb' : 'r');
 
         if (file == null) {
+            // Log the SDL error: a failed open is otherwise silent and can
+            // surface much later in confusing ways (e.g. missing default
+            // assets crashing the first rendered frame)
+            Log.warning('SDLIO / Failed to open file at path $path (${SDL.getError()})');
             return null;
         }
         var size = fileSize(file);
