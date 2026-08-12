@@ -860,10 +860,23 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     public function windowSwap() {
 
+        // The swap can block in the driver until vsync, without ever
+        // reaching a GC safe point: declare it GC-free so a collection
+        // requested by another thread (e.g. a concurrent GC pause) never
+        // has to wait up to a whole frame for this thread. GC-side values
+        // are resolved before entering the zone; the driver call itself
+        // only touches native memory.
         #if (gles_angle && ios)
-        untyped __cpp__('eglSwapBuffers({0}, {1})', _eglDisplay, _eglSurface);
+        var eglDisplay = _eglDisplay;
+        var eglSurface = _eglSurface;
+        cpp.vm.Gc.enterGCFreeZone();
+        untyped __cpp__('eglSwapBuffers({0}, {1})', eglDisplay, eglSurface);
+        cpp.vm.Gc.exitGCFreeZone();
         #else
+        var window = this.window;
+        #if cpp cpp.vm.Gc.enterGCFreeZone(); #end
         SDL.GL_SwapWindow(window);
+        #if cpp cpp.vm.Gc.exitGCFreeZone(); #end
         #end
 
         #if (clay_dwm_flush && windows)

@@ -348,11 +348,25 @@ void main() {
     public function clear(r:Float, g:Float, b:Float, a:Float, clearDepth:Bool = true):Void {
         GL.clearColor(r, g, b, a);
 
-        if (clearDepth && Clay.app.config.render.depth > 0) {
+        var withDepth = clearDepth && Clay.app.config.render.depth > 0;
+
+        // The first command touching the next backbuffer can block in the
+        // driver until a drawable is available (with a vsync-throttled
+        // swapchain this wait can span most of the frame, e.g. on
+        // ANGLE/Metal it lands on this clear rather than on the swap):
+        // declare it GC-free so a collection requested by another thread
+        // never has to wait for it. glClear only takes a scalar mask, no
+        // GC memory is involved.
+        #if cpp cpp.vm.Gc.enterGCFreeZone(); #end
+        if (withDepth) {
             GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-            GL.clearDepth(1.0);
         } else {
             GL.clear(GL.COLOR_BUFFER_BIT);
+        }
+        #if cpp cpp.vm.Gc.exitGCFreeZone(); #end
+
+        if (withDepth) {
+            GL.clearDepth(1.0);
         }
     }
 
