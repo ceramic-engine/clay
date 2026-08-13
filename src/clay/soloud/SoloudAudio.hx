@@ -165,11 +165,17 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
+    /**
+     * When `attachHaxeThread` is `false`, the audio thread is NOT attached
+     * to the haxe runtime around the callback calls: only pass raw native
+     * function pointers in that case, never haxe functions.
+     */
     public function createBusFilter(
         busIndex:Int,
         createFunc:cpp.Callable<(busIndex:Int, instanceId:Int)->Void>,
         destroyFunc:cpp.Callable<(busIndex:Int, instanceId:Int)->Void>,
-        filterFunc:cpp.Callable<(busIndex:Int, instanceId:Int, aBuffer:cpp.RawPointer<cpp.Float32>, aSamples:cpp.UInt32, aChannels:cpp.UInt32, aSamplerate:cpp.Float32, time:cpp.Float64)->Void>
+        filterFunc:cpp.Callable<(busIndex:Int, instanceId:Int, aBuffer:cpp.RawPointer<cpp.Float32>, aSamples:cpp.UInt32, aChannels:cpp.UInt32, aSamplerate:cpp.Float32, time:cpp.Float64)->Void>,
+        attachHaxeThread:Bool = true
     ):Void {
 
         var bus = resolveBus(busIndex);
@@ -177,7 +183,8 @@ class SoloudAudio extends clay.base.BaseAudio {
             busIndex,
             createFunc,
             destroyFunc,
-            filterFunc
+            filterFunc,
+            attachHaxeThread
         );
         bus.setFilter(0, filter);
 
