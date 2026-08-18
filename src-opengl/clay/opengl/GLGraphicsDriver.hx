@@ -679,9 +679,33 @@ void main() {
      * @param dataType Data type of texture
      * @return Created render target
      */
+    /** Cached GL_MAX_SAMPLES value (0 = not queried yet). */
+    static var _maxSamples:Int = 0;
+
+    /**
+     * Clamps a requested MSAA sample count to the GL_MAX_SAMPLES supported by
+     * the context. Requesting more samples than supported would make
+     * `renderbufferStorageMultisample` fail with GL_INVALID_VALUE and leave
+     * the render target framebuffer incomplete (black texture).
+     */
+    function clampSamples(antialiasing:Int):Int {
+        if (antialiasing > 1) {
+            if (_maxSamples <= 0) {
+                var v:Dynamic = GL.getParameter(0x8D57 /* GL_MAX_SAMPLES */);
+                var intVal:Int = v != null ? Std.int(v) : 0;
+                _maxSamples = intVal > 0 ? intVal : 4; // Conservative fallback
+            }
+            if (antialiasing > _maxSamples) {
+                antialiasing = _maxSamples;
+            }
+        }
+        return antialiasing;
+    }
+
     public function createRenderTarget(textureId:TextureId, width:Int, height:Int, depth:Bool, stencil:Bool,
             antialiasing:Int, level:Int, format:TextureFormat, dataType:TextureDataType):RenderTarget {
         var renderTarget = new GLGraphicsDriver_RenderTarget();
+        antialiasing = clampSamples(antialiasing);
 
         // Create actual texture gpu storage
         GL.texImage2D(GL.TEXTURE_2D, level, format, width, height, 0, format, dataType, null);
@@ -793,6 +817,7 @@ void main() {
     public function configureRenderTargetBuffersStorage(renderTarget:RenderTarget, textureId:TextureId,
             width:Int, height:Int, depth:Bool, stencil:Bool, antialiasing:Int):Void {
         var rt:GLGraphicsDriver_RenderTarget = cast renderTarget;
+        antialiasing = clampSamples(antialiasing);
 
         if (antialiasing > 1) {
             // Setup multisample color RBO
