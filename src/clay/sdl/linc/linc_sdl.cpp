@@ -262,15 +262,41 @@ namespace linc {
             SDL_GetDisplayUsableBounds(displayID, rect);
         }
 
+        // Between two animation callbacks the main thread sits in the native
+        // run loop, where it never reaches a GC safe point: a collection
+        // pause requested meanwhile (e.g. a concurrent GC remark) would have
+        // to wait until the thread re-enters haxe code — up to a whole
+        // frame. Parking the thread in a GC free zone while it is handed
+        // back to the run loop lets collections proceed during that idle
+        // time. Trampolines that re-enter haxe code exit the zone first
+        // (done automatically by hx::SetTopOfStack) and park again when the
+        // outermost trampoline returns; the depth guard keeps a nested
+        // trampoline (e.g. an event watch fired while pumping events inside
+        // the frame callback) from parking in the middle of haxe code. All
+        // of it is thread local so a trampoline running on another thread
+        // can never park that thread by mistake.
+        static thread_local int _trampolineDepth = 0;
+        static thread_local bool _parkInGcFreeZoneAfterTrampoline = false;
+
+        static void _handleTrampolineReturn() {
+            if (_trampolineDepth == 0 && _parkInGcFreeZoneAfterTrampoline) {
+                hx::EnterGCFreeZone();
+            }
+        }
+
         #if (defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS))
         bool _setiOSAnimationCallback_didBind = false;
         InternaliOSAnimationCallback _setiOSAnimationCallback_callback;
 
         void _setiOSAnimationCallback_handler(void* userdata) {
             int haxe_stack_ = 99;
+            _trampolineDepth++;
             hx::SetTopOfStack(&haxe_stack_, true);
             _setiOSAnimationCallback_callback();
             hx::SetTopOfStack((int *)0, true);
+            _trampolineDepth--;
+            _parkInGcFreeZoneAfterTrampoline = true;
+            _handleTrampolineReturn();
         }
 
         bool setiOSAnimationCallback(SDL_Window* window, InternaliOSAnimationCallback callback) {
@@ -302,9 +328,12 @@ namespace linc {
             }
             else {
                 int haxe_stack_ = 99;
+                _trampolineDepth++;
                 hx::SetTopOfStack(&haxe_stack_, true);
                 _setEventWatch_eventWatcher(event);
                 hx::SetTopOfStack((int *)0, true);
+                _trampolineDepth--;
+                _handleTrampolineReturn();
             }
             return true;
         }
