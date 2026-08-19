@@ -6,6 +6,10 @@ import cpp.Int16;
 import cpp.Pointer;
 import cpp.RawConstPointer;
 import cpp.RawPointer;
+// All the SDL pointer typedefs use cpp.Pointer rather than RawPointer:
+// raw pointers cannot cross the scriptable glue generated for -D scriptable
+// hosts, while cpp.Pointer boxes to Dynamic and converts implicitly at
+// native call sites.
 import cpp.UInt16;
 import cpp.UInt32;
 import cpp.UInt64;
@@ -17,18 +21,23 @@ typedef SDLWindowID = UInt32;
 typedef SDLDisplayID = UInt32;
 typedef SDLJoystickID = UInt32;
 typedef SDLWindowFlags = UInt64;
-typedef SDLWindowFlagsPointer = RawPointer<UInt64>;
+typedef SDLWindowFlagsPointer = cpp.Pointer<UInt64>;
 typedef SDLInitFlags = UInt32;
-typedef SDLWindowPointer = RawPointer<SDLNativeWindow>;
+typedef SDLWindowPointer = cpp.Pointer<SDLNativeWindow>;
 typedef SDLGamepadPointer = Pointer<SDLNativeGamepad>;
-typedef SDLJoystickPointer = RawPointer<SDLNativeJoystick>;
-typedef SDLEventPointer = RawPointer<SDLNativeEvent>;
-typedef SDLIOStreamPointer = RawPointer<SDLNativeIOStream>;
+typedef SDLJoystickPointer = cpp.Pointer<SDLNativeJoystick>;
+// cpp.Pointer rather than RawPointer: same reason as SDLIOStreamPointer
+// below (scriptable glue cannot bridge raw pointers)
+typedef SDLEventPointer = cpp.Pointer<SDLNativeEvent>;
+// cpp.Pointer rather than RawPointer: raw pointers cannot cross the
+// scriptable glue (-D scriptable hosts); cpp.Pointer boxes to Dynamic and
+// converts implicitly to the raw pointer at native call sites
+typedef SDLIOStreamPointer = cpp.Pointer<SDLNativeIOStream>;
 typedef SDLDisplayModeConstPointer = RawConstPointer<SDLDisplayMode>;
 typedef SDLRectConstPointer = RawConstPointer<SDLNativeRect>;
-typedef SDLRectPointer = RawPointer<SDLNativeRect>;
-typedef SDLSizePointer = RawPointer<SDLNativeSize>;
-typedef SDLPointPointer = RawPointer<SDLNativePoint>;
+typedef SDLRectPointer = cpp.Pointer<SDLNativeRect>;
+typedef SDLSizePointer = cpp.Pointer<SDLNativeSize>;
+typedef SDLPointPointer = cpp.Pointer<SDLNativePoint>;
 
 // Native types (opaque)
 @:native("SDL_Window")
@@ -85,37 +94,37 @@ abstract SDLRect(SDLRectPointer) {
     @:keep
     public var x(get, set):Int;
     inline function get_x():Int {
-        return untyped __cpp__("{0}->x", this);
+        return untyped __cpp__("{0}.ptr->x", this);
     }
     inline function set_x(x:Int):Int {
-        return untyped __cpp__("{0}->x = {1}", this, x);
+        return untyped __cpp__("{0}.ptr->x = {1}", this, x);
     }
 
     @:keep
     public var y(get, set):Int;
     inline function get_y():Int {
-        return untyped __cpp__("{0}->y", this);
+        return untyped __cpp__("{0}.ptr->y", this);
     }
     inline function set_y(y:Int):Int {
-        return untyped __cpp__("{0}->y = {1}", this, y);
+        return untyped __cpp__("{0}.ptr->y = {1}", this, y);
     }
 
     @:keep
     public var w(get, set):Int;
     inline function get_w():Int {
-        return untyped __cpp__("{0}->w", this);
+        return untyped __cpp__("{0}.ptr->w", this);
     }
     inline function set_w(w:Int):Int {
-        return untyped __cpp__("{0}->w = {1}", this, w);
+        return untyped __cpp__("{0}.ptr->w = {1}", this, w);
     }
 
     @:keep
     public var h(get, set):Int;
     inline function get_h():Int {
-        return untyped __cpp__("{0}->h", this);
+        return untyped __cpp__("{0}.ptr->h", this);
     }
     inline function set_h(h:Int):Int {
-        return untyped __cpp__("{0}->h = {1}", this, h);
+        return untyped __cpp__("{0}.ptr->h = {1}", this, h);
     }
 
 }
@@ -130,19 +139,19 @@ abstract SDLSize(SDLSizePointer) {
     @:keep
     public var w(get, set):Int;
     inline function get_w():Int {
-        return untyped __cpp__("{0}->w", this);
+        return untyped __cpp__("{0}.ptr->w", this);
     }
     inline function set_w(w:Int):Int {
-        return untyped __cpp__("{0}->w = {1}", this, w);
+        return untyped __cpp__("{0}.ptr->w = {1}", this, w);
     }
 
     @:keep
     public var h(get, set):Int;
     inline function get_h():Int {
-        return untyped __cpp__("{0}->h", this);
+        return untyped __cpp__("{0}.ptr->h", this);
     }
     inline function set_h(h:Int):Int {
-        return untyped __cpp__("{0}->h = {1}", this, h);
+        return untyped __cpp__("{0}.ptr->h = {1}", this, h);
     }
 
 }
@@ -157,19 +166,19 @@ abstract SDLPoint(SDLPointPointer) {
     @:keep
     public var x(get, set):Int;
     inline function get_x():Int {
-        return untyped __cpp__("{0}->x", this);
+        return untyped __cpp__("{0}.ptr->x", this);
     }
     inline function set_x(x:Int):Int {
-        return untyped __cpp__("{0}->x = {1}", this, x);
+        return untyped __cpp__("{0}.ptr->x = {1}", this, x);
     }
 
     @:keep
     public var y(get, set):Int;
     inline function get_y():Int {
-        return untyped __cpp__("{0}->y", this);
+        return untyped __cpp__("{0}.ptr->y", this);
     }
     inline function set_y(y:Int):Int {
-        return untyped __cpp__("{0}->y = {1}", this, y);
+        return untyped __cpp__("{0}.ptr->y = {1}", this, y);
     }
 
 }
@@ -184,243 +193,243 @@ abstract SDLEvent(SDLEventPointer) {
     @:keep
     public var type(get, never):UInt32;
     inline function get_type():UInt32 {
-        return untyped __cpp__("{0}->type", this);
+        return untyped __cpp__("{0}.ptr->type", this);
     }
 
     @:keep
     public var timestamp(get, never):UInt64;
     inline function get_timestamp():UInt64 {
-        return untyped __cpp__("{0}->common.timestamp", this);
+        return untyped __cpp__("{0}.ptr->common.timestamp", this);
     }
 
     // Window events
     @:keep
     public var windowID(get, never):SDLWindowID;
     inline function get_windowID():SDLWindowID {
-        return untyped __cpp__("{0}->window.windowID", this);
+        return untyped __cpp__("{0}.ptr->window.windowID", this);
     }
 
     @:keep
     public var windowData1(get, never):Int;
     inline function get_windowData1():Int {
-        return untyped __cpp__("{0}->window.data1", this);
+        return untyped __cpp__("{0}.ptr->window.data1", this);
     }
 
     @:keep
     public var windowData2(get, never):Int;
     inline function get_windowData2():Int {
-        return untyped __cpp__("{0}->window.data2", this);
+        return untyped __cpp__("{0}.ptr->window.data2", this);
     }
 
     // Key events
     @:keep
     public var keyDown(get, never):Bool;
     inline function get_keyDown():Bool {
-        return untyped __cpp__("{0}->key.down", this);
+        return untyped __cpp__("{0}.ptr->key.down", this);
     }
 
     @:keep
     public var keyRepeat(get, never):Bool;
     inline function get_keyRepeat():Bool {
-        return untyped __cpp__("{0}->key.repeat", this);
+        return untyped __cpp__("{0}.ptr->key.repeat", this);
     }
 
     @:keep
     public var keyScancode(get, never):UInt32;
     inline function get_keyScancode():UInt32 {
-        return untyped __cpp__("{0}->key.scancode", this);
+        return untyped __cpp__("{0}.ptr->key.scancode", this);
     }
 
     @:keep
     public var keycode(get, never):UInt32;
     inline function get_keycode():UInt32 {
-        return untyped __cpp__("{0}->key.key", this);
+        return untyped __cpp__("{0}.ptr->key.key", this);
     }
 
     @:keep
     public var keymod(get, never):UInt16;
     inline function get_keymod():UInt16 {
-        return untyped __cpp__("{0}->key.mod", this);
+        return untyped __cpp__("{0}.ptr->key.mod", this);
     }
 
     // Mouse events
     @:keep
     public var mouseButton(get, never):UInt8;
     inline function get_mouseButton():UInt8 {
-        return untyped __cpp__("{0}->button.button", this);
+        return untyped __cpp__("{0}.ptr->button.button", this);
     }
 
     @:keep
     public var mouseX(get, never):Float;
     inline function get_mouseX():Float {
-        return untyped __cpp__("{0}->button.x", this);
+        return untyped __cpp__("{0}.ptr->button.x", this);
     }
 
     @:keep
     public var mouseY(get, never):Float;
     inline function get_mouseY():Float {
-        return untyped __cpp__("{0}->button.y", this);
+        return untyped __cpp__("{0}.ptr->button.y", this);
     }
 
     @:keep
     public var mouseDown(get, never):Bool;
     inline function get_mouseDown():Bool {
-        return untyped __cpp__("{0}->button.down", this);
+        return untyped __cpp__("{0}.ptr->button.down", this);
     }
 
     @:keep
     public var motionX(get, never):Float;
     inline function get_motionX():Float {
-        return untyped __cpp__("{0}->motion.x", this);
+        return untyped __cpp__("{0}.ptr->motion.x", this);
     }
 
     @:keep
     public var motionY(get, never):Float;
     inline function get_motionY():Float {
-        return untyped __cpp__("{0}->motion.y", this);
+        return untyped __cpp__("{0}.ptr->motion.y", this);
     }
 
     @:keep
     public var motionXrel(get, never):Float;
     inline function get_motionXrel():Float {
-        return untyped __cpp__("{0}->motion.xrel", this);
+        return untyped __cpp__("{0}.ptr->motion.xrel", this);
     }
 
     @:keep
     public var motionYrel(get, never):Float;
     inline function get_motionYrel():Float {
-        return untyped __cpp__("{0}->motion.yrel", this);
+        return untyped __cpp__("{0}.ptr->motion.yrel", this);
     }
 
     @:keep
     public var wheelX(get, never):Float;
     inline function get_wheelX():Float {
-        return untyped __cpp__("{0}->wheel.x", this);
+        return untyped __cpp__("{0}.ptr->wheel.x", this);
     }
 
     @:keep
     public var wheelY(get, never):Float;
     inline function get_wheelY():Float {
-        return untyped __cpp__("{0}->wheel.y", this);
+        return untyped __cpp__("{0}.ptr->wheel.y", this);
     }
 
     // Touch events
     @:keep
     public var tfingerId(get, never):UInt64;
     inline function get_tfingerId():UInt64 {
-        return untyped __cpp__("{0}->tfinger.fingerID", this);
+        return untyped __cpp__("{0}.ptr->tfinger.fingerID", this);
     }
 
     @:keep
     public var tfingerX(get, never):Float;
     inline function get_tfingerX():Float {
-        return untyped __cpp__("{0}->tfinger.x", this);
+        return untyped __cpp__("{0}.ptr->tfinger.x", this);
     }
 
     @:keep
     public var tfingerY(get, never):Float;
     inline function get_tfingerY():Float {
-        return untyped __cpp__("{0}->tfinger.y", this);
+        return untyped __cpp__("{0}.ptr->tfinger.y", this);
     }
 
     @:keep
     public var tfingerDx(get, never):Float;
     inline function get_tfingerDx():Float {
-        return untyped __cpp__("{0}->tfinger.dx", this);
+        return untyped __cpp__("{0}.ptr->tfinger.dx", this);
     }
 
     @:keep
     public var tfingerDy(get, never):Float;
     inline function get_tfingerDy():Float {
-        return untyped __cpp__("{0}->tfinger.dy", this);
+        return untyped __cpp__("{0}.ptr->tfinger.dy", this);
     }
 
     @:keep
     public var editText(get, never):String;
     inline function get_editText():String {
-        return untyped __cpp__("::String({0}->edit.text)", this);
+        return untyped __cpp__("::String({0}.ptr->edit.text)", this);
     }
 
     @:keep
     public var editStart(get, never):Int;
     inline function get_editStart():Int {
-        return untyped __cpp__("{0}->edit.start", this);
+        return untyped __cpp__("{0}.ptr->edit.start", this);
     }
 
     @:keep
     public var editLength(get, never):Int;
     inline function get_editLength():Int {
-        return untyped __cpp__("{0}->edit.length", this);
+        return untyped __cpp__("{0}.ptr->edit.length", this);
     }
 
     @:keep
     public var textText(get, never):String;
     inline function get_textText():String {
-        return untyped __cpp__("::String({0}->text.text)", this);
+        return untyped __cpp__("::String({0}.ptr->text.text)", this);
     }
 
     // Gamepad events
     @:keep
     public var gdeviceWhich(get, never):SDLJoystickID;
     inline function get_gdeviceWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->gdevice.which", this);
+        return untyped __cpp__("{0}.ptr->gdevice.which", this);
     }
 
     @:keep
     public var gaxisWhich(get, never):SDLJoystickID;
     inline function get_gaxisWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->gaxis.which", this);
+        return untyped __cpp__("{0}.ptr->gaxis.which", this);
     }
 
     @:keep
     public var gaxisAxis(get, never):UInt8;
     inline function get_gaxisAxis():UInt8 {
-        return untyped __cpp__("{0}->gaxis.axis", this);
+        return untyped __cpp__("{0}.ptr->gaxis.axis", this);
     }
 
     @:keep
     public var gaxisValue(get, never):Int16;
     inline function get_gaxisValue():Int16 {
-        return untyped __cpp__("{0}->gaxis.value", this);
+        return untyped __cpp__("{0}.ptr->gaxis.value", this);
     }
 
     @:keep
     public var gbuttonWhich(get, never):SDLJoystickID;
     inline function get_gbuttonWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->gbutton.which", this);
+        return untyped __cpp__("{0}.ptr->gbutton.which", this);
     }
 
     @:keep
     public var gbuttonButton(get, never):UInt8;
     inline function get_gbuttonButton():UInt8 {
-        return untyped __cpp__("{0}->gbutton.button", this);
+        return untyped __cpp__("{0}.ptr->gbutton.button", this);
     }
 
     @:keep
     public var gbuttonDown(get, never):Bool;
     inline function get_gbuttonDown():Bool {
-        return untyped __cpp__("{0}->gbutton.down", this);
+        return untyped __cpp__("{0}.ptr->gbutton.down", this);
     }
 
     @:keep
     public var gsensorWhich(get, never):SDLJoystickID;
     inline function get_gsensorWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->gsensor.which", this);
+        return untyped __cpp__("{0}.ptr->gsensor.which", this);
     }
 
     @:keep
     public var gsensorSensor(get, never):Int;
     inline function get_gsensorSensor():Int {
-        return untyped __cpp__("{0}->gsensor.sensor", this);
+        return untyped __cpp__("{0}.ptr->gsensor.sensor", this);
     }
 
     @:keep
     public var gsensorData(get, never):Array<Float>;
     inline function get_gsensorData():Array<Float> {
         var data = new Array<Float>();
-        data.push(untyped __cpp__("{0}->gsensor.data[0]", this));
-        data.push(untyped __cpp__("{0}->gsensor.data[1]", this));
-        data.push(untyped __cpp__("{0}->gsensor.data[2]", this));
+        data.push(untyped __cpp__("{0}.ptr->gsensor.data[0]", this));
+        data.push(untyped __cpp__("{0}.ptr->gsensor.data[1]", this));
+        data.push(untyped __cpp__("{0}.ptr->gsensor.data[2]", this));
         return data;
     }
 
@@ -428,43 +437,43 @@ abstract SDLEvent(SDLEventPointer) {
     @:keep
     public var jaxisWhich(get, never):SDLJoystickID;
     inline function get_jaxisWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->jaxis.which", this);
+        return untyped __cpp__("{0}.ptr->jaxis.which", this);
     }
 
     @:keep
     public var jaxisAxis(get, never):UInt8;
     inline function get_jaxisAxis():UInt8 {
-        return untyped __cpp__("{0}->jaxis.axis", this);
+        return untyped __cpp__("{0}.ptr->jaxis.axis", this);
     }
 
     @:keep
     public var jaxisValue(get, never):Int16;
     inline function get_jaxisValue():Int16 {
-        return untyped __cpp__("{0}->jaxis.value", this);
+        return untyped __cpp__("{0}.ptr->jaxis.value", this);
     }
 
     @:keep
     public var jbuttonWhich(get, never):SDLJoystickID;
     inline function get_jbuttonWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->jbutton.which", this);
+        return untyped __cpp__("{0}.ptr->jbutton.which", this);
     }
 
     @:keep
     public var jbuttonButton(get, never):UInt8;
     inline function get_jbuttonButton():UInt8 {
-        return untyped __cpp__("{0}->jbutton.button", this);
+        return untyped __cpp__("{0}.ptr->jbutton.button", this);
     }
 
     @:keep
     public var jbuttonDown(get, never):Bool;
     inline function get_jbuttonDown():Bool {
-        return untyped __cpp__("{0}->jbutton.down", this);
+        return untyped __cpp__("{0}.ptr->jbutton.down", this);
     }
 
     @:keep
     public var jdeviceWhich(get, never):SDLJoystickID;
     inline function get_jdeviceWhich():SDLJoystickID {
-        return untyped __cpp__("{0}->jdevice.which", this);
+        return untyped __cpp__("{0}.ptr->jdevice.which", this);
     }
 }
 
@@ -475,206 +484,209 @@ extern class SDLNativeSurface {}
 
 class SDL {
 
+    // The wrappers are `extern inline`: they keep no physical copy, so the
+    // scriptable glue (-D scriptable hosts) never sees their raw native
+    // pointer signatures
     @:keep public static function bind():Void {
         SDL_Extern.bind();
     }
 
-    inline public static function init():Bool {
+    extern inline public static function init():Bool {
         return SDL_Extern.init();
     }
 
-    inline public static function quit():Void {
+    extern inline public static function quit():Void {
         SDL_Extern.quit();
     }
 
-    inline public static function setHint(name:String, value:String):Bool {
+    extern inline public static function setHint(name:String, value:String):Bool {
         return SDL_Extern.setHint(name, value);
     }
 
-    inline public static function setLCNumericCLocale():Void {
+    extern inline public static function setLCNumericCLocale():Void {
         SDL_Extern.setLCNumericCLocale();
     }
 
-    inline public static function initSubSystem(flags:UInt32):Bool {
+    extern inline public static function initSubSystem(flags:UInt32):Bool {
         return SDL_Extern.initSubSystem(flags);
     }
 
-    inline public static function quitSubSystem(flags:UInt32):Void {
+    extern inline public static function quitSubSystem(flags:UInt32):Void {
         SDL_Extern.quitSubSystem(flags);
     }
 
-    inline public static function setVideoDriver(driver:String):Bool {
+    extern inline public static function setVideoDriver(driver:String):Bool {
         return SDL_Extern.setVideoDriver(driver);
     }
 
-    inline public static function getError():String {
+    extern inline public static function getError():String {
         return SDL_Extern.getError();
     }
 
-    inline public static function createWindow(title:String, x:Int, y:Int, width:Int, height:Int, flags:SDLWindowFlags):SDLWindowPointer {
+    extern inline public static function createWindow(title:String, x:Int, y:Int, width:Int, height:Int, flags:SDLWindowFlags):SDLWindowPointer {
         return SDL_Extern.createWindow(title, x, y, width, height, flags);
     }
 
-    inline public static function getWindowID(window:SDLWindowPointer):SDLWindowID {
+    extern inline public static function getWindowID(window:SDLWindowPointer):SDLWindowID {
         return SDL_Extern.getWindowID(window);
     }
 
-    inline public static function setWindowTitle(window:SDLWindowPointer, title:String):Void {
+    extern inline public static function setWindowTitle(window:SDLWindowPointer, title:String):Void {
         SDL_Extern.setWindowTitle(window, title);
     }
 
-    inline public static function setWindowBordered(window:SDLWindowPointer, bordered:Bool):Void {
+    extern inline public static function setWindowBordered(window:SDLWindowPointer, bordered:Bool):Void {
         SDL_Extern.setWindowBordered(window, bordered);
     }
 
-    inline public static function setWindowFullscreenMode(window:SDLWindowPointer, mode:SDLDisplayModeConstPointer):Bool {
+    extern inline public static function setWindowFullscreenMode(window:SDLWindowPointer, mode:SDLDisplayModeConstPointer):Bool {
         return SDL_Extern.setWindowFullscreenMode(window, mode);
     }
 
-    inline public static function setWindowFullscreen(window:SDLWindowPointer, fullscreen:Bool):Bool {
+    extern inline public static function setWindowFullscreen(window:SDLWindowPointer, fullscreen:Bool):Bool {
         return SDL_Extern.setWindowFullscreen(window, fullscreen);
     }
 
 
     #if mac
-    public static function setWindowFullscreenSpace(window:SDLWindowPointer, state:Bool):Bool {
+    extern inline public static function setWindowFullscreenSpace(window:SDLWindowPointer, state:Bool):Bool {
         // TODO
         return false;
     }
 
-    public static function isWindowInFullscreenSpace(window:SDLWindowPointer):Bool {
+    extern inline public static function isWindowInFullscreenSpace(window:SDLWindowPointer):Bool {
         // TODO
         return false;
     }
     #end
 
-    inline public static function getWindowSize(window:SDLWindowPointer, size:SDLSize):Bool {
+    extern inline public static function getWindowSize(window:SDLWindowPointer, size:SDLSize):Bool {
         return SDL_Extern.getWindowSize(window, size);
     }
 
-    inline public static function getWindowSizeInPixels(window:SDLWindowPointer, size:SDLSize):Bool {
+    extern inline public static function getWindowSizeInPixels(window:SDLWindowPointer, size:SDLSize):Bool {
         return SDL_Extern.getWindowSizeInPixels(window, size);
     }
 
-    inline public static function getWindowPosition(window:SDLWindowPointer, position:SDLPoint):Bool {
+    extern inline public static function getWindowPosition(window:SDLWindowPointer, position:SDLPoint):Bool {
         return SDL_Extern.getWindowPosition(window, position);
     }
 
-    inline public static function getWindowFullscreenMode(window:SDLWindowPointer):SDLDisplayModeConstPointer {
+    extern inline public static function getWindowFullscreenMode(window:SDLWindowPointer):SDLDisplayModeConstPointer {
         return SDL_Extern.getWindowFullscreenMode(window);
     }
 
-    inline public static function getDesktopDisplayMode(displayID:SDLDisplayID):SDLDisplayModeConstPointer {
+    extern inline public static function getDesktopDisplayMode(displayID:SDLDisplayID):SDLDisplayModeConstPointer {
         return SDL_Extern.getDesktopDisplayMode(displayID);
     }
 
-    inline public static function getPrimaryDisplay():SDLDisplayID {
+    extern inline public static function getPrimaryDisplay():SDLDisplayID {
         return SDL_Extern.getPrimaryDisplay();
     }
 
-    inline public static function getDisplayForWindow(window:SDLWindowPointer):SDLDisplayID {
+    extern inline public static function getDisplayForWindow(window:SDLWindowPointer):SDLDisplayID {
         return SDL_Extern.getDisplayForWindow(window);
     }
 
-    public static function getWindowFlags(window:SDLWindowPointer):SDLWindowFlags {
+    extern inline public static function getWindowFlags(window:SDLWindowPointer):SDLWindowFlags {
         final flags:SDLWindowFlags = 0;
         SDL_Extern.getWindowFlags(window, untyped __cpp__('&{0}', flags));
         return flags;
     }
 
-    inline public static function GL_SetAttribute(attr:Int, value:Int):Bool {
+    extern inline public static function GL_SetAttribute(attr:Int, value:Int):Bool {
         return SDL_Extern.GL_SetAttribute(attr, value);
     }
 
-    inline public static function GL_CreateContext(window:SDLWindowPointer):SDLGLContext {
+    extern inline public static function GL_CreateContext(window:SDLWindowPointer):SDLGLContext {
         return SDL_Extern.GL_CreateContext(window);
     }
 
-    inline public static function GL_GetCurrentContext():SDLGLContext {
+    extern inline public static function GL_GetCurrentContext():SDLGLContext {
         return SDL_Extern.GL_GetCurrentContext();
     }
 
-    inline public static function GL_GetAttribute(attr:Int):Int {
+    extern inline public static function GL_GetAttribute(attr:Int):Int {
         return SDL_Extern.GL_GetAttribute(attr);
     }
 
-    inline public static function GL_MakeCurrent(window:SDLWindowPointer, context:SDLGLContext):Bool {
+    extern inline public static function GL_MakeCurrent(window:SDLWindowPointer, context:SDLGLContext):Bool {
         return SDL_Extern.GL_MakeCurrent(window, context);
     }
 
-    inline public static function GL_SwapWindow(window:SDLWindowPointer):Bool {
+    extern inline public static function GL_SwapWindow(window:SDLWindowPointer):Bool {
         return SDL_Extern.GL_SwapWindow(window);
     }
 
-    inline public static function GL_SetSwapInterval(interval:Int):Bool {
+    extern inline public static function GL_SetSwapInterval(interval:Int):Bool {
         return SDL_Extern.GL_SetSwapInterval(interval);
     }
 
-    inline public static function GL_DestroyContext(context:SDLGLContext):Void {
+    extern inline public static function GL_DestroyContext(context:SDLGLContext):Void {
         SDL_Extern.GL_DestroyContext(context);
     }
 
-    inline public static function getTicks():UInt64 {
+    extern inline public static function getTicks():UInt64 {
         return SDL_Extern.getTicks();
     }
 
-    inline public static function delay(ms:UInt32):Void {
+    extern inline public static function delay(ms:UInt32):Void {
         SDL_Extern.delay(ms);
     }
 
-    inline public static function pollEvent(event:SDLEventPointer):Bool {
+    extern inline public static function pollEvent(event:SDLEventPointer):Bool {
         return SDL_Extern.pollEvent(event);
     }
 
-    inline public static function pumpEvents():Void {
+    extern inline public static function pumpEvents():Void {
         SDL_Extern.pumpEvents();
     }
 
-    inline public static function getNumJoysticks():Int {
+    extern inline public static function getNumJoysticks():Int {
         return SDL_Extern.getNumJoysticks();
     }
 
-    inline public static function isGamepad(instance_id:SDLJoystickID):Bool {
+    extern inline public static function isGamepad(instance_id:SDLJoystickID):Bool {
         return SDL_Extern.isGamepad(instance_id);
     }
 
-    inline public static function openJoystick(instance_id:SDLJoystickID):SDLJoystickPointer {
+    extern inline public static function openJoystick(instance_id:SDLJoystickID):SDLJoystickPointer {
         return SDL_Extern.openJoystick(instance_id);
     }
 
-    inline public static function closeJoystick(joystick:SDLJoystickPointer):Void {
+    extern inline public static function closeJoystick(joystick:SDLJoystickPointer):Void {
         SDL_Extern.closeJoystick(joystick);
     }
 
-    inline public static function openGamepad(instance_id:SDLJoystickID):SDLGamepadPointer {
+    extern inline public static function openGamepad(instance_id:SDLJoystickID):SDLGamepadPointer {
         return SDL_Extern.openGamepad(instance_id);
     }
 
-    inline public static function closeGamepad(gamepad:SDLGamepadPointer):Void {
+    extern inline public static function closeGamepad(gamepad:SDLGamepadPointer):Void {
         SDL_Extern.closeGamepad(gamepad);
     }
 
-    inline public static function getGamepadNameForID(instance_id:SDLJoystickID):String {
+    extern inline public static function getGamepadNameForID(instance_id:SDLJoystickID):String {
         return SDL_Extern.getGamepadNameForID(instance_id);
     }
 
-    inline public static function getJoystickNameForID(instance_id:SDLJoystickID):String {
+    extern inline public static function getJoystickNameForID(instance_id:SDLJoystickID):String {
         return SDL_Extern.getJoystickNameForID(instance_id);
     }
 
-    inline public static function gamepadHasRumble(gamepad:SDLGamepadPointer):Bool {
+    extern inline public static function gamepadHasRumble(gamepad:SDLGamepadPointer):Bool {
         return SDL_Extern.gamepadHasRumble(gamepad);
     }
 
-    inline public static function rumbleGamepad(gamepad:SDLGamepadPointer, low_frequency_rumble:UInt16, high_frequency_rumble:UInt16, duration_ms:UInt32):Bool {
+    extern inline public static function rumbleGamepad(gamepad:SDLGamepadPointer, low_frequency_rumble:UInt16, high_frequency_rumble:UInt16, duration_ms:UInt32):Bool {
         return SDL_Extern.rumbleGamepad(gamepad, low_frequency_rumble, high_frequency_rumble, duration_ms);
     }
 
-    inline public static function setGamepadSensorEnabled(gamepad:SDLGamepadPointer, type:Int, enabled:Bool):Bool {
+    extern inline public static function setGamepadSensorEnabled(gamepad:SDLGamepadPointer, type:Int, enabled:Bool):Bool {
         return SDL_Extern.setGamepadSensorEnabled(gamepad, type, enabled);
     }
 
-    inline public static function getJoystickID(joystick:SDLJoystickPointer):SDLJoystickID {
+    extern inline public static function getJoystickID(joystick:SDLJoystickPointer):SDLJoystickID {
         return SDL_Extern.getJoystickID(joystick);
     }
 
@@ -685,7 +697,7 @@ class SDL {
         iOSAnimationCallback();
     }
 
-    inline public static function setiOSAnimationCallback(window:SDLWindowPointer, callback:()->Void):Bool {
+    extern inline public static function setiOSAnimationCallback(window:SDLWindowPointer, callback:()->Void):Bool {
         SDL.iOSAnimationCallback = callback;
         return SDL_Extern.setiOSAnimationCallback(window, cpp.Callable.fromStaticFunction(handleiOSAnimationCallback));
     }
@@ -704,86 +716,86 @@ class SDL {
     }
 
 
-    inline public static function getDisplayContentScale(displayID:SDLDisplayID):Float {
+    extern inline public static function getDisplayContentScale(displayID:SDLDisplayID):Float {
         return SDL_Extern.getDisplayContentScale(displayID);
     }
 
-    inline public static function getDisplayUsableBounds(displayID:SDLDisplayID, rect:SDLRect):Void {
+    extern inline public static function getDisplayUsableBounds(displayID:SDLDisplayID, rect:SDLRect):Void {
         SDL_Extern.getDisplayUsableBounds(displayID, rect);
     }
 
-    inline public static function getBasePath():String {
+    extern inline public static function getBasePath():String {
         return SDL_Extern.getBasePath();
     }
 
-    inline public static function startTextInput(window:SDLWindowPointer):Void {
+    extern inline public static function startTextInput(window:SDLWindowPointer):Void {
         SDL_Extern.startTextInput(window);
     }
 
-    inline public static function stopTextInput(window:SDLWindowPointer):Void {
+    extern inline public static function stopTextInput(window:SDLWindowPointer):Void {
         SDL_Extern.stopTextInput(window);
     }
 
-    inline public static function setTextInputArea(window:SDLWindowPointer, rect:SDLRect, cursor:Int):Void {
+    extern inline public static function setTextInputArea(window:SDLWindowPointer, rect:SDLRect, cursor:Int):Void {
         SDL_Extern.setTextInputArea(window, rect, cursor);
     }
 
     // IO operations
-    inline public static function ioFromFile(file:String, mode:String):SDLIOStreamPointer {
+    extern inline public static function ioFromFile(file:String, mode:String):SDLIOStreamPointer {
         return SDL_Extern.ioFromFile(file, mode);
     }
 
-    inline public static function ioFromMem(mem:BytesData, size:Int):SDLIOStreamPointer {
+    extern inline public static function ioFromMem(mem:BytesData, size:Int):SDLIOStreamPointer {
         return SDL_Extern.ioFromMem(mem, size);
     }
 
-    inline public static function ioRead(context:SDLIOStreamPointer, dest:BytesData, size:Int):Int {
+    extern inline public static function ioRead(context:SDLIOStreamPointer, dest:BytesData, size:Int):Int {
         return SDL_Extern.ioRead(context, dest, size);
     }
 
-    inline public static function ioWrite(context:SDLIOStreamPointer, src:BytesData, size:Int):Int {
+    extern inline public static function ioWrite(context:SDLIOStreamPointer, src:BytesData, size:Int):Int {
         return SDL_Extern.ioWrite(context, src, size);
     }
 
-    inline public static function ioSeek(context:SDLIOStreamPointer, offset:Int, whence:Int):Int {
+    extern inline public static function ioSeek(context:SDLIOStreamPointer, offset:Int, whence:Int):Int {
         return SDL_Extern.ioSeek(context, offset, whence).toInt();
     }
 
-    inline public static function ioTell(context:SDLIOStreamPointer):Int {
+    extern inline public static function ioTell(context:SDLIOStreamPointer):Int {
         return SDL_Extern.ioTell(context).toInt();
     }
 
-    inline public static function ioClose(context:SDLIOStreamPointer):Bool {
+    extern inline public static function ioClose(context:SDLIOStreamPointer):Bool {
         return SDL_Extern.ioClose(context);
     }
 
     // Path operations
-    inline public static function getPrefPath(org:String, app:String):String {
+    extern inline public static function getPrefPath(org:String, app:String):String {
         var result = SDL_Extern.getPrefPath(org, app);
         return result;
     }
 
-    inline public static function hasClipboardText():Bool {
+    extern inline public static function hasClipboardText():Bool {
         return SDL_Extern.hasClipboardText();
     }
 
-    inline public static function getClipboardText():String {
+    extern inline public static function getClipboardText():String {
         return SDL_Extern.getClipboardText();
     }
 
-    inline public static function setClipboardText(text:String):Bool {
+    extern inline public static function setClipboardText(text:String):Bool {
         return SDL_Extern.setClipboardText(text);
     }
 
-    inline public static function byteOrderIsBigEndian():Bool {
+    extern inline public static function byteOrderIsBigEndian():Bool {
         return untyped __cpp__("SDL_BYTEORDER == SDL_BIG_ENDIAN");
     }
 
-    inline public static function createRGBSurfaceFrom(pixels:BytesData, width:Int, height:Int, depth:Int, pitch:Int, rmask:UInt32, gmask:UInt32, bmask:UInt32, amask:UInt32):SDLSurfacePointer {
+    extern inline public static function createRGBSurfaceFrom(pixels:BytesData, width:Int, height:Int, depth:Int, pitch:Int, rmask:UInt32, gmask:UInt32, bmask:UInt32, amask:UInt32):SDLSurfacePointer {
         return SDL_Extern.createRGBSurfaceFrom(pixels, width, height, depth, pitch, rmask, gmask, bmask, amask);
     }
 
-    inline public static function freeSurface(surface:SDLSurfacePointer):Void {
+    extern inline public static function freeSurface(surface:SDLSurfacePointer):Void {
         SDL_Extern.freeSurface(surface);
     }
 

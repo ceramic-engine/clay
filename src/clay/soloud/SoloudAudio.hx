@@ -178,7 +178,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         attachHaxeThread:Bool = true
     ):Void {
 
-        var bus = resolveBus(busIndex);
+        var bus = resolveBus(busIndex).bus;
         var filter = Soloud.createFilterFunction(
             busIndex,
             createFunc,
@@ -200,7 +200,7 @@ class SoloudAudio extends clay.base.BaseAudio {
         var inst = source.instance(handle);
         var soloudHandle:Int = -1;
 
-        var bus = resolveBus(busIndex);
+        var bus = resolveBus(busIndex).bus;
 
         if (data.isStream) {
             soloudHandle = bus.play(data.wavStream, volume * VOLUME_FACTOR, 0.0, paused);
@@ -235,7 +235,9 @@ class SoloudAudio extends clay.base.BaseAudio {
 
     }
 
-    function resolveBus(busIndex:Int):soloud.Bus {
+    // Returns the wrapper rather than the raw native pointer: methods with
+    // raw pointer signatures cannot get valid scriptable glue (-D scriptable)
+    function resolveBus(busIndex:Int):SoloudBus {
 
         while (busIndex >= bussesByIndex.length) {
             bussesByIndex.push(null);
@@ -248,7 +250,7 @@ class SoloudAudio extends clay.base.BaseAudio {
             final _bus = soloudBus.bus;
             soloud.play(untyped _bus);
         }
-        return soloudBus.bus;
+        return soloudBus;
 
     }
 

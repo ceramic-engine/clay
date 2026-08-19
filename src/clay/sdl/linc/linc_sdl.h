@@ -118,7 +118,7 @@ namespace linc {
         bool setiOSAnimationCallback(SDL_Window* window, InternaliOSAnimationCallback callback);
         #endif
 
-        typedef ::cpp::Function < int(SDL_Event*) > InternalEventWatcherCallback;
+        typedef ::cpp::Function < int(::cpp::Pointer<SDL_Event>) > InternalEventWatcherCallback;
         bool setEventWatch(SDL_Window* window, InternalEventWatcherCallback eventWatcher);
 
         // Base path

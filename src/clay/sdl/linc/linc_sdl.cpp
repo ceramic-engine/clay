@@ -330,7 +330,7 @@ namespace linc {
                 int haxe_stack_ = 99;
                 _trampolineDepth++;
                 hx::SetTopOfStack(&haxe_stack_, true);
-                _setEventWatch_eventWatcher(event);
+                _setEventWatch_eventWatcher(::cpp::Pointer<SDL_Event>(event));
                 hx::SetTopOfStack((int *)0, true);
                 _trampolineDepth--;
                 _handleTrampolineReturn();

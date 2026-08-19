@@ -1240,7 +1240,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
             case SDL.SDL_EVENT_GAMEPAD_ADDED:
 
                 var _gamepad = SDL.openGamepad(e.gdeviceWhich);
-                var instanceId = SDL.getJoystickID(cast _gamepad);
+                var instanceId = SDL.getJoystickID(cast _gamepad.raw);
                 gamepads.set(e.gdeviceWhich, _gamepad);
                 gamepadInstanceIds.set(instanceId, e.gdeviceWhich);
 
