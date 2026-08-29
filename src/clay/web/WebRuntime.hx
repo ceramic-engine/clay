@@ -332,13 +332,18 @@ class WebRuntime extends clay.base.BaseRuntime {
         eventsWindow.addEventListener('mouseup', handleMouseUp);
         eventsWindow.addEventListener('mousemove', handleMouseMove);
 
-        window.addEventListener('wheel', handleWheel);
+        // Browsers make `wheel`/`touchstart`/`touchmove` listeners passive by
+        // default when attached to the window, which silently disables the
+        // conditional `preventDefault()` done in the handlers (used to keep
+        // the page from scrolling when the app captures scroll). Explicitly
+        // register them as non-passive.
+        window.addEventListener('wheel', handleWheel, untyped { passive: false });
 
         // Touch events
 
-        window.addEventListener('touchstart', handleTouchStart);
+        window.addEventListener('touchstart', handleTouchStart, untyped { passive: false });
         window.addEventListener('touchend', handleTouchEnd);
-        window.addEventListener('touchmove', handleTouchMove);
+        window.addEventListener('touchmove', handleTouchMove, untyped { passive: false });
 
         // Gamepad events
 
