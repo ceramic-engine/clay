@@ -539,6 +539,10 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    // Fractional wheel remainder carried between events (see handleWheel)
+    var wheelAccX:Float = 0;
+    var wheelAccY:Float = 0;
+
     function handleWheel(ev:js.html.WheelEvent) {
 
         if (app.config.runtime.preventDefaultMouseWheel) {
@@ -549,17 +553,32 @@ class WebRuntime extends clay.base.BaseRuntime {
             return;
 
         final wheelFactor = 0.1; // Try to have consistent behavior between web and native platforms
+
+        #if !clay_no_wheel_round
+        // Rounding each event in isolation DISCARDS small deltas entirely: on
+        // macOS every device (trackpad AND notched mice, through the system's
+        // smooth scrolling) delivers continuous pixel deltas of just a few
+        // units, so `round(delta * 0.1)` was 0 almost every time and the wheel
+        // looked dead. Accumulate and emit the integer part, carrying the
+        // fractional remainder to the next event: same integer-only output as
+        // before, but nothing is ever lost.
+        wheelAccX += ev.deltaX * wheelFactor;
+        wheelAccY += ev.deltaY * wheelFactor;
+        final wheelX = Math.round(wheelAccX);
+        final wheelY = Math.round(wheelAccY);
+        wheelAccX -= wheelX;
+        wheelAccY -= wheelY;
+        if (wheelX != 0 || wheelY != 0) {
+            app.input.emitMouseWheel(wheelX, wheelY, timestamp(), webWindowId);
+        }
+        #else
         app.input.emitMouseWheel(
-            #if !clay_no_wheel_round
-            Math.round(ev.deltaX * wheelFactor),
-            Math.round(ev.deltaY * wheelFactor),
-            #else
             ev.deltaX * wheelFactor,
             ev.deltaY * wheelFactor,
-            #end
             timestamp(),
             webWindowId
         );
+        #end
 
     }
 
