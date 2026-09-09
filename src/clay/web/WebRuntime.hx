@@ -69,6 +69,17 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var nextFrameCallbacks:Array<()->Void> = [];
 
+    /**
+     * Right mouse button state as seen by clay.
+     *
+     * Chromium 130 on macOS (Electron 33) dispatches `mousedown` and `contextmenu` for the right button
+     * and nothing else: no `mouseup`, no `pointerup`, no `auxclick`, and no event at all while the button
+     * is held. Chromium 112 (Electron 24) still dispatched the release. A right button drag is therefore
+     * impossible there, but the button state can still be kept consistent: the release is emitted as soon
+     * as a mouse event reports the button as no longer held (see `syncRightButton()`).
+     */
+    var rightButtonDown:Bool = false;
+
 /// Lifecycle
 
     override function init() {
@@ -412,7 +423,30 @@ class WebRuntime extends clay.base.BaseRuntime {
             ev.preventDefault();
         }
 
+    }
 
+    /**
+     * Emit the release of the right mouse button when an event reports it as no longer held.
+     * Needed because some browsers never deliver its `mouseup` (see `rightButtonDown`). Where the
+     * release is delivered normally, `buttons` still reports the button as held during a drag, so this
+     * changes nothing and the real `mouseup` ends the gesture.
+     */
+    function syncRightButton(ev:js.html.MouseEvent) {
+
+        if (!rightButtonDown)
+            return;
+
+        final buttons:Null<Int> = ev.buttons;
+        if (buttons != null && (buttons & 2) == 0) {
+            rightButtonDown = false;
+            app.input.emitMouseUp(
+                translateMouseX(ev),
+                translateMouseY(ev),
+                2,
+                timestamp(),
+                webWindowId
+            );
+        }
 
     }
 
@@ -466,6 +500,13 @@ class WebRuntime extends clay.base.BaseRuntime {
         ev.preventDefault();
         #end
 
+        if (ev.button == 2) {
+            rightButtonDown = true;
+        }
+        else {
+            syncRightButton(ev);
+        }
+
         app.input.emitMouseDown(
             translateMouseX(ev),
             translateMouseY(ev),
@@ -473,25 +514,6 @@ class WebRuntime extends clay.base.BaseRuntime {
             timestamp(),
             webWindowId
         );
-
-        if (ev.button == 2) {
-            // On web, right click mouse up might not fire,
-            // so we simulate it
-            final x = translateMouseX(ev);
-            final y = translateMouseY(ev);
-            final button = ev.button;
-            nextFrameCallbacks.push(() -> {
-                nextFrameCallbacks.push(() -> {
-                    app.input.emitMouseUp(
-                        x,
-                        y,
-                        button,
-                        timestamp(),
-                        webWindowId
-                    );
-                });
-            });
-        }
 
     }
 
@@ -503,6 +525,13 @@ class WebRuntime extends clay.base.BaseRuntime {
         #if !clay_no_mouse_prevent_default
         ev.preventDefault();
         #end
+
+        if (ev.button == 2) {
+            rightButtonDown = false;
+        }
+        else {
+            syncRightButton(ev);
+        }
 
         app.input.emitMouseUp(
             translateMouseX(ev),
@@ -522,6 +551,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         #if !clay_no_mouse_prevent_default
         ev.preventDefault();
         #end
+
+        syncRightButton(ev);
 
         var movementX = ev.movementX == null ? 0 : ev.movementX;
         var movementY = ev.movementY == null ? 0 : ev.movementY;
@@ -551,6 +582,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (skipMouseEvents)
             return;
+
+        syncRightButton(ev);
 
         final wheelFactor = 0.1; // Try to have consistent behavior between web and native platforms
 
