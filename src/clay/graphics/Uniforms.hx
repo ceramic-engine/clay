@@ -305,6 +305,12 @@ class Uniforms {
         var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
 
         #if web
+        if (texture == null) {
+            // Unbind: nothing to apply for this uniform anymore
+            textures.remove(name);
+            dirtyTextures.remove(name);
+            return;
+        }
         var existing = textures.get(name);
         if (existing != null) {
             existing.texture = texture;
@@ -316,6 +322,12 @@ class Uniforms {
         if (dirtyTextures.indexOf(name) == -1)
             dirtyTextures.push(name);
         #else
+        if (texture == null) {
+            // Unbind: nothing to apply for this uniform anymore
+            textures.remove(location);
+            dirtyTextures.remove(location);
+            return;
+        }
         var existing = textures.get(location);
         if (existing != null) {
             existing.texture = texture;
