@@ -1274,6 +1274,12 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function setCursorVisible(visible:Bool):Void {
+
+        js.Browser.document.body.style.cursor = visible ? '' : 'none';
+
+    }
+
     inline function clamp(n:Float) return Math.max(0, Math.min(n, 1));
 
     public function startGamepadRumble(gamepadId:Int, lowFrequency:Float, highFrequency:Float, duration:Float) {

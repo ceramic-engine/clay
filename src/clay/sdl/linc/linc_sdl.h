@@ -67,6 +67,8 @@ namespace linc {
         void setWindowBordered(SDL_Window* window, bool bordered);
         bool setWindowFullscreenMode(SDL_Window* window, const SDL_DisplayMode* mode);
         bool setWindowFullscreen(SDL_Window* window, bool fullscreen);
+        bool showCursor();
+        bool hideCursor();
         bool getWindowSize(SDL_Window* window, SDLSize* size);
         bool getWindowSizeInPixels(SDL_Window* window, SDLSize* size);
         bool getWindowPosition(SDL_Window* window, SDLPoint* position);

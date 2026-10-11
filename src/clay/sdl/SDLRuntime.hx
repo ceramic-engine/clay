@@ -797,6 +797,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function setCursorVisible(visible:Bool):Void {
+
+        if (visible) {
+            SDL.showCursor();
+        }
+        else {
+            SDL.hideCursor();
+        }
+
+    }
+
     public function setWindowBorderless(borderless:Bool):Void {
 
         app.config.window.borderless = borderless;

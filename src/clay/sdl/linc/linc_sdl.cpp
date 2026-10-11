@@ -125,6 +125,14 @@ namespace linc {
             return SDL_SetWindowFullscreen(window, fullscreen);
         }
 
+        bool showCursor() {
+            return SDL_ShowCursor();
+        }
+
+        bool hideCursor() {
+            return SDL_HideCursor();
+        }
+
         bool getWindowPosition(SDL_Window* window, SDLPoint* position) {
             int x = 0;
             int y = 0;

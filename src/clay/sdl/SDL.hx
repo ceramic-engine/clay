@@ -547,6 +547,14 @@ class SDL {
         return SDL_Extern.setWindowFullscreen(window, fullscreen);
     }
 
+    extern inline public static function showCursor():Bool {
+        return SDL_Extern.showCursor();
+    }
+
+    extern inline public static function hideCursor():Bool {
+        return SDL_Extern.hideCursor();
+    }
+
 
     #if mac
     extern inline public static function setWindowFullscreenSpace(window:SDLWindowPointer, state:Bool):Bool {
@@ -1288,6 +1296,12 @@ class SDL {
 
     @:native('::linc::sdl::setWindowFullscreen')
     static function setWindowFullscreen(window:SDLWindowPointer, fullscreen:Bool):Bool;
+
+    @:native('::linc::sdl::showCursor')
+    static function showCursor():Bool;
+
+    @:native('::linc::sdl::hideCursor')
+    static function hideCursor():Bool;
 
     @:native('::linc::sdl::getWindowSize')
     static function getWindowSize(window:SDLWindowPointer, size:SDLSize):Bool;
