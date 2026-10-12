@@ -133,6 +133,11 @@ namespace linc {
             return SDL_HideCursor();
         }
 
+        int getKeyFromScancode(int scancode) {
+            // Key produced by this physical key with the current keyboard layout, no modifier
+            return (int)SDL_GetKeyFromScancode((SDL_Scancode)scancode, SDL_KMOD_NONE, false);
+        }
+
         bool getWindowPosition(SDL_Window* window, SDLPoint* position) {
             int x = 0;
             int y = 0;

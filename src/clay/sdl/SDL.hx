@@ -555,6 +555,10 @@ class SDL {
         return SDL_Extern.hideCursor();
     }
 
+    extern inline public static function getKeyFromScancode(scancode:Int):Int {
+        return SDL_Extern.getKeyFromScancode(scancode);
+    }
+
 
     #if mac
     extern inline public static function setWindowFullscreenSpace(window:SDLWindowPointer, state:Bool):Bool {
@@ -1302,6 +1306,9 @@ class SDL {
 
     @:native('::linc::sdl::hideCursor')
     static function hideCursor():Bool;
+
+    @:native('::linc::sdl::getKeyFromScancode')
+    static function getKeyFromScancode(scancode:Int):Int;
 
     @:native('::linc::sdl::getWindowSize')
     static function getWindowSize(window:SDLWindowPointer, size:SDLSize):Bool;

@@ -808,6 +808,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /**
+     * Key code produced by the physical key `scanCode` with the current keyboard
+     * layout (the letter printed on that key), or 0 if unknown.
+     */
+    public function keyCodeForScanCode(scanCode:Int):Int {
+
+        return SDL.getKeyFromScancode(scanCode);
+
+    }
+
     public function setWindowBorderless(borderless:Bool):Void {
 
         app.config.window.borderless = borderless;

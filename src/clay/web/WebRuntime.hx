@@ -333,6 +333,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         js.Browser.document.addEventListener('keyup',    handleKeyUp);
         js.Browser.document.addEventListener('keypress', handleKeyPress);
 
+        loadKeyboardLayout();
+
         // Mouse events
 
         window.addEventListener('contextmenu', handleContextMenu);
@@ -752,6 +754,11 @@ class WebRuntime extends clay.base.BaseRuntime {
         var keyCode = convertKeyCode(ev.keyCode);
         var scanCode = convertScanCode(ev.code, keyCode);
         var modState = modStateFromEvent(ev);
+
+        // What this physical key produces with the current layout, from the key itself
+        if (ev.code != null && keyCode != 0 && scanCode != 0) {
+            pressedLayoutKeyCodes.set(scanCode, keyCode);
+        }
 
         if (!modState.none) {
             switch keyCode {
@@ -1271,6 +1278,60 @@ class WebRuntime extends clay.base.BaseRuntime {
         app.config.window.title = title;
 
         js.Browser.document.title = title;
+
+    }
+
+    /**
+     * Key codes of the physical keys with the current layout, as reported by the browser
+     * keyboard layout map (`navigator.keyboard.getLayoutMap()`, Chromium and Electron).
+     */
+    var layoutKeyCodes:Map<Int,Int> = new Map();
+
+    /**
+     * Key codes of the physical keys with the current layout, learned from key presses
+     * (always right, but only known for keys pressed at least once).
+     */
+    var pressedLayoutKeyCodes:Map<Int,Int> = new Map();
+
+    function loadKeyboardLayout():Void {
+
+        var keyboard:Dynamic = untyped js.Browser.navigator.keyboard;
+        if (keyboard == null || keyboard.getLayoutMap == null) return;
+
+        var load = function() {
+            try {
+                (keyboard.getLayoutMap():js.lib.Promise<Dynamic>).then(function(layoutMap:Dynamic) {
+                    var keyCodes = new Map<Int,Int>();
+                    layoutMap.forEach(function(key:String, code:String) {
+                        if (key == null || key.length != 1) return;
+                        var scanCode = convertScanCode(code, 0);
+                        if (scanCode == 0) return;
+                        keyCodes.set(scanCode, key.toLowerCase().charCodeAt(0));
+                    });
+                    layoutKeyCodes = keyCodes;
+                    // A layout change makes the keys learned from presses outdated
+                    pressedLayoutKeyCodes = new Map();
+                });
+            }
+            catch (e:Dynamic) {}
+        };
+
+        load();
+        if (keyboard.addEventListener != null) {
+            keyboard.addEventListener('layoutchange', load);
+        }
+
+    }
+
+    /**
+     * Key code produced by the physical key `scanCode` with the current keyboard
+     * layout (the letter printed on that key), or 0 if unknown.
+     */
+    public function keyCodeForScanCode(scanCode:Int):Int {
+
+        if (pressedLayoutKeyCodes.exists(scanCode)) return pressedLayoutKeyCodes.get(scanCode);
+        if (layoutKeyCodes.exists(scanCode)) return layoutKeyCodes.get(scanCode);
+        return 0;
 
     }
 

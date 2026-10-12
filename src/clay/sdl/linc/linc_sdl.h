@@ -69,6 +69,7 @@ namespace linc {
         bool setWindowFullscreen(SDL_Window* window, bool fullscreen);
         bool showCursor();
         bool hideCursor();
+        int getKeyFromScancode(int scancode);
         bool getWindowSize(SDL_Window* window, SDLSize* size);
         bool getWindowSizeInPixels(SDL_Window* window, SDLSize* size);
         bool getWindowPosition(SDL_Window* window, SDLPoint* position);
