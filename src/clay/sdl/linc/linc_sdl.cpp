@@ -414,8 +414,17 @@ namespace linc {
             return SDL_CloseIO(context);
         }
 
-        const char* getPrefPath(const char* org, const char* app) {
-            return SDL_GetPrefPath(org, app);
+        // SDL_GetPrefPath() allocates its result: copied into a Haxe string
+        // and freed here, like getClipboardText(), otherwise every call
+        // (one per storage access) leaks the path
+        ::String getPrefPath(const char* org, const char* app) {
+            char* path = SDL_GetPrefPath(org, app);
+            if (path) {
+                ::String result = ::String(path);
+                SDL_free(path);
+                return result;
+            }
+            return ::String("");
         }
 
         bool hasClipboardText() {

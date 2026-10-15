@@ -771,8 +771,7 @@ class SDL {
 
     // Path operations
     extern inline public static function getPrefPath(org:String, app:String):String {
-        var result = SDL_Extern.getPrefPath(org, app);
-        return result;
+        return SDL_Extern.getPrefPath(org, app);
     }
 
     extern inline public static function hasClipboardText():Bool {
@@ -1438,7 +1437,7 @@ class SDL {
     static function ioClose(context:SDLIOStreamPointer):Bool;
 
     @:native('::linc::sdl::getPrefPath')
-    static function getPrefPath(org:String, app:String):ConstCharStar;
+    static function getPrefPath(org:String, app:String):String;
 
     @:native('::linc::sdl::hasClipboardText')
     static function hasClipboardText():Bool;

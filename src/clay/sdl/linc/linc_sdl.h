@@ -139,7 +139,7 @@ namespace linc {
         bool ioClose(SDL_IOStream* context);
 
         // Path operations
-        const char* getPrefPath(const char* org, const char* app);
+        ::String getPrefPath(const char* org, const char* app);
 
         // Clipboard
         bool hasClipboardText();
