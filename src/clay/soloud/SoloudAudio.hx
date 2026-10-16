@@ -699,6 +699,28 @@ class SoloudAudio extends clay.base.BaseAudio {
         return null;
     }
 
+    #if android
+    /**
+     * Whether `path` is a file of the app's assets, which soloud can't read by itself on
+     * android: `assets/...`, or with SDL3 a scheme-style path (`assets://assets/...`).
+     */
+    static function isAndroidAssetPath(path:String):Bool {
+
+        return path.startsWith('assets/') || path.indexOf('://') != -1;
+
+    }
+
+    /**
+     * `path` without its scheme, if any, to name the extracted copy of the asset.
+     */
+    static function androidAssetRelativePath(path:String):String {
+
+        final schemeIndex = path.indexOf('://');
+        return schemeIndex != -1 ? path.substring(schemeIndex + 3) : path;
+
+    }
+    #end
+
     static function audioDataFromFile(app:Clay, path:String, isStream:Bool, format:AudioFormat):AudioData {
 
         var wav:Wav = untyped __cpp__('NULL');
@@ -717,10 +739,10 @@ class SoloudAudio extends clay.base.BaseAudio {
 
             #if android
             var result;
-            if (path.startsWith('assets/')) {
+            if (isAndroidAssetPath(path)) {
                 // On android, soloud is not capable of directly reading the assets folder files,
                 // so we first extract the asset file to a place exploitable by soloud and use that.
-                var extractedPath = Path.join([app.io.appPathPrefs(), 'clay', 'extracted', path]);
+                var extractedPath = Path.join([app.io.appPathPrefs(), 'clay', 'extracted', androidAssetRelativePath(path)]);
                 var extractedPathDir = Path.directory(extractedPath);
                 if (FileSystem.exists(extractedPathDir) && !FileSystem.isDirectory(extractedPathDir)) {
                     FileSystem.deleteFile(extractedPathDir);
@@ -758,7 +780,7 @@ class SoloudAudio extends clay.base.BaseAudio {
 
             #if android
             var result;
-            if (path.startsWith('assets/')) {
+            if (isAndroidAssetPath(path)) {
                 // On android, soloud is not capable of directly reading the assets folder files,
                 // so we first read the file via clay/sdl and give soloud the raw data directly
                 var bytes = app.io.loadData(path, true);
