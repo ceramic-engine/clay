@@ -806,6 +806,22 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     // ========================================================================
 
     /**
+     * The number of bytes to upload for `bytes` bytes of data: the next power of two,
+     * within the `capacity` of the staging array (what is past the data is not drawn).
+     * The driver allocates storage for each buffer size it gets: with sizes that only
+     * change when the data doubles or halves, it reuses the same storage from one frame
+     * to the next, instead of allocating again (an irregular cost) each time the number
+     * of vertices of a batch changes.
+     */
+    static inline function uploadSize(bytes:Int, capacity:Int):Int {
+
+        var size = 256;
+        while (size < bytes) size <<= 1;
+        return size < capacity ? size : capacity;
+
+    }
+
+    /**
      * Flushes the current batch of vertices to the GPU.
      *
      * This is the core rendering method that:
@@ -850,19 +866,19 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
 
         // fromBuffer takes byte length, so floats * 4
         #if cpp
-        var pos = Float32Array.fromBuffer(_posBuffer, 0, _posIndex * 4, _viewPosBufferView);
-        var uvs = Float32Array.fromBuffer(_uvBuffer, 0, _uvIndex * 4, _viewUvsBufferView);
-        var colors = Float32Array.fromBuffer(_colorBuffer, 0, _colorIndex * 4, _viewColorsBufferView);
-        var indices = Uint16Array.fromBuffer(_indiceBuffer, 0, _numIndices * 2, _viewIndicesBufferView);
+        var pos = Float32Array.fromBuffer(_posBuffer, 0, uploadSize(_posIndex * 4, _posList.length * 4), _viewPosBufferView);
+        var uvs = Float32Array.fromBuffer(_uvBuffer, 0, uploadSize(_uvIndex * 4, _uvList.length * 4), _viewUvsBufferView);
+        var colors = Float32Array.fromBuffer(_colorBuffer, 0, uploadSize(_colorIndex * 4, _colorList.length * 4), _viewColorsBufferView);
+        var indices = Uint16Array.fromBuffer(_indiceBuffer, 0, uploadSize(_numIndices * 2, _indiceList.length * 2), _viewIndicesBufferView);
         #else
         // The staging arrays are not necessarily at the start of their
         // underlying buffer: on js they become views into the wasm memory
         // at their bump-allocated offsets (see prepareNextBuffers()), so the
         // upload views must start from each array's own byteOffset.
-        var pos = Float32Array.fromBuffer(_posList.buffer, _posList.byteOffset, _posIndex * 4);
-        var uvs = Float32Array.fromBuffer(_uvList.buffer, _uvList.byteOffset, _uvIndex * 4);
-        var colors = Float32Array.fromBuffer(_colorList.buffer, _colorList.byteOffset, _colorIndex * 4);
-        var indices = Uint16Array.fromBuffer(_indiceList.buffer, _indiceList.byteOffset, _numIndices * 2);
+        var pos = Float32Array.fromBuffer(_posList.buffer, _posList.byteOffset, uploadSize(_posIndex * 4, _posList.length * 4));
+        var uvs = Float32Array.fromBuffer(_uvList.buffer, _uvList.byteOffset, uploadSize(_uvIndex * 4, _uvList.length * 4));
+        var colors = Float32Array.fromBuffer(_colorList.buffer, _colorList.byteOffset, uploadSize(_colorIndex * 4, _colorList.length * 4));
+        var indices = Uint16Array.fromBuffer(_indiceList.buffer, _indiceList.byteOffset, uploadSize(_numIndices * 2, _indiceList.length * 2));
         #end
 
         // Begin submit
