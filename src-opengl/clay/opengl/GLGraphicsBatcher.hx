@@ -165,7 +165,6 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
 
     var _batchMultiTexture:Bool = false;
     var _posSize:Int = 0;
-    var _customGLBuffers:Array<GLBuffer> = [];
     var _customAttributes:Array<Dynamic> = null;
 
     var _maxVerts:Int = 0;
@@ -904,18 +903,22 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         GL.vertexAttribPointer(ATTRIBUTE_COLOR, 4, GL.FLOAT, false, 0, 0);
         GL.bufferData(GL.ARRAY_BUFFER, colors, GL.STREAM_DRAW);
 
+        // The texture slot and the custom attributes are interleaved with the
+        // position: they point into the position buffer, already uploaded,
+        // instead of uploading the whole interleaved data again for each of them.
         var offset = 3;
         var n = ATTRIBUTE_COLOR + 1;
-        var customGLBuffersLen:Int = 0;
+        var extraAttributesLen:Int = 0;
+
+        if (batchMultiTexture || _customAttributes != null) {
+            GL.bindBuffer(GL.ARRAY_BUFFER, pb);
+        }
 
         if (batchMultiTexture) {
-            var b = GL.createBuffer();
-            _customGLBuffers[customGLBuffersLen++] = b;
+            extraAttributesLen++;
 
             GL.enableVertexAttribArray(n);
-            GL.bindBuffer(GL.ARRAY_BUFFER, b);
             GL.vertexAttribPointer(n, 1, GL.FLOAT, false, _posSize * 4, offset * 4);
-            GL.bufferData(GL.ARRAY_BUFFER, pos, GL.STREAM_DRAW);
 
             n++;
             offset++;
@@ -923,20 +926,12 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
 
         if (_customAttributes != null) {
             var allAttrs = _customAttributes;
-            var start = customGLBuffersLen;
-            var end = start + allAttrs.length;
-            customGLBuffersLen += allAttrs.length;
-            for (ii in start...end) {
-                var attrIndex = ii - start;
-                var attr = allAttrs[attrIndex];
-
-                var b = GL.createBuffer();
-                _customGLBuffers[ii] = b;
+            extraAttributesLen += allAttrs.length;
+            for (ii in 0...allAttrs.length) {
+                var attr = allAttrs[ii];
 
                 GL.enableVertexAttribArray(n);
-                GL.bindBuffer(GL.ARRAY_BUFFER, b);
                 GL.vertexAttribPointer(n, attr.size, GL.FLOAT, false, _posSize * 4, offset * 4);
-                GL.bufferData(GL.ARRAY_BUFFER, pos, GL.STREAM_DRAW);
 
                 n++;
                 offset += attr.size;
@@ -953,11 +948,9 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         GL.deleteBuffer(cb);
         GL.deleteBuffer(tb);
 
-        if (customGLBuffersLen > 0) {
+        if (extraAttributesLen > 0) {
             var n = ATTRIBUTE_COLOR + 1;
-            for (ii in 0...customGLBuffersLen) {
-                var b = _customGLBuffers[ii];
-                GL.deleteBuffer(b);
+            for (ii in 0...extraAttributesLen) {
                 GL.disableVertexAttribArray(n);
                 n++;
             }
