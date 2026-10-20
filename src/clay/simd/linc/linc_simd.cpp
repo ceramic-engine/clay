@@ -629,6 +629,15 @@ namespace linc {
 
         }
 
+        void copyIndicesOffsetU16(
+            unsigned short* dst, const int* src, int count, int base) {
+
+            for (int i = 0; i < count; i++) {
+                dst[i] = (unsigned short)(base + src[i]);
+            }
+
+        }
+
         void putQuadIndicesU16(
             unsigned short* dst, int base) {
 

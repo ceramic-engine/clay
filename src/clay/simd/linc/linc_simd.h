@@ -133,6 +133,10 @@ namespace linc {
         extern void fillIndicesSequentialU16(
             unsigned short* dst, int start, int count);
 
+        // Writes base + src[i] for count indices into `dst`.
+        extern void copyIndicesOffsetU16(
+            unsigned short* dst, const int* src, int count, int base);
+
         // Writes the 6 indices of a quad (two triangles):
         // base, base+1, base+2, base, base+2, base+3.
         extern void putQuadIndicesU16(

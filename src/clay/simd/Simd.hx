@@ -156,6 +156,11 @@ extern class Simd {
     static function fillIndicesSequentialU16(
         dst:RawPointer<UInt16>, start:Int, count:Int):Void;
 
+    /** Writes `count` indices `base + src[i]` into `dst`. */
+    @:native('::linc::simd::copyIndicesOffsetU16')
+    static function copyIndicesOffsetU16(
+        dst:RawPointer<UInt16>, src:RawPointer<Int>, count:Int, base:Int):Void;
+
     /**
      * Writes the 6 indices of a quad (two triangles):
      * base, base+1, base+2, base, base+2, base+3.
