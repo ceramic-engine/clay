@@ -1,3 +1,4 @@
+#include <hxcpp.h>
 #include "./linc_simd.h"
 
 // Implementation selection. LINC_SIMD_FORCE_SCALAR (set via the build
