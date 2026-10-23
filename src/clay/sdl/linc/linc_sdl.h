@@ -89,6 +89,10 @@ namespace linc {
         bool GL_SetSwapInterval(int interval);
         void GL_DestroyContext(SDL_GLContext context);
 
+        // Render watch (Android): lets the activity detect a frame stuck in the graphics driver
+        void renderWatchBegin();
+        void renderWatchEnd();
+
         // Timer
         Uint64 getTicks();
         void delay(Uint32 ms);
