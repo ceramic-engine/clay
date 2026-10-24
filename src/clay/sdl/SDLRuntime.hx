@@ -966,11 +966,6 @@ class SDLRuntime extends clay.base.BaseRuntime {
             doUpdate = app.shouldUpdate(newTimestamp);
             if (doUpdate) {
                 app.emitTick(newTimestamp);
-                #if android
-                // From here to the end of the swap, the activity watchdog can see a frame
-                // stuck in the graphics driver and recreate the surface to unblock it
-                SDL.renderWatchBegin();
-                #end
                 app.emitRender();
 
                 #if (mac || windows || linux)
@@ -1005,9 +1000,6 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
 
             if (doUpdate) {
-                #if android
-                SDL.renderWatchEnd();
-                #end
                 lastFrameTime = Timestamp.now();
             }
 

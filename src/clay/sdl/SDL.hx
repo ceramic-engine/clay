@@ -630,14 +630,6 @@ class SDL {
         return SDL_Extern.GL_SwapWindow(window);
     }
 
-    extern inline public static function renderWatchBegin():Void {
-        SDL_Extern.renderWatchBegin();
-    }
-
-    extern inline public static function renderWatchEnd():Void {
-        SDL_Extern.renderWatchEnd();
-    }
-
     extern inline public static function GL_SetSwapInterval(interval:Int):Bool {
         return SDL_Extern.GL_SetSwapInterval(interval);
     }
@@ -1359,12 +1351,6 @@ class SDL {
 
     @:native('::linc::sdl::GL_SwapWindow')
     static function GL_SwapWindow(window:SDLWindowPointer):Bool;
-
-    @:native('::linc::sdl::renderWatchBegin')
-    static function renderWatchBegin():Void;
-
-    @:native('::linc::sdl::renderWatchEnd')
-    static function renderWatchEnd():Void;
 
     @:native('::linc::sdl::GL_SetSwapInterval')
     static function GL_SetSwapInterval(interval:Int):Bool;
