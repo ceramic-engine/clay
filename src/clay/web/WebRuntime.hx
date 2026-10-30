@@ -70,6 +70,37 @@ class WebRuntime extends clay.base.BaseRuntime {
     var nextFrameCallbacks:Array<()->Void> = [];
 
     /**
+     * The last intervals between animation frames (seconds), in a ring, and the same
+     * values sorted: their median is the refresh period of the display (see `shouldTick()`).
+     */
+    var frameIntervals:Array<Float> = [for (_ in 0...FRAME_INTERVAL_COUNT) 0.0];
+
+    var sortedFrameIntervals:Array<Float> = [for (_ in 0...FRAME_INTERVAL_COUNT) 0.0];
+
+    var frameIntervalIndex:Int = 0;
+
+    var frameIntervalCount:Int = 0;
+
+    var lastFrameTimestamp:Float = -1;
+
+    /**
+     * A tick every this many animation frames, to update at the target rate (`config.updateRate`)
+     * on a beat of the display. The divider found from the refresh period is taken once it has
+     * been the same for `FRAME_DIVIDER_SETTLE_FRAMES` frames.
+     */
+    var frameDivider:Int = 1;
+
+    var frameDividerCandidate:Int = 1;
+
+    var frameDividerCandidateFrames:Int = 0;
+
+    var framesSinceTick:Int = 0;
+
+    static inline final FRAME_INTERVAL_COUNT:Int = 15;
+
+    static inline final FRAME_DIVIDER_SETTLE_FRAMES:Int = 30;
+
+    /**
      * Right mouse button state as seen by clay.
      *
      * Chromium 130 on macOS (Electron 33) dispatches `mousedown` and `contextmenu` for the right button
@@ -140,17 +171,92 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         }
 
-        var newTimestamp = timestamp();
-        if (app.shouldUpdate(newTimestamp)) {
+        // The time of the frame given by the browser (on the beat of the display), never
+        // behind the time already ticked
+        var newTimestamp = t > 0 ? t / 1000.0 - timestampStart : timestamp();
+        if (newTimestamp < app.timestamp)
+            newTimestamp = app.timestamp;
+
+        var ticked = shouldTick(newTimestamp);
+        if (ticked) {
             didEmitTickOnce = true;
             app.emitTick(newTimestamp);
         }
 
         clearPendingKeyUps();
 
-        app.emitRender();
+        // A frame without a tick would draw the same image again
+        if (ticked || !didEmitTickOnce)
+            app.emitRender();
 
         return true;
+
+    }
+
+    /**
+     * Whether the animation frame at `newTimestamp` ticks. At a target update rate, the
+     * ticks follow the display instead of a clock: every `frameDivider` frames, the largest
+     * divider of the refresh rate that keeps at least the target rate (every frame at 60 Hz
+     * for 60 fps, every other frame at 120 Hz or 144 Hz). Comparing frame times to a clock
+     * instead would skip a frame whenever one comes a little early, and then make up for it
+     * with a double step: uneven motion, in waves as the display and the clock drift apart.
+     */
+    function shouldTick(newTimestamp:Float):Bool {
+
+        if (lastFrameTimestamp >= 0 && newTimestamp > lastFrameTimestamp) {
+            frameIntervals[frameIntervalIndex] = newTimestamp - lastFrameTimestamp;
+            frameIntervalIndex = (frameIntervalIndex + 1) % FRAME_INTERVAL_COUNT;
+            if (frameIntervalCount < FRAME_INTERVAL_COUNT)
+                frameIntervalCount++;
+        }
+        lastFrameTimestamp = newTimestamp;
+
+        var updateRate = app.config.updateRate;
+        if (updateRate > 0 && frameIntervalCount > 0) {
+            var candidate = Math.floor(updateRate / refreshPeriod() + 0.1);
+            if (candidate < 1)
+                candidate = 1;
+            if (candidate == frameDivider) {
+                frameDividerCandidateFrames = 0;
+            }
+            else if (candidate != frameDividerCandidate) {
+                frameDividerCandidate = candidate;
+                frameDividerCandidateFrames = 1;
+            }
+            else if (++frameDividerCandidateFrames >= FRAME_DIVIDER_SETTLE_FRAMES) {
+                frameDivider = candidate;
+                frameDividerCandidateFrames = 0;
+            }
+        }
+        else {
+            frameDivider = 1;
+        }
+
+        framesSinceTick++;
+        if (framesSinceTick < frameDivider)
+            return false;
+        framesSinceTick = 0;
+        return true;
+
+    }
+
+    /**
+     * The refresh period of the display (seconds): the median of the last intervals between
+     * frames, which a slow frame or a missed one does not move.
+     */
+    function refreshPeriod():Float {
+
+        var count = frameIntervalCount;
+        for (i in 0...count) {
+            var value = frameIntervals[i];
+            var j = i;
+            while (j > 0 && sortedFrameIntervals[j - 1] > value) {
+                sortedFrameIntervals[j] = sortedFrameIntervals[j - 1];
+                j--;
+            }
+            sortedFrameIntervals[j] = value;
+        }
+        return sortedFrameIntervals[count >> 1];
 
     }
 
