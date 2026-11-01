@@ -55,6 +55,12 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var windowDpr:Float = 1.0;
 
+    /** Exact size of the canvas box in device pixels, when the browser reports it
+        (ResizeObserver with device-pixel-content-box), or -1 */
+    var devicePixelWidth:Int = -1;
+
+    var devicePixelHeight:Int = -1;
+
     var touches:IntMap<{x:Float, y:Float}> = new IntMap();
 
     var gamepadButtonCache:Array<Array<Float>>;
@@ -269,8 +275,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         // For High DPI, we scale the config sizes
         windowDpr = windowDevicePixelRatio();
-        window.width = Math.floor(config.width * windowDpr);
-        window.height = Math.floor(config.height * windowDpr);
+        window.width = Math.round(config.width * windowDpr);
+        window.height = Math.round(config.height * windowDpr);
 
         // These are in css device pixels
         windowW = config.width;
@@ -285,6 +291,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         window.id = app.config.runtime.windowId;
         app.config.runtime.windowParent.appendChild(window);
+
+        observeDevicePixelSize();
 
         // Make the canvas focusable so it can hold keyboard focus
         // (required when embedded in an iframe, e.g. itch.io)
@@ -1207,12 +1215,49 @@ class WebRuntime extends clay.base.BaseRuntime {
             app.emitWindowEvent(MOVED, timestamp(), webWindowId, windowX, windowY);
         }
 
-        if (w != windowW || h != windowH || dpr != windowDpr) {
+        // The canvas must have exactly as many pixels as its box covers on screen,
+        // otherwise the browser rescales the whole canvas when displaying it.
+        // Prefer the exact size reported by the browser, otherwise compute it
+        // from the (non rounded) css size of the box.
+        var pixelWidth:Int;
+        var pixelHeight:Int;
+        if (devicePixelWidth > 0 && devicePixelHeight > 0 && dpr == windowDpr) {
+            pixelWidth = devicePixelWidth;
+            pixelHeight = devicePixelHeight;
+        }
+        else {
+            pixelWidth = Math.round(bounds.width * windowDpr);
+            pixelHeight = Math.round(bounds.height * windowDpr);
+        }
+
+        if (w != windowW || h != windowH || dpr != windowDpr || pixelWidth != window.width || pixelHeight != window.height) {
             windowW = w;
             windowH = h;
-            window.width = Math.floor(windowW * windowDpr);
-            window.height = Math.floor(windowH * windowDpr);
+            window.width = pixelWidth;
+            window.height = pixelHeight;
             app.emitWindowEvent(SIZE_CHANGED, timestamp(), webWindowId, window.width, window.height);
+        }
+
+    }
+
+    function observeDevicePixelSize():Void {
+
+        // Exact size of the canvas in device pixels, when supported (not on Safari)
+        try {
+            var observer:Dynamic = js.Syntax.code('new ResizeObserver({0})', (entries:Array<Dynamic>) -> {
+                for (entry in entries) {
+                    var sizes:Array<Dynamic> = entry.devicePixelContentBoxSize;
+                    if (sizes != null && sizes.length > 0) {
+                        devicePixelWidth = Math.round(sizes[0].inlineSize);
+                        devicePixelHeight = Math.round(sizes[0].blockSize);
+                    }
+                }
+            });
+            observer.observe(window, { box: 'device-pixel-content-box' });
+        }
+        catch (e:Dynamic) {
+            devicePixelWidth = -1;
+            devicePixelHeight = -1;
         }
 
     }
@@ -1356,13 +1401,13 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     override inline public function windowWidth():Int {
 
-        return Math.round(windowW * windowDevicePixelRatio());
+        return window.width;
 
     }
 
     override inline public function windowHeight():Int {
 
-        return Math.round(windowH * windowDevicePixelRatio());
+        return window.height;
 
     }
 
