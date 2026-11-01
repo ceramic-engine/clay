@@ -65,9 +65,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
 /// Internal
 
     static var timestampStart:Float = 0.0;
+    /** Window width in pixels */
     var windowW:Int;
+    /** Window height in pixels */
     var windowH:Int;
-    var windowDpr:Float = 1.0;
+    /** Ratio from SDL window coordinates (mouse, window size) to pixels */
+    var pixelDensity:Float = 1.0;
+    /** Whether SDL window coordinates are pixels (windows, x11) instead of logical points (mac, ios, wayland) */
+    var windowCoordsArePixels:Bool = false;
     var windowFocused:Bool = true;
 
     #if (ios || tvos || android)
@@ -161,6 +166,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     override function shutdown(immediate:Bool = false) {
 
         if (!immediate) {
+            SDL.uninstallDpiChangeHandler();
             SDL.quit();
             Log.debug('SDL / shutdown');
         } else {
@@ -321,16 +327,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / init video (window)');
         }
 
-        #if windows
-        // Get DPI info (needed on windows to adapt window size)
-        var displayID = SDL.getPrimaryDisplay();
-        var contentScale = SDL.getDisplayContentScale(displayID);
-        var createWindowWidth:Int = Std.int(windowConfig.width * contentScale);
-        var createWindowHeight:Int = Std.int(windowConfig.height * contentScale);
-        #else
+        var videoDriver = SDL.getCurrentVideoDriver();
+        windowCoordsArePixels = (videoDriver == 'windows' || videoDriver == 'x11');
+
         var createWindowWidth:Int = windowConfig.width;
         var createWindowHeight:Int = windowConfig.height;
-        #end
+        if (windowCoordsArePixels #if clay_no_display_scale && videoDriver == 'windows' #end) {
+            // Window coordinates are pixels: scale the requested (logical) size
+            // with the content scale of the display (DPI settings)
+            var contentScale = SDL.getDisplayContentScale(SDL.getPrimaryDisplay());
+            createWindowWidth = Math.round(windowConfig.width * contentScale);
+            createWindowHeight = Math.round(windowConfig.height * contentScale);
+        }
 
         // Create window
         window = SDL.createWindow(
@@ -345,6 +353,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
 
         untyped __cpp__('SDL_SyncWindow({0})', window);
+
+        #if !clay_no_display_scale
+        if (windowCoordsArePixels && !windowConfig.fullscreen) {
+            // The window may have been created on a display with a different
+            // scale than the primary display: ensure it matches the requested logical size
+            resizeWindowToLogicalSize(windowConfig.width, windowConfig.height);
+        }
+        // Keep the logical window size when its DPI changes (windows only)
+        SDL.installDpiChangeHandler(window);
+        #end
 
         var windowId:Int = SDL.getWindowID(window);
 
@@ -630,25 +648,59 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
         }
 
-        SDL.getWindowSizeInPixels(window, _sdlSize);
-        windowW = _sdlSize.w;
-        windowH = _sdlSize.h;
+        updateWindowMetrics();
         SDL.getWindowPosition(window, _sdlPoint);
         config.x = _sdlPoint.x;
         config.y = _sdlPoint.y;
 
-        windowDpr = windowDevicePixelRatio();
+        var scale = windowDevicePixelRatio();
+        config.width = Math.round(windowW / scale);
+        config.height = Math.round(windowH / scale);
 
-        //#if android
-        windowW = Math.round(windowW / windowDpr);
-        windowH = Math.round(windowH / windowDpr);
-        //#end
-        config.width = windowW;
-        config.height = windowH;
-
-        Log.debug('SDL / window / x=${config.x} y=${config.y} w=${config.width} h=${config.height} scale=$windowDpr');
+        Log.debug('SDL / window / x=${config.x} y=${config.y} w=${config.width} h=${config.height} pixels=${windowW}x${windowH} scale=$scale pixelDensity=$pixelDensity');
 
         return config;
+
+    }
+
+    /** Update window size in pixels and pixel density from the current SDL window state */
+    function updateWindowMetrics():Void {
+
+        SDL.getWindowSizeInPixels(window, _sdlSize);
+        windowW = _sdlSize.w;
+        windowH = _sdlSize.h;
+
+        #if android
+        // Unchanged android behavior (pointer coordinates use the computed density)
+        pixelDensity = windowDevicePixelRatio();
+        #else
+        pixelDensity = SDL.getWindowPixelDensity(window);
+        if (pixelDensity <= 0) {
+            pixelDensity = 1.0;
+        }
+        #end
+
+    }
+
+    /** Resize the window so that its size matches the given logical size with the current display scale */
+    function resizeWindowToLogicalSize(width:Int, height:Int):Void {
+
+        var scale = windowDevicePixelRatio();
+        var density = SDL.getWindowPixelDensity(window);
+        if (density <= 0) {
+            density = 1.0;
+        }
+        var targetWidth = Math.round(width * scale / density);
+        var targetHeight = Math.round(height * scale / density);
+
+        SDL.getWindowSize(window, _sdlSize);
+        if (_sdlSize.w != targetWidth || _sdlSize.h != targetHeight) {
+            Log.debug('SDL / resize window from ${_sdlSize.w}x${_sdlSize.h} to ${targetWidth}x${targetHeight} (scale=$scale)');
+            SDL.setDpiChangeHandlerBypass(true);
+            untyped __cpp__('SDL_SetWindowSize({0}, {1}, {2})', window, targetWidth, targetHeight);
+            untyped __cpp__('SDL_SyncWindow({0})', window);
+            SDL.setDpiChangeHandlerBypass(false);
+        }
 
     }
 
@@ -766,15 +818,34 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #else
 
-        SDL.getWindowSizeInPixels(window, _sdlSize);
-        var pixelHeight = _sdlSize.w;
+        if (window == null) {
+            return 1.0;
+        }
 
-        SDL.getWindowSize(window, _sdlSize);
-        var deviceHeight = _sdlSize.w;
+        #if clay_no_display_scale
+        // Legacy behavior: ignore the display scale (DPI settings) on platforms
+        // where window coordinates are pixels (windows, x11)
+        var scale:Float = SDL.getWindowPixelDensity(window);
+        #else
+        // Pixel density multiplied by the content scale of the display:
+        // works for platforms using logical points (mac, ios, wayland)
+        // as well as platforms using pixels (windows, x11)
+        var scale:Float = SDL.getWindowDisplayScale(window);
+        #end
 
-        return pixelHeight / deviceHeight;
+        return scale > 0 ? scale : 1.0;
 
         #end
+
+    }
+
+    /**
+     * Ratio from SDL window coordinates to pixels
+     * (2 on mac retina displays, 1 on windows as window coordinates are already pixels)
+     */
+    public function windowPixelDensity():Float {
+
+        return pixelDensity;
 
     }
 
@@ -871,7 +942,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
         isSdlFullscreen = fullscreen;
         app.config.window.fullscreen = fullscreen;
 
-        return SDL.setWindowFullscreen(window, fullscreen);
+        // Let SDL restore/resize the window itself, even if DPI changes in the process
+        SDL.setDpiChangeHandlerBypass(true);
+        var result = SDL.setWindowFullscreen(window, fullscreen);
+        SDL.setDpiChangeHandlerBypass(false);
+        return result;
 
     }
 
@@ -1339,7 +1414,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     inline function toPixels(value:Float):Int {
-        return Math.floor(windowDpr * value);
+        return Math.floor(pixelDensity * value);
     }
 
     /** Helper to return a `ModState` (shift, ctrl etc) from a given `InputEvent` */
@@ -1420,27 +1495,20 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_RESIZED:
                 type = RESIZED;
-                windowDpr = windowDevicePixelRatio();
-                windowW = toPixels(data1);
-                windowH = toPixels(data2);
-                //#if android
-                windowW = Math.round(windowW / windowDpr);
-                windowH = Math.round(windowH / windowDpr);
-                //#end
+                // Event data is in window coordinates, use the actual size in pixels instead
+                updateWindowMetrics();
                 data1 = windowW;
                 data2 = windowH;
 
             case SDL.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 type = SIZE_CHANGED;
-                windowDpr = windowDevicePixelRatio();
-                windowW = toPixels(data1);
-                windowH = toPixels(data2);
-                //#if android
-                windowW = Math.round(windowW / windowDpr);
-                windowH = Math.round(windowH / windowDpr);
-                //#end
+                updateWindowMetrics();
                 data1 = windowW;
                 data2 = windowH;
+
+            case SDL.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+                // Density change is picked up by the screen update of the next tick
+                updateWindowMetrics();
 
             case _:
 

@@ -59,6 +59,7 @@ namespace linc {
         void quitSubSystem(Uint32 flags);
         bool setVideoDriver(::String driver);
         ::String getError();
+        ::String getCurrentVideoDriver();
 
         // Window management
         SDL_Window* createWindow(::String title, int x, int y, int width, int height, Uint32 flags);
@@ -78,6 +79,13 @@ namespace linc {
         SDL_DisplayID getPrimaryDisplay();
         SDL_DisplayID getDisplayForWindow(SDL_Window* window);
         bool getWindowFlags(SDL_Window* window, SDL_WindowFlags* flags);
+        float getWindowPixelDensity(SDL_Window* window);
+        float getWindowDisplayScale(SDL_Window* window);
+
+        // Windows only (no-op elsewhere): keep the logical window size when its DPI changes
+        bool installDpiChangeHandler(SDL_Window* window);
+        void uninstallDpiChangeHandler();
+        void setDpiChangeHandlerBypass(bool bypass);
 
         // OpenGL
         bool GL_SetAttribute(int attr, int value);

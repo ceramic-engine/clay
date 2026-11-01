@@ -523,6 +523,10 @@ class SDL {
         return SDL_Extern.getError();
     }
 
+    extern inline public static function getCurrentVideoDriver():String {
+        return SDL_Extern.getCurrentVideoDriver();
+    }
+
     extern inline public static function createWindow(title:String, x:Int, y:Int, width:Int, height:Int, flags:SDLWindowFlags):SDLWindowPointer {
         return SDL_Extern.createWindow(title, x, y, width, height, flags);
     }
@@ -604,6 +608,27 @@ class SDL {
         final flags:SDLWindowFlags = 0;
         SDL_Extern.getWindowFlags(window, untyped __cpp__('&{0}', flags));
         return flags;
+    }
+
+    extern inline public static function getWindowPixelDensity(window:SDLWindowPointer):Float {
+        return SDL_Extern.getWindowPixelDensity(window);
+    }
+
+    extern inline public static function getWindowDisplayScale(window:SDLWindowPointer):Float {
+        return SDL_Extern.getWindowDisplayScale(window);
+    }
+
+    /** Windows only (no-op elsewhere): keep the logical window size when its DPI changes */
+    extern inline public static function installDpiChangeHandler(window:SDLWindowPointer):Bool {
+        return SDL_Extern.installDpiChangeHandler(window);
+    }
+
+    extern inline public static function uninstallDpiChangeHandler():Void {
+        SDL_Extern.uninstallDpiChangeHandler();
+    }
+
+    extern inline public static function setDpiChangeHandlerBypass(bypass:Bool):Void {
+        SDL_Extern.setDpiChangeHandlerBypass(bypass);
     }
 
     extern inline public static function GL_SetAttribute(attr:Int, value:Int):Bool {
@@ -1283,6 +1308,9 @@ class SDL {
     @:native('::linc::sdl::getError')
     static function getError():String;
 
+    @:native('::linc::sdl::getCurrentVideoDriver')
+    static function getCurrentVideoDriver():String;
+
     @:native('::linc::sdl::createWindow')
     static function createWindow(title:String, x:Int, y:Int, width:Int, height:Int, flags:SDLWindowFlags):SDLWindowPointer;
 
@@ -1333,6 +1361,21 @@ class SDL {
 
     @:native('::linc::sdl::getWindowFlags')
     static function getWindowFlags(window:SDLWindowPointer, flags:SDLWindowFlagsPointer):Bool;
+
+    @:native('::linc::sdl::getWindowPixelDensity')
+    static function getWindowPixelDensity(window:SDLWindowPointer):Float;
+
+    @:native('::linc::sdl::getWindowDisplayScale')
+    static function getWindowDisplayScale(window:SDLWindowPointer):Float;
+
+    @:native('::linc::sdl::installDpiChangeHandler')
+    static function installDpiChangeHandler(window:SDLWindowPointer):Bool;
+
+    @:native('::linc::sdl::uninstallDpiChangeHandler')
+    static function uninstallDpiChangeHandler():Void;
+
+    @:native('::linc::sdl::setDpiChangeHandlerBypass')
+    static function setDpiChangeHandlerBypass(bypass:Bool):Void;
 
     @:native('::linc::sdl::GL_SetAttribute')
     static function GL_SetAttribute(attr:Int, value:Int):Bool;

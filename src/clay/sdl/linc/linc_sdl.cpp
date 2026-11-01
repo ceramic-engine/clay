@@ -3,6 +3,16 @@
 
 #include <locale.h>
 
+#if defined(SDL_PLATFORM_WINDOWS)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #if (defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS))
 #include <stdio.h>
 #include <SDL3/SDL_main.h>
@@ -89,6 +99,12 @@ namespace linc {
             return result;
         }
 
+        ::String getCurrentVideoDriver() {
+            const char* driver = SDL_GetCurrentVideoDriver();
+            ::String result = driver ? ::String(driver) : ::String("");
+            return result;
+        }
+
         SDL_Window* createWindow(::String title, int x, int y, int width, int height, Uint32 flags) {
             SDL_PropertiesID props = SDL_CreateProperties();
 
@@ -167,6 +183,142 @@ namespace linc {
             *flags = SDL_GetWindowFlags(window);
             return true;
         }
+
+        float getWindowPixelDensity(SDL_Window* window) {
+            return SDL_GetWindowPixelDensity(window);
+        }
+
+        float getWindowDisplayScale(SDL_Window* window) {
+            return SDL_GetWindowDisplayScale(window);
+        }
+
+        #if defined(SDL_PLATFORM_WINDOWS)
+
+        typedef UINT (WINAPI *GetDpiForWindowFunc)(HWND);
+        typedef HRESULT (WINAPI *GetDpiForMonitorFunc)(HMONITOR, int, UINT*, UINT*);
+
+        static SDL_Window* dpiWindow = NULL;
+        static HWND dpiHwnd = NULL;
+        static WNDPROC dpiPrevWndProc = NULL;
+        static GetDpiForWindowFunc dpiGetDpiForWindow = NULL;
+        static GetDpiForMonitorFunc dpiGetDpiForMonitor = NULL;
+        static bool dpiBypass = false;
+        static UINT dpiCurrent = 0;
+        // Client size in logical units (pixels at 96 DPI), as of the last resize at a stable DPI
+        static double dpiLogicalWidth = 0;
+        static double dpiLogicalHeight = 0;
+
+        // Resize the window so that its client area has exactly the given size in pixels
+        static void dpiSetClientSize(HWND hwnd, int x, int y, int clientWidth, int clientHeight) {
+            for (int attempt = 0; attempt < 2; attempt++) {
+                RECT windowRect, clientRect;
+                GetWindowRect(hwnd, &windowRect);
+                GetClientRect(hwnd, &clientRect);
+                const int frameWidth = (windowRect.right - windowRect.left) - clientRect.right;
+                const int frameHeight = (windowRect.bottom - windowRect.top) - clientRect.bottom;
+                if (attempt > 0 && clientRect.right == clientWidth && clientRect.bottom == clientHeight) {
+                    return;
+                }
+                SetWindowPos(
+                    hwnd, NULL,
+                    x, y,
+                    clientWidth + frameWidth, clientHeight + frameHeight,
+                    SWP_NOZORDER | SWP_NOACTIVATE | (attempt > 0 ? SWP_NOMOVE : 0)
+                );
+            }
+        }
+
+        // Whether the window and its monitor both use the DPI we were last notified about
+        static bool dpiIsStable(HWND hwnd) {
+            if (dpiGetDpiForWindow(hwnd) != dpiCurrent) return false;
+            UINT dpiX = 0, dpiY = 0;
+            HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor == NULL || dpiGetDpiForMonitor(monitor, 0 /* MDT_EFFECTIVE_DPI */, &dpiX, &dpiY) != S_OK) return false;
+            return dpiX == dpiCurrent;
+        }
+
+        static LRESULT CALLBACK dpiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+            if (msg == WM_SIZE) {
+                // Track the logical client size, but only when the DPI is stable
+                // (Windows may resize the window before notifying a DPI change)
+                const int width = LOWORD(lParam);
+                const int height = HIWORD(lParam);
+                if (wParam != SIZE_MINIMIZED && width > 0 && height > 0 && dpiIsStable(hwnd)) {
+                    dpiLogicalWidth = width * 96.0 / dpiCurrent;
+                    dpiLogicalHeight = height * 96.0 / dpiCurrent;
+                }
+            }
+            else if (msg == WM_DPICHANGED) {
+                const UINT newDpi = HIWORD(wParam);
+                dpiCurrent = newDpi;
+
+                if (!dpiBypass && newDpi != 0 && dpiLogicalWidth > 0 && dpiLogicalHeight > 0 &&
+                    !IsZoomed(hwnd) && (SDL_GetWindowFlags(dpiWindow) & SDL_WINDOW_FULLSCREEN) == 0) {
+                    // Keep the logical client size on the new DPI (SDL would keep the size in pixels),
+                    // at the position suggested by Windows (which keeps the window on the new display)
+                    const RECT* suggested = (const RECT*)lParam;
+                    dpiSetClientSize(
+                        hwnd,
+                        suggested->left, suggested->top,
+                        (int)(dpiLogicalWidth * newDpi / 96.0 + 0.5),
+                        (int)(dpiLogicalHeight * newDpi / 96.0 + 0.5)
+                    );
+                    return 0;
+                }
+            }
+            return CallWindowProc(dpiPrevWndProc, hwnd, msg, wParam, lParam);
+        }
+
+        bool installDpiChangeHandler(SDL_Window* window) {
+            if (dpiHwnd != NULL) return false;
+            HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+            if (hwnd == NULL) return false;
+            // Windows 10 1607+ functions, loaded dynamically
+            HMODULE user32 = GetModuleHandleW(L"user32.dll");
+            if (user32 == NULL) return false;
+            dpiGetDpiForWindow = (GetDpiForWindowFunc)GetProcAddress(user32, "GetDpiForWindow");
+            if (dpiGetDpiForWindow == NULL) return false;
+            HMODULE shcore = LoadLibraryW(L"shcore.dll");
+            if (shcore == NULL) return false;
+            dpiGetDpiForMonitor = (GetDpiForMonitorFunc)GetProcAddress(shcore, "GetDpiForMonitor");
+            if (dpiGetDpiForMonitor == NULL) return false;
+            dpiPrevWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
+            if (dpiPrevWndProc == NULL) return false;
+            dpiCurrent = dpiGetDpiForWindow(hwnd);
+            if (dpiCurrent == 0) return false;
+            RECT clientRect;
+            GetClientRect(hwnd, &clientRect);
+            dpiLogicalWidth = clientRect.right * 96.0 / dpiCurrent;
+            dpiLogicalHeight = clientRect.bottom * 96.0 / dpiCurrent;
+            dpiWindow = window;
+            dpiHwnd = hwnd;
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)dpiWndProc);
+            return true;
+        }
+
+        void uninstallDpiChangeHandler() {
+            if (dpiHwnd == NULL) return;
+            SetWindowLongPtr(dpiHwnd, GWLP_WNDPROC, (LONG_PTR)dpiPrevWndProc);
+            dpiWindow = NULL;
+            dpiHwnd = NULL;
+            dpiPrevWndProc = NULL;
+        }
+
+        void setDpiChangeHandlerBypass(bool bypass) {
+            dpiBypass = bypass;
+        }
+
+        #else
+
+        bool installDpiChangeHandler(SDL_Window* window) {
+            return false;
+        }
+
+        void uninstallDpiChangeHandler() {}
+
+        void setDpiChangeHandlerBypass(bool bypass) {}
+
+        #endif
 
         bool GL_SetAttribute(int attr, int value) {
             return SDL_GL_SetAttribute((SDL_GLAttr)attr, value);
