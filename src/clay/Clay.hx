@@ -85,14 +85,26 @@ class Clay {
     public var appId(default, null):String;
 
     /**
-     * Main window screen width
+     * Main window screen width, in logical units.
+     * Rounded up so that it always covers the whole window (`screenWidth * screenDensity >= screenPixelWidth`)
      */
     public var screenWidth(default, null):Int;
 
     /**
-     * Main window screen height
+     * Main window screen height, in logical units.
+     * Rounded up so that it always covers the whole window (`screenHeight * screenDensity >= screenPixelHeight`)
      */
     public var screenHeight(default, null):Int;
+
+    /**
+     * Main window screen width, in actual pixels
+     */
+    public var screenPixelWidth(default, null):Int;
+
+    /**
+     * Main window screen height, in actual pixels
+     */
+    public var screenPixelHeight(default, null):Int;
 
     /**
      * Main window screen density (device pixel ratio)
@@ -483,8 +495,15 @@ class Clay {
     function updateScreen():Void {
 
         screenDensity = app.runtime.windowDevicePixelRatio();
-        screenWidth = Math.round(app.runtime.windowWidth() / screenDensity);
-        screenHeight = Math.round(app.runtime.windowHeight() / screenDensity);
+        screenPixelWidth = app.runtime.windowWidth();
+        screenPixelHeight = app.runtime.windowHeight();
+
+        // Round the logical size up (with a small tolerance for density values
+        // that are not exact as floats, like 1.100000023841858): the logical area
+        // must cover every pixel of the window, slightly overflowing it if needed,
+        // rather than stopping before its last row or column
+        screenWidth = Math.ceil(screenPixelWidth / screenDensity - 0.0001);
+        screenHeight = Math.ceil(screenPixelHeight / screenDensity - 0.0001);
 
     }
 
