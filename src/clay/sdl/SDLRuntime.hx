@@ -59,6 +59,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public var window:SDLWindowPointer;
     public var currentSdlEvent:SDLEvent = null;
     public var skipMouseEvents:Bool = false;
+
+    /** Time of the last fractional (precise) wheel event on macOS, see SDL_EVENT_MOUSE_WHEEL */
+    var lastPreciseScrollTime:Float = -1.0;
     public var skipKeyboardEvents:Bool = false;
     public var minFrameTime:Float = 0.005;
 
@@ -1231,6 +1234,32 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_MOUSE_WHEEL:
                 if (!skipMouseEvents) {
+                    // Raw scroll deltas, positive when the content moves up or left
+                    // (SDL's y is positive away from the user). On macOS SDL
+                    // reports a precise device (trackpad, smooth scrolling) as
+                    // points times 0.1, almost always fractional, and a notched
+                    // wheel as whole lines: whole values are taken as lines,
+                    // the others as pixels once the 0.1 is undone. Elsewhere
+                    // SDL reports lines (fractional on high resolution wheels).
+                    #if mac
+                    // A precise gesture can still produce a whole value now
+                    // and then: once a fractional value was seen, the events
+                    // of the next 0.5 s stay pixels
+                    final now = haxe.Timer.stamp();
+                    final whole = e.wheelX == Math.round(e.wheelX) && e.wheelY == Math.round(e.wheelY);
+                    if (!whole) {
+                        lastPreciseScrollTime = now;
+                    }
+                    if (whole && now - lastPreciseScrollTime > 0.5) {
+                        app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
+                    }
+                    else {
+                        app.input.emitMouseScroll(e.wheelX * 10.0, -e.wheelY * 10.0, 0, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
+                    }
+                    #else
+                    app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
+                    #end
+
                     final wheelFactor = -5.0; // Try to have consistent behavior between web and native platforms
                     app.input.emitMouseWheel(
                         #if !clay_no_wheel_round

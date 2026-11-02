@@ -66,6 +66,19 @@ class Input {
 
     }
 
+    /**
+     * Scrolling with the deltas as the device reports them, unlike
+     * `emitMouseWheel` which scales and rounds them into a unit of its own.
+     * `deltaX` and `deltaY` are positive when the content should move up or
+     * left (the browser `wheel` sign); `unit` is 0 for logical pixels
+     * (trackpads, smooth scrolling) and 1 for lines (notched mouse wheels).
+     */
+    inline public function emitMouseScroll(deltaX:Float, deltaY:Float, unit:Int, timestamp:Float, windowId:Int) {
+
+        app.events.mouseScroll(deltaX, deltaY, unit, timestamp, windowId);
+
+    }
+
     inline public function emitTouchDown(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
 
         app.events.touchDown(x, y, dx, dy, touchId, timestamp);

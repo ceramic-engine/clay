@@ -43,6 +43,9 @@ class Events {
 
     public function mouseWheel(x:Float, y:Float, timestamp:Float, windowId:Int) {}
 
+    /** Scrolling with the deltas as the device reports them (`unit`: 0 pixels, 1 lines), see `Input.emitMouseScroll` */
+    public function mouseScroll(deltaX:Float, deltaY:Float, unit:Int, timestamp:Float, windowId:Int) {}
+
     public function touchDown(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {}
 
     public function touchUp(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {}
