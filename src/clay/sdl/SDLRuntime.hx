@@ -868,6 +868,52 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    public function minimizeWindow():Void {
+
+        SDL.minimizeWindow(window);
+
+    }
+
+    public function maximizeWindow():Void {
+
+        SDL.maximizeWindow(window);
+
+    }
+
+    public function restoreWindow():Void {
+
+        SDL.restoreWindow(window);
+
+    }
+
+    public function isWindowMaximized():Bool {
+
+        return SDL.isWindowMaximized(window);
+
+    }
+
+    /**
+     * Opens the system menu of the window at the given position, in window
+     * coordinates (where the platform has one: Windows, some Linux desktops).
+     */
+    public function showWindowMenu(x:Float, y:Float):Void {
+
+        SDL.showWindowSystemMenu(window, Std.int(x), Std.int(y));
+
+    }
+
+    /**
+     * Sets the regions of the window that move or resize it when dragged:
+     * a flat list of `x, y, width, height, kind` in window coordinates
+     * (kind: 0 normal, 1 draggable, 2 to 9 resize from the top left corner
+     * clockwise to the left edge), the last matching region wins.
+     */
+    public function setWindowHitRegions(regions:Array<Float>):Void {
+
+        SDL.setWindowHitRegions(window, regions);
+
+    }
+
     public function setCursorVisible(visible:Bool):Void {
 
         if (visible) {

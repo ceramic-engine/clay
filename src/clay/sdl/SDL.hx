@@ -543,6 +543,35 @@ class SDL {
         SDL_Extern.setWindowBordered(window, bordered);
     }
 
+    extern inline public static function minimizeWindow(window:SDLWindowPointer):Bool {
+        return SDL_Extern.minimizeWindow(window);
+    }
+
+    extern inline public static function maximizeWindow(window:SDLWindowPointer):Bool {
+        return SDL_Extern.maximizeWindow(window);
+    }
+
+    extern inline public static function restoreWindow(window:SDLWindowPointer):Bool {
+        return SDL_Extern.restoreWindow(window);
+    }
+
+    extern inline public static function isWindowMaximized(window:SDLWindowPointer):Bool {
+        return SDL_Extern.isWindowMaximized(window);
+    }
+
+    extern inline public static function showWindowSystemMenu(window:SDLWindowPointer, x:Int, y:Int):Bool {
+        return SDL_Extern.showWindowSystemMenu(window, x, y);
+    }
+
+    /**
+     * Window hit regions (SDL_SetWindowHitTest): a flat list of
+     * `x, y, width, height, SDL_HitTestResult` in window coordinates, the
+     * last matching region wins. An empty list removes the hit test.
+     */
+    extern inline public static function setWindowHitRegions(window:SDLWindowPointer, regions:Array<Float>):Void {
+        SDL_Extern.setWindowHitRegions(window, regions);
+    }
+
     extern inline public static function setWindowFullscreenMode(window:SDLWindowPointer, mode:SDLDisplayModeConstPointer):Bool {
         return SDL_Extern.setWindowFullscreenMode(window, mode);
     }
@@ -821,6 +850,18 @@ class SDL {
 
     extern inline public static function setClipboardText(text:String):Bool {
         return SDL_Extern.setClipboardText(text);
+    }
+
+    extern inline public static function openURL(url:String):Bool {
+        return SDL_Extern.openURL(url);
+    }
+
+    /**
+     * The name of the platform (SDL_GetPlatform): "macOS", "Windows", "Linux",
+     * "iOS", "tvOS", "Android"...
+     */
+    extern inline public static function getPlatform():String {
+        return SDL_Extern.getPlatform();
     }
 
     extern inline public static function byteOrderIsBigEndian():Bool {
@@ -1320,6 +1361,24 @@ class SDL {
     @:native('::linc::sdl::setWindowTitle')
     static function setWindowTitle(window:SDLWindowPointer, title:String):Void;
 
+    @:native('::linc::sdl::minimizeWindow')
+    static function minimizeWindow(window:SDLWindowPointer):Bool;
+
+    @:native('::linc::sdl::maximizeWindow')
+    static function maximizeWindow(window:SDLWindowPointer):Bool;
+
+    @:native('::linc::sdl::restoreWindow')
+    static function restoreWindow(window:SDLWindowPointer):Bool;
+
+    @:native('::linc::sdl::isWindowMaximized')
+    static function isWindowMaximized(window:SDLWindowPointer):Bool;
+
+    @:native('::linc::sdl::showWindowSystemMenu')
+    static function showWindowSystemMenu(window:SDLWindowPointer, x:Int, y:Int):Bool;
+
+    @:native('::linc::sdl::setWindowHitRegions')
+    static function setWindowHitRegions(window:SDLWindowPointer, regions:Array<Float>):Void;
+
     @:native('::linc::sdl::setWindowBordered')
     static function setWindowBordered(window:SDLWindowPointer, bordered:Bool):Void;
 
@@ -1511,6 +1570,12 @@ class SDL {
 
     @:native('::linc::sdl::setClipboardText')
     static function setClipboardText(text:String):Bool;
+
+    @:native('::linc::sdl::openURL')
+    static function openURL(url:String):Bool;
+
+    @:native('::linc::sdl::getPlatform')
+    static function getPlatform():String;
 
     @:native('::linc::sdl::createRGBSurfaceFrom')
     static function createRGBSurfaceFrom(pixels:BytesData, width:Int, height:Int, depth:Int, pitch:Int, rmask:UInt32, gmask:UInt32, bmask:UInt32, amask:UInt32):SDLSurfacePointer;

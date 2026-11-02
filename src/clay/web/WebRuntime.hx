@@ -1438,6 +1438,26 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /** Not available in a browser: does nothing. */
+    public function minimizeWindow():Void {}
+
+    /** Not available in a browser: does nothing. */
+    public function maximizeWindow():Void {}
+
+    /** Not available in a browser: does nothing. */
+    public function restoreWindow():Void {}
+
+    /** A browser page is never a maximized window. */
+    public function isWindowMaximized():Bool {
+        return false;
+    }
+
+    /** Not available in a browser: does nothing. */
+    public function showWindowMenu(x:Float, y:Float):Void {}
+
+    /** Not available in a browser: does nothing. */
+    public function setWindowHitRegions(regions:Array<Float>):Void {}
+
     /**
      * Key codes of the physical keys with the current layout, as reported by the browser
      * keyboard layout map (`navigator.keyboard.getLayoutMap()`, Chromium and Electron).

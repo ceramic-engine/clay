@@ -2,6 +2,7 @@
 #include "./linc_sdl.h"
 
 #include <locale.h>
+#include <vector>
 
 #if defined(SDL_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -127,6 +128,64 @@ namespace linc {
 
         void setWindowTitle(SDL_Window* window, const char* title) {
             SDL_SetWindowTitle(window, title);
+        }
+
+        bool minimizeWindow(SDL_Window* window) {
+            return SDL_MinimizeWindow(window);
+        }
+
+        bool maximizeWindow(SDL_Window* window) {
+            return SDL_MaximizeWindow(window);
+        }
+
+        bool restoreWindow(SDL_Window* window) {
+            return SDL_RestoreWindow(window);
+        }
+
+        bool isWindowMaximized(SDL_Window* window) {
+            return (SDL_GetWindowFlags(window) & SDL_WINDOW_MAXIMIZED) != 0;
+        }
+
+        bool showWindowSystemMenu(SDL_Window* window, int x, int y) {
+            return SDL_ShowWindowSystemMenu(window, x, y);
+        }
+
+        // Window hit regions: flat (x, y, width, height, SDL_HitTestResult)
+        // in window coordinates, the last matching region wins. SDL may call
+        // the hit test from another thread (Windows), hence the mutex.
+        static std::vector<float> hitRegions;
+        static SDL_Mutex* hitRegionsMutex = NULL;
+
+        static SDL_HitTestResult SDLCALL hitTestCallback(SDL_Window* window, const SDL_Point* area, void* data) {
+            SDL_HitTestResult result = SDL_HITTEST_NORMAL;
+            SDL_LockMutex(hitRegionsMutex);
+            for (int i = (int)hitRegions.size() - 5; i >= 0; i -= 5) {
+                float x = hitRegions[i];
+                float y = hitRegions[i + 1];
+                if (area->x >= x && area->x < x + hitRegions[i + 2] && area->y >= y && area->y < y + hitRegions[i + 3]) {
+                    result = (SDL_HitTestResult)(int)hitRegions[i + 4];
+                    break;
+                }
+            }
+            SDL_UnlockMutex(hitRegionsMutex);
+            return result;
+        }
+
+        void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions) {
+            if (hitRegionsMutex == NULL) {
+                hitRegionsMutex = SDL_CreateMutex();
+            }
+            int count = regions != null() ? regions->length : 0;
+            SDL_LockMutex(hitRegionsMutex);
+            hitRegions.clear();
+            for (int i = 0; i + 4 < count; i += 5) {
+                for (int k = 0; k < 5; k++) {
+                    hitRegions.push_back((float)regions[i + k]);
+                }
+            }
+            bool empty = hitRegions.empty();
+            SDL_UnlockMutex(hitRegionsMutex);
+            SDL_SetWindowHitTest(window, empty ? NULL : hitTestCallback, NULL);
         }
 
         void setWindowBordered(SDL_Window* window, bool bordered) {
@@ -608,6 +667,14 @@ namespace linc {
 
         bool setClipboardText(const char* text) {
             return SDL_SetClipboardText(text);
+        }
+
+        bool openURL(const char* url) {
+            return SDL_OpenURL(url);
+        }
+
+        ::String getPlatform() {
+            return ::String(SDL_GetPlatform());
         }
 
         bool byteOrderIsBigEndian() {

@@ -66,6 +66,12 @@ namespace linc {
         SDL_WindowID getWindowID(SDL_Window* window);
         void setWindowTitle(SDL_Window* window, const char* title);
         void setWindowBordered(SDL_Window* window, bool bordered);
+        bool minimizeWindow(SDL_Window* window);
+        bool maximizeWindow(SDL_Window* window);
+        bool restoreWindow(SDL_Window* window);
+        bool isWindowMaximized(SDL_Window* window);
+        bool showWindowSystemMenu(SDL_Window* window, int x, int y);
+        void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
         bool setWindowFullscreenMode(SDL_Window* window, const SDL_DisplayMode* mode);
         bool setWindowFullscreen(SDL_Window* window, bool fullscreen);
         bool showCursor();
@@ -156,6 +162,8 @@ namespace linc {
         bool hasClipboardText();
         ::String getClipboardText();
         bool setClipboardText(const char* text);
+        bool openURL(const char* url);
+        ::String getPlatform();
 
         bool byteOrderIsBigEndian();
         SDL_Surface* createRGBSurfaceFrom(::Array<unsigned char> pixels, int width, int height, int depth, int pitch, Uint32 rmask, Uint32 gmask, Uint32 bmask, Uint32 amask);
