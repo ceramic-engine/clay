@@ -1278,6 +1278,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     e.timestamp.toInt() / 1000.0
                 );
 
+            case SDL.SDL_EVENT_FINGER_CANCELED:
+                app.input.emitTouchCancel(
+                    e.tfingerX,
+                    e.tfingerY,
+                    e.tfingerDx,
+                    e.tfingerDy,
+                    toFingerId(e.tfingerId.toInt()),
+                    e.timestamp.toInt() / 1000.0
+                );
+                removeFingerId(e.tfingerId.toInt());
+
         #if clay_sdl_joystick_to_gamepad
 
         /// Joystick events

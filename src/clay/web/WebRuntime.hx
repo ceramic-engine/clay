@@ -516,6 +516,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         window.addEventListener('touchstart', handleTouchStart, untyped { passive: false });
         window.addEventListener('touchend', handleTouchEnd);
         window.addEventListener('touchmove', handleTouchMove, untyped { passive: false });
+        window.addEventListener('touchcancel', handleTouchCancel);
 
         // Gamepad events
 
@@ -575,6 +576,7 @@ class WebRuntime extends clay.base.BaseRuntime {
         el.addEventListener('touchstart', handleTouchStart);
         el.addEventListener('touchend', handleTouchEnd);
         el.addEventListener('touchmove', handleTouchMove);
+        el.addEventListener('touchcancel', handleTouchCancel);
 
     }
 
@@ -840,6 +842,42 @@ class WebRuntime extends clay.base.BaseRuntime {
             }
 
             app.input.emitTouchUp(
+                x,
+                y,
+                x - touchInfo.x,
+                y - touchInfo.y,
+                touch.identifier,
+                timestamp()
+            );
+
+            touchInfo.x = x;
+            touchInfo.y = y;
+
+        }
+
+    }
+
+    /**
+     * The browser took over the touches (native scrolling, a system gesture):
+     * no `touchend` follows for them.
+     */
+    function handleTouchCancel(ev:js.html.TouchEvent) {
+
+        var bound = window.getBoundingClientRect();
+        for (touch in ev.changedTouches) {
+
+            var x:Float = touch.clientX - bound.left;
+            var y:Float = touch.clientY - bound.top;
+            x = x / bound.width;
+            y = y / bound.height;
+
+            var touchInfo = touches.get(touch.identifier);
+            if (touchInfo == null) {
+                touchInfo = { x: x, y: y};
+                touches.set(touch.identifier, touchInfo);
+            }
+
+            app.input.emitTouchCancel(
                 x,
                 y,
                 x - touchInfo.x,

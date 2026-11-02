@@ -84,6 +84,12 @@ class Input {
 
     }
 
+    inline public function emitTouchCancel(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
+
+        app.events.touchCancel(x, y, dx, dy, touchId, timestamp);
+
+    }
+
     inline public function emitGamepadAxis(gamepad:Int, axis:Int, value:Float, timestamp:Float) {
 
         app.events.gamepadAxis(gamepad, axis, value, timestamp);

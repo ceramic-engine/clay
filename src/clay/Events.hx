@@ -49,6 +49,9 @@ class Events {
 
     public function touchMove(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {}
 
+    /** The system took over a touch (native gesture, touch removed): no `touchUp` follows from the platform */
+    public function touchCancel(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {}
+
     public function gamepadAxis(gamepad:Int, axis:Int, value:Float, timestamp:Float) {}
 
     public function gamepadDown(gamepad:Int, button:Int, value:Float, timestamp:Float) {}
