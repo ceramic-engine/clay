@@ -46,6 +46,8 @@ class GLGraphicsDriver #if !completion implements clay.spec.GraphicsDriver #end 
 
     inline static final RGBA8 = 32856;
 
+    inline static final MAX_VARYING_COMPONENTS = 0x8B4B;
+
     inline static final COLOR = 6144;
 
     // ========================================================================
@@ -236,6 +238,45 @@ class GLGraphicsDriver #if !completion implements clay.spec.GraphicsDriver #end 
         var maxUnits = GL.getParameter(GL.MAX_TEXTURE_IMAGE_UNITS);
         return Std.int(Math.min(32, maxUnits));
     }
+
+    /**
+     * Returns the maximum number of vertex attributes (`MAX_VERTEX_ATTRIBS`).
+     *
+     * @return Maximum number of vertex attributes
+     */
+    public function getMaxVertexAttributes():Int {
+        var value:Int = GL.getParameter(GL.MAX_VERTEX_ATTRIBS);
+        return value > 0 ? value : 16;
+    }
+
+    /**
+     * Returns the maximum number of varying vectors (`MAX_VARYING_VECTORS`).
+     * Desktop OpenGL contexts without `ARB_ES2_compatibility` do not know
+     * this value: they get `MAX_VARYING_COMPONENTS` / 4 (OpenGL 3), and 32
+     * when neither is known.
+     *
+     * @return Maximum number of varying vectors
+     */
+    public function getMaxVaryingVectors():Int {
+        var value:Int = GL.getParameter(GL.MAX_VARYING_VECTORS);
+        #if !clay_web
+        if (value <= 0) {
+            // Clear the INVALID_ENUM of an unknown parameter
+            clearErrors();
+            value = Std.int((GL.getParameter(MAX_VARYING_COMPONENTS):Int) / 4);
+            clearErrors();
+        }
+        #end
+        return value > 0 ? value : 32;
+    }
+
+    #if !clay_web
+    function clearErrors():Void {
+        for (i in 0...8) {
+            if (GL.getError() == GL.NO_ERROR) break;
+        }
+    }
+    #end
 
     /**
      * Tests the maximum number of if-statements supported in fragment shaders.
@@ -891,9 +932,11 @@ void main() {
                 #else
                 GL.renderbufferStorage(GL.RENDERBUFFER, GL.DEPTH_COMPONENT, width, height);
                 #end
-            } else {
-                GL.renderbufferStorage(GL.RENDERBUFFER, GL.RGBA, width, height);
             }
+            // Without depth or stencil, the renderbuffer is not attached (the
+            // color goes to the texture) and needs no storage. It used to get
+            // GL.RGBA storage, which is not a renderbuffer format of WebGL 2
+            // and OpenGL ES 3 (INVALID_ENUM).
 
             // Setup FBO
             bindFramebuffer(rt.framebuffer);

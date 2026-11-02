@@ -57,6 +57,20 @@ interface GraphicsDriver {
     function getMaxTextureUnits():Int;
 
     /**
+     * Returns the maximum number of vertex attributes (`MAX_VERTEX_ATTRIBS`).
+     *
+     * @return Maximum number of vertex attributes
+     */
+    function getMaxVertexAttributes():Int;
+
+    /**
+     * Returns the maximum number of varying vectors (`MAX_VARYING_VECTORS`).
+     *
+     * @return Maximum number of varying vectors
+     */
+    function getMaxVaryingVectors():Int;
+
+    /**
      * Tests the maximum number of if-statements supported in fragment shaders.
      *
      * This is used for multi-texture batching optimization, which requires

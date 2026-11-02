@@ -330,9 +330,15 @@ class WebRuntime extends clay.base.BaseRuntime {
             if (gl != null) {
                 webglVersion = config.webgl.version;
             }
+            else {
+                // No silent fallback to WebGL 1: shaders written for WebGL 2
+                // (`#version 300 es`) would fail later with less clear errors
+                Log.error('WebGL ${config.webgl.version} is not available (blocked or unsupported by this browser)');
+                return false;
+            }
         }
 
-        // Minimum requirement: webgl 1 (if nothing else worked)
+        // WebGL 1 when explicitly requested
         if (gl == null) {
             gl = window.getContextWebGL(attr);
             webglVersion = 1.0;
