@@ -498,12 +498,10 @@ class Clay {
         screenPixelWidth = app.runtime.windowWidth();
         screenPixelHeight = app.runtime.windowHeight();
 
-        // Round the logical size up (with a small tolerance for density values
-        // that are not exact as floats, like 1.100000023841858): the logical area
-        // must cover every pixel of the window, slightly overflowing it if needed,
-        // rather than stopping before its last row or column
-        screenWidth = Math.ceil(screenPixelWidth / screenDensity - 0.0001);
-        screenHeight = Math.ceil(screenPixelHeight / screenDensity - 0.0001);
+        // Rounded up: the logical area covers every pixel of the window
+        // (see ScreenMetrics.logicalSize())
+        screenWidth = ScreenMetrics.logicalSize(screenPixelWidth, screenDensity);
+        screenHeight = ScreenMetrics.logicalSize(screenPixelHeight, screenDensity);
 
     }
 

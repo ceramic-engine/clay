@@ -1,6 +1,7 @@
 package clay.web;
 
 import clay.Config;
+import clay.ScreenMetrics;
 import clay.Types;
 import clay.opengl.GL;
 
@@ -1385,18 +1386,12 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         // The canvas must have exactly as many pixels as its box covers on screen,
         // otherwise the browser rescales the whole canvas when displaying it.
-        // Prefer the exact size reported by the browser, otherwise compute it
-        // from the (non rounded) css size of the box.
-        var pixelWidth:Int;
-        var pixelHeight:Int;
-        if (devicePixelWidth > 0 && devicePixelHeight > 0 && dpr == windowDpr) {
-            pixelWidth = devicePixelWidth;
-            pixelHeight = devicePixelHeight;
-        }
-        else {
-            pixelWidth = Math.round(bounds.width * windowDpr);
-            pixelHeight = Math.round(bounds.height * windowDpr);
-        }
+        // Prefer the exact size reported by the browser when it matches the box
+        // just read (it lags behind a resize or a change of device pixel ratio:
+        // the observer marks the bounds dirty once it catches up), otherwise
+        // compute it from the (non rounded) css size of the box.
+        var pixelWidth = ScreenMetrics.canvasPixelSize(devicePixelWidth, bounds.width, windowDpr);
+        var pixelHeight = ScreenMetrics.canvasPixelSize(devicePixelHeight, bounds.height, windowDpr);
 
         if (w != windowW || h != windowH || dpr != windowDpr || pixelWidth != window.width || pixelHeight != window.height) {
             windowW = w;
