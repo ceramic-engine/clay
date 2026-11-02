@@ -45,10 +45,11 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     public static inline var MAX_INDICES:Int = 16384;
 
     /**
-     * Maximum number of buffer sets to cycle through.
-     * Buffer cycling prevents GPU stalls by using multiple buffer sets.
+     * Index of the last CPU staging buffer set (`MAX_BUFFERS + 1` sets).
+     * The GL upload copies the staging data when `flush()` runs, so the sets
+     * are reused right away: two are enough.
      */
-    public static inline var MAX_BUFFERS:Int = 64;
+    public static inline var MAX_BUFFERS:Int = 1;
 
     /**
      * Vertex attribute location for position data (x, y, z).
@@ -191,6 +192,52 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     var _colorIndex:Int = 0;
 
     var _primitiveType:Int = GL.TRIANGLES;
+
+    // ========================================================================
+    // Persistent GL buffers
+    // ========================================================================
+    //
+    // One GL buffer per stream (positions and interleaved attributes, uvs,
+    // colors, indices), created once and given each flush with
+    // `bufferData()`, which also orphans the storage used by the draws
+    // still in flight. The upload size is rounded up to a power of two
+    // (`uploadSize()`): under ANGLE (the native GL of Ceramic on macOS),
+    // a `bufferData()` of a size the driver has not seen recently allocates
+    // a new internal storage, which is slow, while a power of two size
+    // reuses one. Do not remove that rounding without measuring under
+    // ANGLE with flush sizes that vary: an A/B on 2026-11-02 (GPUI port
+    // bench, same snapshot, runs alternated) gave a Ceramic draw median of
+    // 1.47 ms with the rounding against 2.75 ms with exact sizes on a
+    // scrolled page of inputs, 1.57 against 3.94 on a scrolled page of
+    // buttons, 2.81 against 4.01 on a scrolled table; on WebGL both were
+    // equal. A fixed size storage (orphaned per flush, or written at
+    // increasing offsets with `bufferSubData()` and orphaned when full) was
+    // much slower on macOS (allocations of the full size, or waits for the
+    // GPU), and creating and deleting the buffers per flush was slower too.
+
+    /**
+     * The number of bytes to upload for `bytes` bytes of data: the next power
+     * of two, within the `capacity` of the staging array (what is past the
+     * data is not drawn). The driver allocates storage for each buffer size
+     * it gets: with sizes that only change when the data doubles or halves,
+     * it reuses the same storage from one flush to the next instead of
+     * allocating again (an irregular cost, slow under ANGLE) each time the
+     * number of vertices of a batch changes.
+     */
+    static inline function uploadSize(bytes:Int, capacity:Int):Int {
+
+        var size = 256;
+        while (size < bytes) size <<= 1;
+        return size < capacity ? size : capacity;
+
+    }
+
+    var _gpuBuffersReady:Bool = false;
+
+    var _gpuPosBuffer:GLBuffer;
+    var _gpuUvBuffer:GLBuffer;
+    var _gpuColorBuffer:GLBuffer;
+    var _gpuIndexBuffer:GLBuffer;
 
     // ========================================================================
     // Initialization & Frame Lifecycle
@@ -805,36 +852,18 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     // ========================================================================
 
     /**
-     * The number of bytes to upload for `bytes` bytes of data: the next power of two,
-     * within the `capacity` of the staging array (what is past the data is not drawn).
-     * The driver allocates storage for each buffer size it gets: with sizes that only
-     * change when the data doubles or halves, it reuses the same storage from one frame
-     * to the next, instead of allocating again (an irregular cost) each time the number
-     * of vertices of a batch changes.
-     */
-    static inline function uploadSize(bytes:Int, capacity:Int):Int {
-
-        var size = 256;
-        while (size < bytes) size <<= 1;
-        return size < capacity ? size : capacity;
-
-    }
-
-    /**
      * Flushes the current batch of vertices to the GPU.
      *
      * This is the core rendering method that:
-     * 1. Creates GPU buffers from the accumulated vertex data
+     * 1. Copies the accumulated vertex data into the persistent GL buffers
      * 2. Configures vertex attributes for the shader
      * 3. Handles multi-texture batching if supported
      * 4. Sets up custom shader attributes
      * 5. Issues the draw call to render all triangles/lines
-     * 6. Cleans up temporary buffers
-     * 7. Prepares for the next batch
+     * 6. Prepares for the next batch
      *
-     * The method uses temporary GPU buffers that are deleted after
-     * rendering to avoid memory leaks. Buffer data is uploaded as
-     * STREAM_DRAW for optimal performance with dynamic geometry.
+     * Only the bytes of the batch are uploaded, into persistent buffers
+     * (see `ensureGpuBuffers()`).
      */
     #if ceramic_debug_render_timing
     /** Accumulated wall time spent inside flush() (GL calls), in seconds. Reset externally. */
@@ -842,6 +871,20 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     /** Number of flush() calls since last reset. */
     public static var debugFlushCount:Int = 0;
     #end
+
+    /** Bytes uploaded by `flush()` since the start (vertex and index data). */
+    public static var uploadedBytes:Float = 0;
+
+    /** Creates the persistent GL buffers. */
+    inline function ensureGpuBuffers():Void {
+        if (!_gpuBuffersReady) {
+            _gpuBuffersReady = true;
+            _gpuPosBuffer = GL.createBuffer();
+            _gpuUvBuffer = GL.createBuffer();
+            _gpuColorBuffer = GL.createBuffer();
+            _gpuIndexBuffer = GL.createBuffer();
+        }
+    }
 
     public function flush():Void {
 
@@ -861,47 +904,53 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         }
         #end
 
+        ensureGpuBuffers();
+
         var batchMultiTexture = _batchMultiTexture;
+
+        // Byte sizes of the batch upload, rounded up to a power of two (see
+        // `uploadSize()` and the comment of the persistent GL buffers)
+        var posBytes = uploadSize(_posIndex * 4, _posList.length * 4);
+        var uvBytes = uploadSize(_uvIndex * 4, _uvList.length * 4);
+        var colorBytes = uploadSize(_colorIndex * 4, _colorList.length * 4);
+        var indexBytes = uploadSize(_numIndices * 2, _indiceList.length * 2);
 
         // fromBuffer takes byte length, so floats * 4
         #if cpp
-        var pos = Float32Array.fromBuffer(_posBuffer, 0, uploadSize(_posIndex * 4, _posList.length * 4), _viewPosBufferView);
-        var uvs = Float32Array.fromBuffer(_uvBuffer, 0, uploadSize(_uvIndex * 4, _uvList.length * 4), _viewUvsBufferView);
-        var colors = Float32Array.fromBuffer(_colorBuffer, 0, uploadSize(_colorIndex * 4, _colorList.length * 4), _viewColorsBufferView);
-        var indices = Uint16Array.fromBuffer(_indiceBuffer, 0, uploadSize(_numIndices * 2, _indiceList.length * 2), _viewIndicesBufferView);
+        var pos = Float32Array.fromBuffer(_posBuffer, 0, posBytes, _viewPosBufferView);
+        var uvs = Float32Array.fromBuffer(_uvBuffer, 0, uvBytes, _viewUvsBufferView);
+        var colors = Float32Array.fromBuffer(_colorBuffer, 0, colorBytes, _viewColorsBufferView);
+        var indices = Uint16Array.fromBuffer(_indiceBuffer, 0, indexBytes, _viewIndicesBufferView);
         #else
         // The staging arrays are not necessarily at the start of their
         // underlying buffer: on js they become views into the wasm memory
         // at their bump-allocated offsets (see prepareNextBuffers()), so the
         // upload views must start from each array's own byteOffset.
-        var pos = Float32Array.fromBuffer(_posList.buffer, _posList.byteOffset, uploadSize(_posIndex * 4, _posList.length * 4));
-        var uvs = Float32Array.fromBuffer(_uvList.buffer, _uvList.byteOffset, uploadSize(_uvIndex * 4, _uvList.length * 4));
-        var colors = Float32Array.fromBuffer(_colorList.buffer, _colorList.byteOffset, uploadSize(_colorIndex * 4, _colorList.length * 4));
-        var indices = Uint16Array.fromBuffer(_indiceList.buffer, _indiceList.byteOffset, uploadSize(_numIndices * 2, _indiceList.length * 2));
+        var pos = Float32Array.fromBuffer(_posList.buffer, _posList.byteOffset, posBytes);
+        var uvs = Float32Array.fromBuffer(_uvList.buffer, _uvList.byteOffset, uvBytes);
+        var colors = Float32Array.fromBuffer(_colorList.buffer, _colorList.byteOffset, colorBytes);
+        var indices = Uint16Array.fromBuffer(_indiceList.buffer, _indiceList.byteOffset, indexBytes);
         #end
 
         // Begin submit
-
-        var pb = GL.createBuffer();
-        var cb = GL.createBuffer();
-        var tb = GL.createBuffer();
-        var ib = GL.createBuffer();
 
         GL.enableVertexAttribArray(0);
         GL.enableVertexAttribArray(1);
         GL.enableVertexAttribArray(2);
 
-        GL.bindBuffer(GL.ARRAY_BUFFER, pb);
+        GL.bindBuffer(GL.ARRAY_BUFFER, _gpuPosBuffer);
         GL.vertexAttribPointer(ATTRIBUTE_POS, 3, GL.FLOAT, false, _posSize * 4, 0);
         GL.bufferData(GL.ARRAY_BUFFER, pos, GL.STREAM_DRAW);
 
-        GL.bindBuffer(GL.ARRAY_BUFFER, tb);
+        GL.bindBuffer(GL.ARRAY_BUFFER, _gpuUvBuffer);
         GL.vertexAttribPointer(ATTRIBUTE_UV, 2, GL.FLOAT, false, 0, 0);
         GL.bufferData(GL.ARRAY_BUFFER, uvs, GL.STREAM_DRAW);
 
-        GL.bindBuffer(GL.ARRAY_BUFFER, cb);
+        GL.bindBuffer(GL.ARRAY_BUFFER, _gpuColorBuffer);
         GL.vertexAttribPointer(ATTRIBUTE_COLOR, 4, GL.FLOAT, false, 0, 0);
         GL.bufferData(GL.ARRAY_BUFFER, colors, GL.STREAM_DRAW);
+
+        uploadedBytes += posBytes + uvBytes + colorBytes + indexBytes;
 
         // The texture slot and the custom attributes are interleaved with the
         // position: they point into the position buffer, already uploaded,
@@ -911,7 +960,7 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         var extraAttributesLen:Int = 0;
 
         if (batchMultiTexture || _customAttributes != null) {
-            GL.bindBuffer(GL.ARRAY_BUFFER, pb);
+            GL.bindBuffer(GL.ARRAY_BUFFER, _gpuPosBuffer);
         }
 
         if (batchMultiTexture) {
@@ -938,15 +987,11 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
             }
         }
 
-        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, ib);
+        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, _gpuIndexBuffer);
         GL.bufferData(GL.ELEMENT_ARRAY_BUFFER, indices, GL.STREAM_DRAW);
 
         // Draw
         GL.drawElements(_primitiveType, _numIndices, GL.UNSIGNED_SHORT, 0);
-
-        GL.deleteBuffer(pb);
-        GL.deleteBuffer(cb);
-        GL.deleteBuffer(tb);
 
         if (extraAttributesLen > 0) {
             var n = ATTRIBUTE_COLOR + 1;
@@ -957,7 +1002,6 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
         }
 
         GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, Clay.app.graphics.noBuffer);
-        GL.deleteBuffer(ib);
 
         // End submit
 

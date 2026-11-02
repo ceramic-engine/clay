@@ -137,6 +137,12 @@ class GLGraphicsDriver #if !completion implements clay.spec.GraphicsDriver #end 
 
     final _clearBufferForBlitValues:Float32Array;
 
+    // Blend functions last given to GL (-1: unknown)
+    var _blendSrcRgb:Int = -1;
+    var _blendDstRgb:Int = -1;
+    var _blendSrcAlpha:Int = -1;
+    var _blendDstAlpha:Int = -1;
+
     // ========================================================================
     // Constructor
     // ========================================================================
@@ -405,12 +411,30 @@ void main() {
      * @param dstAlpha Destination blend factor for alpha channel
      */
     public inline function setBlendFuncSeparate(srcRgb:BlendMode, dstRgb:BlendMode, srcAlpha:BlendMode, dstAlpha:BlendMode):Void {
-        GL.blendFuncSeparate(
-            srcRgb,
-            dstRgb,
-            srcAlpha,
-            dstAlpha
-        );
+        // Skipped when GL already has these functions (only this driver sets them)
+        if (_blendSrcRgb != srcRgb || _blendDstRgb != dstRgb || _blendSrcAlpha != srcAlpha || _blendDstAlpha != dstAlpha) {
+            _blendSrcRgb = srcRgb;
+            _blendDstRgb = dstRgb;
+            _blendSrcAlpha = srcAlpha;
+            _blendDstAlpha = dstAlpha;
+            GL.blendFuncSeparate(
+                srcRgb,
+                dstRgb,
+                srcAlpha,
+                dstAlpha
+            );
+        }
+    }
+
+    /**
+     * Forgets the blend functions known to be set, for code that changed
+     * them with GL directly.
+     */
+    public inline function invalidateBlendFunc():Void {
+        _blendSrcRgb = -1;
+        _blendDstRgb = -1;
+        _blendSrcAlpha = -1;
+        _blendDstAlpha = -1;
     }
 
     // ========================================================================
@@ -1087,22 +1111,49 @@ void main() {
      * with the given shader, as this is needed on some graphics backend.
      * @param shader Shader program to synchronize
      */
-    public inline function synchronizeShaderMatrices(shader:GpuShader):Void {
-        // Update this shader the the latest known projection and modelView matrices
-        setMatrix4Uniform(
-            shader,
-            getUniformLocation(shader, 'projectionMatrix'),
-            projectionMatrix
-        );
-        setMatrix4Uniform(
-            shader,
-            getUniformLocation(shader, 'modelViewMatrix'),
-            modelViewMatrix
-        );
+    public function synchronizeShaderMatrices(shader:GpuShader):Void {
+        // Update this shader to the latest known projection and modelView
+        // matrices: the uniforms of a program keep their values, so a matrix
+        // equal to the one this program last received is not uploaded again
+        var s:GLGraphicsDriver_GpuShader = cast shader;
+        if (s.uploadedProjectionMatrix == null) {
+            s.uploadedProjectionMatrix = new Float32Array(16);
+            s.uploadedModelViewMatrix = new Float32Array(16);
+            s.projectionMatrixLocation = getUniformLocation(shader, 'projectionMatrix');
+            s.modelViewMatrixLocation = getUniformLocation(shader, 'modelViewMatrix');
+        }
+        if (!s.matricesUploaded || !sameMatrix(s.uploadedProjectionMatrix, projectionMatrix)) {
+            copyMatrix(projectionMatrix, s.uploadedProjectionMatrix);
+            setMatrix4Uniform(shader, s.projectionMatrixLocation, projectionMatrix);
+        }
+        if (!s.matricesUploaded || !sameMatrix(s.uploadedModelViewMatrix, modelViewMatrix)) {
+            copyMatrix(modelViewMatrix, s.uploadedModelViewMatrix);
+            setMatrix4Uniform(shader, s.modelViewMatrixLocation, modelViewMatrix);
+        }
+        s.matricesUploaded = true;
+    }
+
+    static inline function sameMatrix(a:Float32Array, b:Float32Array):Bool {
+        var same = true;
+        for (i in 0...16) {
+            if (a[i] != b[i]) {
+                same = false;
+                break;
+            }
+        }
+        return same;
+    }
+
+    static inline function copyMatrix(from:Float32Array, to:Float32Array):Void {
+        for (i in 0...16) {
+            to[i] = from[i];
+        }
     }
 
     /**
      * Gets the location of a uniform variable in a shader.
+     * Locations are looked up once per program and name, then cached (on
+     * the web, each GL lookup allocates a new location object).
      *
      * @param shader Shader program
      * @param name Uniform variable name
@@ -1110,7 +1161,21 @@ void main() {
      */
     public inline function getUniformLocation(shader:GpuShader, name:String):UniformLocation {
         var s:GLGraphicsDriver_GpuShader = cast shader;
-        return GL.getUniformLocation(s.program, name);
+        var location = s.uniformLocations.get(name);
+        if (location == null) {
+            location = fetchUniformLocation(s, name);
+        }
+        return location;
+    }
+
+    function fetchUniformLocation(s:GLGraphicsDriver_GpuShader, name:String):UniformLocation {
+        if (s.uniformLocations.exists(name)) {
+            // Known to be missing (null location on the web)
+            return s.uniformLocations.get(name);
+        }
+        var location = GL.getUniformLocation(s.program, name);
+        s.uniformLocations.set(name, location);
+        return location;
     }
 
     /**
@@ -1458,4 +1523,18 @@ class GLGraphicsDriver_GpuShader {
      * Array of texture uniform names by slot index.
      */
     public var textures:Array<String> = [];
+
+    /**
+     * Uniform locations of this program, by name (see `getUniformLocation()`).
+     */
+    public var uniformLocations:Map<String, UniformLocation> = new Map();
+
+    /** Locations of the matrices of `synchronizeShaderMatrices()` */
+    public var projectionMatrixLocation:UniformLocation;
+    public var modelViewMatrixLocation:UniformLocation;
+
+    /** Matrices last uploaded to this program (valid when `matricesUploaded`) */
+    public var uploadedProjectionMatrix:Float32Array = null;
+    public var uploadedModelViewMatrix:Float32Array = null;
+    public var matricesUploaded:Bool = false;
 }
