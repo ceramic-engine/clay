@@ -39,6 +39,13 @@ class WebRuntime extends clay.base.BaseRuntime {
      */
     public var skipKeyboardEvents:Bool = false;
 
+    /**
+     * The DOM keyboard event being dispatched, while `keyDown()` and `keyUp()`
+     * events are emitted from it, `null` otherwise. Lets event handlers read
+     * more details from it (like the produced character in `key`).
+     */
+    public var currentKeyEvent(default, null):js.html.KeyboardEvent = null;
+
 /// Internal
 
     /** The window x position.
@@ -944,6 +951,7 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         keyDownStates.set(keyCode, true);
 
+        currentKeyEvent = ev;
         app.input.emitKeyDown(
             keyCode,
             scanCode,
@@ -952,6 +960,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             timestamp(),
             webWindowId
         );
+        currentKeyEvent = null;
 
     }
 
@@ -970,6 +979,7 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (keyDownStates.get(keyCode) == true) {
             keyDownStates.set(keyCode, false);
+            currentKeyEvent = ev;
             app.input.emitKeyUp(
                 keyCode,
                 scanCode,
@@ -978,6 +988,7 @@ class WebRuntime extends clay.base.BaseRuntime {
                 timestamp(),
                 webWindowId
             );
+            currentKeyEvent = null;
         }
 
     }
@@ -1211,8 +1222,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         app.input.modState.ralt    = keyEvent.altKey;
         app.input.modState.lmeta   = keyEvent.metaKey;
         app.input.modState.rmeta   = keyEvent.metaKey;
-        app.input.modState.num     = false;                // Unsupported
-        app.input.modState.caps    = false;                // Unsupported
+        app.input.modState.num     = keyEvent.getModifierState('NumLock');
+        app.input.modState.caps    = keyEvent.getModifierState('CapsLock');
         app.input.modState.mode    = false;                // Unsupported
         app.input.modState.ctrl    = keyEvent.ctrlKey;
         app.input.modState.shift   = keyEvent.shiftKey;

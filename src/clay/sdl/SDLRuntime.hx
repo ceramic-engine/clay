@@ -1468,22 +1468,23 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         var input = app.input;
 
+        // modValue is a bit mask: several modifiers (and locks) can be active at once
         input.modState.none    = (modValue == SDL.SDL_KMOD_NONE);
-        input.modState.lshift  = (modValue == SDL.SDL_KMOD_LSHIFT);
-        input.modState.rshift  = (modValue == SDL.SDL_KMOD_RSHIFT);
-        input.modState.lctrl   = (modValue == SDL.SDL_KMOD_LCTRL);
-        input.modState.rctrl   = (modValue == SDL.SDL_KMOD_RCTRL);
-        input.modState.lalt    = (modValue == SDL.SDL_KMOD_LALT);
-        input.modState.ralt    = (modValue == SDL.SDL_KMOD_RALT);
-        input.modState.lmeta   = (modValue == SDL.SDL_KMOD_LGUI);
-        input.modState.rmeta   = (modValue == SDL.SDL_KMOD_RGUI);
-        input.modState.num     = (modValue == SDL.SDL_KMOD_NUM);
-        input.modState.caps    = (modValue == SDL.SDL_KMOD_CAPS);
-        input.modState.mode    = (modValue == SDL.SDL_KMOD_MODE);
-        input.modState.ctrl    = (modValue == SDL.SDL_KMOD_CTRL  || modValue == SDL.SDL_KMOD_LCTRL  || modValue == SDL.SDL_KMOD_RCTRL);
-        input.modState.shift   = (modValue == SDL.SDL_KMOD_SHIFT || modValue == SDL.SDL_KMOD_LSHIFT || modValue == SDL.SDL_KMOD_RSHIFT);
-        input.modState.alt     = (modValue == SDL.SDL_KMOD_ALT   || modValue == SDL.SDL_KMOD_LALT   || modValue == SDL.SDL_KMOD_RALT);
-        input.modState.meta    = (modValue == SDL.SDL_KMOD_GUI   || modValue == SDL.SDL_KMOD_LGUI   || modValue == SDL.SDL_KMOD_RGUI);
+        input.modState.lshift  = (modValue & SDL.SDL_KMOD_LSHIFT) != 0;
+        input.modState.rshift  = (modValue & SDL.SDL_KMOD_RSHIFT) != 0;
+        input.modState.lctrl   = (modValue & SDL.SDL_KMOD_LCTRL) != 0;
+        input.modState.rctrl   = (modValue & SDL.SDL_KMOD_RCTRL) != 0;
+        input.modState.lalt    = (modValue & SDL.SDL_KMOD_LALT) != 0;
+        input.modState.ralt    = (modValue & SDL.SDL_KMOD_RALT) != 0;
+        input.modState.lmeta   = (modValue & SDL.SDL_KMOD_LGUI) != 0;
+        input.modState.rmeta   = (modValue & SDL.SDL_KMOD_RGUI) != 0;
+        input.modState.num     = (modValue & SDL.SDL_KMOD_NUM) != 0;
+        input.modState.caps    = (modValue & SDL.SDL_KMOD_CAPS) != 0;
+        input.modState.mode    = (modValue & SDL.SDL_KMOD_MODE) != 0;
+        input.modState.ctrl    = (modValue & SDL.SDL_KMOD_CTRL) != 0;
+        input.modState.shift   = (modValue & SDL.SDL_KMOD_SHIFT) != 0;
+        input.modState.alt     = (modValue & SDL.SDL_KMOD_ALT) != 0;
+        input.modState.meta    = (modValue & SDL.SDL_KMOD_GUI) != 0;
 
         return app.input.modState;
 
