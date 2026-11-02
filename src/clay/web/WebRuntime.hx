@@ -61,6 +61,26 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     var devicePixelHeight:Int = -1;
 
+    /**
+     * Whether the size of the canvas may have changed since `updateWindowBounds()`
+     * last read its bounds: set by a `ResizeObserver` on the canvas and by the
+     * window's `resize` event (always true without `ResizeObserver`).
+     */
+    var windowBoundsDirty:Bool = true;
+
+    /** Whether a `ResizeObserver` watches the canvas. */
+    var windowResizeObserved:Bool = false;
+
+    /** Frames since `updateWindowBounds()` last read the bounds of the canvas. */
+    var framesSinceBoundsCheck:Int = 0;
+
+    /**
+     * A move of the canvas with no change of its size (the page layout around it)
+     * fires no event: its bounds are read again at least every this many frames,
+     * and before a mouse event that comes after a frame that did not read them.
+     */
+    static inline final WINDOW_BOUNDS_CHECK_FRAMES:Int = 30;
+
     var touches:IntMap<{x:Float, y:Float}> = new IntMap();
 
     var gamepadButtonCache:Array<Array<Float>>;
@@ -173,7 +193,11 @@ class WebRuntime extends clay.base.BaseRuntime {
             if (gamepadsSupported)
                 pollGamepads();
 
-            updateWindowBounds();
+            // getBoundingClientRect() and the page offsets cost a layout read
+            // each: only when something may have moved or resized
+            framesSinceBoundsCheck++;
+            if (windowBoundsDirty || framesSinceBoundsCheck >= WINDOW_BOUNDS_CHECK_FRAMES || windowDevicePixelRatio() != windowDpr)
+                updateWindowBounds();
 
         }
 
@@ -445,6 +469,14 @@ class WebRuntime extends clay.base.BaseRuntime {
         window.addEventListener('mouseenter', handleMouseEnter);
         window.addEventListener('mouseleave', handleMouseLeave);
 
+        // Size changes of the canvas (see updateWindowBounds())
+        if (js.Syntax.code("typeof ResizeObserver !== 'undefined'")) {
+            final observer:Dynamic = js.Syntax.code("new ResizeObserver({0})", (_) -> windowBoundsDirty = true);
+            observer.observe(window);
+            windowResizeObserved = true;
+        }
+        js.Browser.window.addEventListener('resize', _ -> windowBoundsDirty = true);
+
         js.Browser.document.addEventListener('visibilitychange', handleVisibilityChange);
 
         // Key events
@@ -618,6 +650,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (skipMouseEvents)
             return;
 
+        refreshWindowBoundsForMouseEvent();
+
         #if !clay_no_mouse_prevent_default
         ev.preventDefault();
         #end
@@ -644,6 +678,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (skipMouseEvents)
             return;
 
+        refreshWindowBoundsForMouseEvent();
+
         #if !clay_no_mouse_prevent_default
         ev.preventDefault();
         #end
@@ -669,6 +705,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (skipMouseEvents)
             return;
+
+        refreshWindowBoundsForMouseEvent();
 
         #if !clay_no_mouse_prevent_default
         ev.preventDefault();
@@ -1203,7 +1241,32 @@ class WebRuntime extends clay.base.BaseRuntime {
         return Math.floor(windowDpr * (ev.pageY - windowY));
     }
 
+    /**
+     * Makes the next frame read the bounds of the canvas again: to call after
+     * changing its size or position from outside clay (the observers would
+     * only report it once the browser lays the page out).
+     */
+    public function invalidateWindowBounds():Void {
+
+        windowBoundsDirty = true;
+
+    }
+
+    /**
+     * Mouse events are placed with the last bounds read: read them again when
+     * the current frame did not (`updateWindowBounds()` in `loop()`).
+     */
+    inline function refreshWindowBoundsForMouseEvent() {
+
+        if (framesSinceBoundsCheck > 0 && app.ready)
+            updateWindowBounds();
+
+    }
+
     function updateWindowBounds() {
+
+        windowBoundsDirty = !windowResizeObserved;
+        framesSinceBoundsCheck = 0;
 
         var dpr = windowDpr;
         windowDpr = windowDevicePixelRatio();
@@ -1256,6 +1319,7 @@ class WebRuntime extends clay.base.BaseRuntime {
                     if (sizes != null && sizes.length > 0) {
                         devicePixelWidth = Math.round(sizes[0].inlineSize);
                         devicePixelHeight = Math.round(sizes[0].blockSize);
+                        windowBoundsDirty = true;
                     }
                 }
             });
