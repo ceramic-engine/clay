@@ -14,6 +14,13 @@ class WebConfig {
 
     var preventDefaultTouches:Bool = #if clay_allow_default_touches false #else true #end;
 
+    /**
+     * Deliver smooth scrolling (wheel events in pixels: trackpads, smooth wheels) on the beat
+     * of the frames when the browser dispatches it unevenly (Safari): see `clay.WheelResampler`.
+     * Line and page deltas always go through untouched.
+     */
+    var wheelResampling:Bool = false;
+
     var preventDefaultKeys:Array<KeyCode> = [
         KeyCode.LEFT, KeyCode.RIGHT, KeyCode.UP, KeyCode.DOWN,
         KeyCode.BACKSPACE, KeyCode.TAB, KeyCode.DELETE, KeyCode.SPACE

@@ -216,6 +216,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         var ticked = shouldTick(newTimestamp);
         if (ticked) {
+            if (wheelResampler != null)
+                sampleWheel(newTimestamp);
             didEmitTickOnce = true;
             app.emitTick(newTimestamp);
         }
@@ -739,7 +741,10 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     }
 
-    // Fractional wheel remainder carried between events (see handleWheel)
+    /** Frame aligned smooth scrolling (`config.runtime.wheelResampling`), created on first use. */
+    var wheelResampler:clay.WheelResampler = null;
+
+    // Fractional wheel remainder carried between events (see emitWheel)
     var wheelAccX:Float = 0;
     var wheelAccY:Float = 0;
 
@@ -754,6 +759,51 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         syncRightButton(ev);
 
+        // Smooth scrolling (pixels) on the beat of the frames when the browser delivers it
+        // unevenly (see sampleWheel())
+        if (ev.deltaMode == 0 && (app.config.runtime.wheelResampling || wheelResampler != null)) {
+            if (wheelResampler == null)
+                wheelResampler = new clay.WheelResampler();
+            if (app.config.runtime.wheelResampling || wheelResampler.active) {
+                final arrival = timestamp();
+                var time = ev.timeStamp / 1000.0 - timestampStart;
+                // Event times share the clock of performance.now() in current browsers; anything
+                // else is replaced by the time of arrival
+                if (!(time <= arrival + 0.05 && time >= arrival - 1.0))
+                    time = arrival;
+                if (wheelResampler.add(time, arrival, ev.deltaX, ev.deltaY))
+                    return;
+            }
+        }
+
+        emitWheel(ev.deltaX, ev.deltaY, ev.deltaMode == 1 ? 1 : 0);
+
+    }
+
+    /**
+     * Resampled smooth scrolling of this frame (see `clay.WheelResampler`), emitted before the
+     * tick so that it is handled in this frame's update like the events that came directly.
+     */
+    function sampleWheel(frameTime:Float) {
+
+        // The time of the animation frame is not always on the clock of the events: Electron
+        // gives a time ahead of performance.now(), which would sample events not received yet
+        var now = timestamp();
+        if (frameTime > now)
+            frameTime = now;
+
+        var period = frameIntervalCount > 0 ? refreshPeriod() * frameDivider : 1.0 / 60.0;
+        if (wheelResampler.sample(frameTime, period))
+            emitWheel(wheelResampler.stepX, wheelResampler.stepY, 0);
+
+    }
+
+    function emitWheel(deltaX:Float, deltaY:Float, unit:Int) {
+
+        // Raw scroll deltas: the browser's pixels (deltaMode 0, and 2 which
+        // GPUI's web platform treats as pixels too) or lines (deltaMode 1)
+        app.input.emitMouseScroll(deltaX, deltaY, unit, timestamp(), webWindowId);
+
         final wheelFactor = 0.1; // Try to have consistent behavior between web and native platforms
 
         #if !clay_no_wheel_round
@@ -764,8 +814,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         // looked dead. Accumulate and emit the integer part, carrying the
         // fractional remainder to the next event: same integer-only output as
         // before, but nothing is ever lost.
-        wheelAccX += ev.deltaX * wheelFactor;
-        wheelAccY += ev.deltaY * wheelFactor;
+        wheelAccX += deltaX * wheelFactor;
+        wheelAccY += deltaY * wheelFactor;
         final wheelX = Math.round(wheelAccX);
         final wheelY = Math.round(wheelAccY);
         wheelAccX -= wheelX;
@@ -775,8 +825,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         }
         #else
         app.input.emitMouseWheel(
-            ev.deltaX * wheelFactor,
-            ev.deltaY * wheelFactor,
+            deltaX * wheelFactor,
+            deltaY * wheelFactor,
             timestamp(),
             webWindowId
         );
@@ -1697,6 +1747,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             preventDefaultContextMenu: #if clay_allow_default_context_menu false #else true #end,
             preventDefaultMouseWheel: #if clay_allow_default_mouse_wheel false #else true #end,
             preventDefaultTouches: #if clay_allow_default_touches false #else true #end,
+            wheelResampling: false,
             preventDefaultKeys: [
                 KeyCode.LEFT, KeyCode.RIGHT, KeyCode.UP, KeyCode.DOWN,
                 KeyCode.BACKSPACE, KeyCode.TAB, KeyCode.DELETE, KeyCode.SPACE
