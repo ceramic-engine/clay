@@ -27,12 +27,16 @@ class ScreenMetrics {
      * not supported (Safari). That report comes asynchronously, after layout:
      * right after a resize or a change of device pixel ratio, it is still the
      * size of the previous box. It is only used when it matches the box read
-     * now (`cssSize` times `dpr`, within the pixel snapping of its edges);
-     * otherwise the size is computed from the (non rounded) css size.
+     * now: `cssSize` times `dpr`, within the snapping of its edges to device
+     * pixels, which moves the size by less than one pixel (each edge is
+     * rounded to the nearest pixel). A report one pixel or more away is the
+     * size of another box (a stale one, by one pixel after a resize of half
+     * a css pixel at 2x for instance): the size is then computed from the
+     * (non rounded) css size.
      */
     public static function canvasPixelSize(reportedPixels:Int, cssSize:Float, dpr:Float):Int {
 
-        if (reportedPixels > 0 && Math.abs(reportedPixels - cssSize * dpr) <= 1.0)
+        if (reportedPixels > 0 && Math.abs(reportedPixels - cssSize * dpr) < 1.0)
             return reportedPixels;
 
         return Math.round(cssSize * dpr);

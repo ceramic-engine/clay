@@ -19,6 +19,8 @@ class ScreenMetricsTest {
         testReportedSizeIsUsedWhenItMatchesTheBox();
         testStaleReportAfterResizeIsIgnored();
         testStaleReportAfterDprChangeIsIgnored();
+        testCanvasSizeAtTwoX();
+        testReportWithinSnapping();
         testUnsupportedReport();
 
         trace('ScreenMetricsTest: ' + checks + ' checks, ' + failures + ' failed');
@@ -87,6 +89,11 @@ class ScreenMetricsTest {
         equals(2048, ScreenMetrics.canvasPixelSize(1480, 1024, 2), 'stale height after resize');
         // css 800 -> 801 at 1.5x: the stale 1200 is 1.5 away from 1201.5
         equals(1202, ScreenMetrics.canvasPixelSize(1200, 801, 1.5), 'stale width after a 1 css pixel resize');
+        // css 511.5 -> 512 at 2x: a report one pixel off is never the box of an
+        // exact 1024 pixels (both edges at whole pixels), the window must get 1024
+        equals(1024, ScreenMetrics.canvasPixelSize(1023, 512, 2), 'stale report one pixel short at 2x');
+        equals(1024, ScreenMetrics.canvasPixelSize(1025, 512, 2), 'stale report one pixel over at 2x');
+        equals(1023, ScreenMetrics.canvasPixelSize(1023, 511.5, 2), 'box of 511.5 css pixels at 2x');
 
     }
 
@@ -98,6 +105,37 @@ class ScreenMetricsTest {
         equals(2048, ScreenMetrics.canvasPixelSize(1024, 1024, 2), 'stale report from 1x to 2x');
         // Browser zoom 100% -> 150% on a 2x display: css size shrinks, dpr grows
         equals(192, ScreenMetrics.canvasPixelSize(128, 64, 3), 'stale report after zoom');
+
+    }
+
+    static function testCanvasSizeAtTwoX() {
+
+        // At 2x, a whole css size always gives exactly twice as many pixels,
+        // whatever the report (current, stale or missing)
+        for (css in 1...2049) {
+            for (reported in [-1, 2 * css - 1, 2 * css, 2 * css + 1]) {
+                equals(2 * css, ScreenMetrics.canvasPixelSize(reported, css, 2), 'css $css at 2x, report $reported');
+            }
+        }
+
+    }
+
+    static function testReportWithinSnapping() {
+
+        // Every report a box can get from snapping its edges (each to the
+        // nearest pixel, from any position) is used as is
+        for (cssTenths in 1...2000) {
+            final css = cssTenths / 10;
+            for (dpr in [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]) {
+                for (posTenths in 0...20) {
+                    final start = posTenths / 10 * dpr;
+                    final end = start + css * dpr;
+                    final snapped = Math.round(end) - Math.round(start);
+                    if (snapped > 0 && Math.abs(snapped - css * dpr) < 1.0)
+                        equals(snapped, ScreenMetrics.canvasPixelSize(snapped, css, dpr), 'snapped $snapped for css $css at $dpr');
+                }
+            }
+        }
 
     }
 
