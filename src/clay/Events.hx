@@ -71,4 +71,26 @@ class Events {
 
     public function audioEvent(event:AudioEvent, handle:AudioHandle):Void {}
 
+    /** An item of the native menu bar (`runtime.setMenuBar`) was chosen. */
+    public function menuAction(id:Int):Void {}
+
+    /**
+     * The key down just emitted (`keyDown`) matches the shortcut of the
+     * native menu bar item `id`: the menu left the key to the app first, and
+     * the item runs only if the app decides so (it is not triggered by the
+     * system).
+     */
+    public function menuKeyEquivalent(id:Int):Void {}
+
+    /** A menu of the native menu bar opens. */
+    public function menuWillOpen():Void {}
+
+    /**
+     * Whether the native menu bar item `id` can be chosen, asked
+     * synchronously when the system validates the items.
+     */
+    public function menuItemEnabled(id:Int):Bool {
+        return true;
+    }
+
 }

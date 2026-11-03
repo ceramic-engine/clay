@@ -938,6 +938,116 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    #if (mac && !ios)
+    var menuBarInstalled:Bool = false;
+
+    /** An error thrown by a menu callback, rethrown once back in the main loop. */
+    var menuCallbackError:Dynamic = null;
+    var hasMenuCallbackError:Bool = false;
+    #end
+
+    /**
+     * Installs the application menu bar (see `clay.MenuItemSpec`).
+     *
+     * macOS: an `NSMenu` set as the main menu, replacing SDL's default menus.
+     * Chosen items call `events.menuAction(id)`, opening menus
+     * `events.menuWillOpen()`, and the system asks `events.menuItemEnabled(id)`
+     * to validate items. A shortcut is first delivered as a key down
+     * (`events.keyDown`), immediately followed by `events.menuKeyEquivalent(id)`:
+     * the menu itself does not run the item, the app does if it did not
+     * handle the key (the order of a native window, then the menu).
+     *
+     * Windows and Linux: does nothing (no application menu bar; a menu per
+     * window would be needed).
+     */
+    public function setMenuBar(menus:Array<clay.MenuItemSpec>):Void {
+
+        #if (mac && !ios)
+        if (!menuBarInstalled) {
+            menuBarInstalled = true;
+            SDL.setMenuCallbacks(handleMenuValidate, handleMenuAction, handleMenuWillOpen);
+        }
+        SDL.menuBarBegin();
+        if (menus != null) {
+            for (menu in menus) {
+                addMenuBarItem(0, menu);
+            }
+        }
+        SDL.menuBarCommit();
+        #end
+
+    }
+
+    #if (mac && !ios)
+    function addMenuBarItem(parent:Int, item:clay.MenuItemSpec):Void {
+
+        final handle = SDL.menuBarAddItem(
+            parent, item.kind, item.title != null ? item.title : '', item.key != null ? item.key : '',
+            item.modifiers, item.role, item.id, item.enabled, item.checked
+        );
+        if (handle > 0 && item.items != null) {
+            for (child in item.items) {
+                addMenuBarItem(handle, child);
+            }
+        }
+
+    }
+
+    // The menu callbacks run inside SDL's event pump, under AppKit frames:
+    // errors are kept and rethrown once back in the main loop
+
+    function handleMenuValidate(id:Int):Bool {
+
+        try {
+            return app.events.menuItemEnabled(id);
+        } catch (e:Dynamic) {
+            keepMenuCallbackError(e);
+            return false;
+        }
+
+    }
+
+    function handleMenuAction(id:Int):Void {
+
+        try {
+            app.events.menuAction(id);
+        } catch (e:Dynamic) {
+            keepMenuCallbackError(e);
+        }
+
+    }
+
+    function handleMenuWillOpen():Void {
+
+        try {
+            app.events.menuWillOpen();
+        } catch (e:Dynamic) {
+            keepMenuCallbackError(e);
+        }
+
+    }
+
+    function keepMenuCallbackError(e:Dynamic):Void {
+
+        if (!hasMenuCallbackError) {
+            hasMenuCallbackError = true;
+            menuCallbackError = e;
+        }
+
+    }
+
+    function rethrowMenuCallbackError():Void {
+
+        if (hasMenuCallbackError) {
+            final e = menuCallbackError;
+            hasMenuCallbackError = false;
+            menuCallbackError = null;
+            throw e;
+        }
+
+    }
+    #end
+
     var pendingFileDialogs:Array<{id:Int, done:(paths:Array<String>, error:String)->Void}> = [];
 
     /**
@@ -1147,6 +1257,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             while (SDL.pollEvent(_sdlEvent)) {
 
+                #if (mac && !ios)
+                if (hasMenuCallbackError) rethrowMenuCallbackError();
+                #end
+
                 var e = new SDLEvent(_sdlEvent);
                 currentSdlEvent = e;
 
@@ -1162,6 +1276,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 currentSdlEvent = null;
 
             }
+
+            #if (mac && !ios)
+            if (menuBarInstalled) {
+                // Every key down pumped so far was delivered
+                SDL.clearMenuKeyEquivalents();
+                if (hasMenuCallbackError) rethrowMenuCallbackError();
+            }
+            #end
 
             if (pendingFileDialogs.length > 0) {
                 pollFileDialogs();
@@ -1240,6 +1362,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
                         e.timestamp.toInt() / 1000.0,
                         Std.int(e.windowID)
                     );
+                    #if (mac && !ios)
+                    if (menuBarInstalled) {
+                        // The menu bar left this shortcut to the app
+                        final menuItemId = SDL.takeMenuKeyEquivalent(_sdlEvent);
+                        if (menuItemId != -1) {
+                            app.events.menuKeyEquivalent(menuItemId);
+                        }
+                    }
+                    #end
                 }
 
             case SDL.SDL_EVENT_KEY_UP:

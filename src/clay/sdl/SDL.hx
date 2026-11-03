@@ -576,6 +576,114 @@ class SDL {
         SDL_Extern.raiseWindow(window);
     }
 
+    #if (mac && !ios)
+
+    // Native menu bar (macOS): linc_sdl_menu_mac.mm
+
+    static var menuValidateHandler:(id:Int)->Bool = null;
+    static var menuActionHandler:(id:Int)->Void = null;
+    static var menuWillOpenHandler:()->Void = null;
+
+    static function handleMenuValidate(id:Int):Int {
+        return menuValidateHandler(id) ? 1 : 0;
+    }
+
+    static function handleMenuAction(id:Int):Void {
+        menuActionHandler(id);
+    }
+
+    static function handleMenuWillOpen():Void {
+        menuWillOpenHandler();
+    }
+
+    /**
+     * Sets the functions called synchronously by the native menu bar, on
+     * the main thread while events are pumped (`pollEvent`): validation of
+     * an item, an item chosen, a menu opening.
+     */
+    public static function setMenuCallbacks(validate:(id:Int)->Bool, action:(id:Int)->Void, willOpen:()->Void):Void {
+        menuValidateHandler = validate;
+        menuActionHandler = action;
+        menuWillOpenHandler = willOpen;
+        SDL_Extern.setMenuCallbacks(
+            cpp.Callable.fromStaticFunction(handleMenuValidate),
+            cpp.Callable.fromStaticFunction(handleMenuAction),
+            cpp.Callable.fromStaticFunction(handleMenuWillOpen)
+        );
+    }
+
+    /** Starts building a new menu bar (handle 0 is its root). */
+    extern inline public static function menuBarBegin():Void {
+        SDL_Extern.menuBarBegin();
+    }
+
+    /**
+     * Adds an item to the menu with the given handle (see `clay.MenuItemSpec`
+     * for the values). Returns the handle of the submenu created for a
+     * submenu item, 0 otherwise.
+     */
+    extern inline public static function menuBarAddItem(parent:Int, kind:Int, title:String, key:String, modifiers:Int, role:Int, id:Int, enabled:Bool, checked:Bool):Int {
+        return SDL_Extern.menuBarAddItem(parent, kind, title, key, modifiers, role, id, enabled, checked);
+    }
+
+    /** Installs the menu bar built since `menuBarBegin` as the main menu. */
+    extern inline public static function menuBarCommit():Void {
+        SDL_Extern.menuBarCommit();
+    }
+
+    /**
+     * The id of the menu item whose shortcut matched the key down `event`
+     * (the menu left the key to the app), or -1. Taken once.
+     */
+    extern inline public static function takeMenuKeyEquivalent(event:SDLEventPointer):Int {
+        return SDL_Extern.takeMenuKeyEquivalent(event);
+    }
+
+    /** Forgets the shortcuts matched for key downs that were not delivered. */
+    extern inline public static function clearMenuKeyEquivalents():Void {
+        SDL_Extern.clearMenuKeyEquivalents();
+    }
+
+    /**
+     * Test support: chooses the menu bar item `id` like a click would
+     * (`performActionForItemAtIndex:`). Returns false if no such item.
+     */
+    extern inline public static function menuBarPerformItem(id:Int):Bool {
+        return SDL_Extern.menuBarPerformItem(id);
+    }
+
+    /**
+     * Test support: the state of the menu bar item `id` after the system
+     * validated its menu (`-[NSMenu update]`): -1 if no such item, else
+     * 1 (enabled) | 2 (checked).
+     */
+    extern inline public static function menuBarItemState(id:Int):Int {
+        return SDL_Extern.menuBarItemState(id);
+    }
+
+    /**
+     * Test support: a text dump of the installed main menu (one line per
+     * item, indented by depth: title, key equivalent, modifier mask, action,
+     * tag, state).
+     */
+    extern inline public static function menuBarDescribe():String {
+        return SDL_Extern.menuBarDescribe();
+    }
+
+    /**
+     * Test support: offers the main menu a synthesized key down (`chars`
+     * with `modifiers` as in `clay.MenuItemSpec`), as if SDL had just
+     * delivered it to the app with the given timestamp. Returns the id the
+     * menu left to the app (what `takeMenuKeyEquivalent` would give for that
+     * key down), -1 if no item matched, -2 if the menu handled the key
+     * itself.
+     */
+    extern inline public static function menuBarTestKeyEquivalent(chars:String, modifiers:Int, timestamp:Int):Int {
+        return SDL_Extern.menuBarTestKeyEquivalent(chars, modifiers, timestamp);
+    }
+
+    #end
+
     /** `SDL_FILEDIALOG_OPENFILE` */
     public static inline var FILE_DIALOG_OPEN_FILE:Int = 0;
     /** `SDL_FILEDIALOG_SAVEFILE` */
@@ -1418,6 +1526,38 @@ class SDL {
 
     @:native('::linc::sdl::raiseWindow')
     static function raiseWindow(window:SDLWindowPointer):Void;
+
+    #if (mac && !ios)
+    @:native('::linc::sdl::setMenuCallbacks')
+    static function setMenuCallbacks(validate:cpp.Callable<Int->Int>, action:cpp.Callable<Int->Void>, willOpen:cpp.Callable<()->Void>):Void;
+
+    @:native('::linc::sdl::menuBarBegin')
+    static function menuBarBegin():Void;
+
+    @:native('::linc::sdl::menuBarAddItem')
+    static function menuBarAddItem(parent:Int, kind:Int, title:String, key:String, modifiers:Int, role:Int, id:Int, enabled:Bool, checked:Bool):Int;
+
+    @:native('::linc::sdl::menuBarCommit')
+    static function menuBarCommit():Void;
+
+    @:native('::linc::sdl::takeMenuKeyEquivalent')
+    static function takeMenuKeyEquivalent(event:SDLEventPointer):Int;
+
+    @:native('::linc::sdl::clearMenuKeyEquivalents')
+    static function clearMenuKeyEquivalents():Void;
+
+    @:native('::linc::sdl::menuBarPerformItem')
+    static function menuBarPerformItem(id:Int):Bool;
+
+    @:native('::linc::sdl::menuBarItemState')
+    static function menuBarItemState(id:Int):Int;
+
+    @:native('::linc::sdl::menuBarDescribe')
+    static function menuBarDescribe():String;
+
+    @:native('::linc::sdl::menuBarTestKeyEquivalent')
+    static function menuBarTestKeyEquivalent(chars:String, modifiers:Int, timestamp:Int):Int;
+    #end
 
     @:native('::linc::sdl::showFileDialog')
     static function showFileDialog(window:SDLWindowPointer, type:Int, title:String, accept:String, location:String, filters:Array<String>, many:Bool):Int;

@@ -599,6 +599,9 @@ class WebRuntime extends clay.base.BaseRuntime {
     /** The browser decides which page has the focus: does nothing. */
     public function activateWindow():Void {}
 
+    /** No application menu bar in a browser: does nothing. */
+    public function setMenuBar(menus:Array<clay.MenuItemSpec>):Void {}
+
 /// Input handlers
 
     @:noCompletion
