@@ -488,6 +488,8 @@ class WebRuntime extends clay.base.BaseRuntime {
         js.Browser.window.addEventListener('resize', _ -> windowBoundsDirty = true);
 
         js.Browser.document.addEventListener('visibilitychange', handleVisibilityChange);
+        js.Browser.window.addEventListener('focus', _ -> refreshWindowFocus());
+        js.Browser.window.addEventListener('blur', _ -> refreshWindowFocus());
 
         // Key events
 
@@ -561,15 +563,41 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (js.Browser.document.hidden) {
             app.emitWindowEvent(HIDDEN, timestamp(), webWindowId, 0, 0);
             app.emitWindowEvent(MINIMIZED, timestamp(), webWindowId, 0, 0);
-            app.emitWindowEvent(FOCUS_LOST, timestamp(), webWindowId, 0, 0);
         }
         else {
             app.emitWindowEvent(SHOWN, timestamp(), webWindowId, 0, 0);
             app.emitWindowEvent(RESTORED, timestamp(), webWindowId, 0, 0);
-            app.emitWindowEvent(FOCUS_GAINED, timestamp(), webWindowId, 0, 0);
+        }
+        refreshWindowFocus();
+
+    }
+
+    var windowFocused:Bool = true;
+
+    /**
+     * The page counts as focused while it is visible and has the browser's
+     * focus (`document.hasFocus()`, true while any element of the page, the
+     * canvas or a text field, has it). Emits `FOCUS_GAINED` / `FOCUS_LOST`
+     * when that changes.
+     */
+    function refreshWindowFocus():Void {
+
+        final document = js.Browser.document;
+        final focused = !document.hidden && document.hasFocus();
+        if (focused != windowFocused) {
+            windowFocused = focused;
+            app.emitWindowEvent(focused ? FOCUS_GAINED : FOCUS_LOST, timestamp(), webWindowId, 0, 0);
         }
 
     }
+
+    /** Whether the page is visible and has the browser's focus. */
+    public function isWindowFocused():Bool {
+        return windowFocused;
+    }
+
+    /** The browser decides which page has the focus: does nothing. */
+    public function activateWindow():Void {}
 
 /// Input handlers
 

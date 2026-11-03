@@ -572,6 +572,43 @@ class SDL {
         SDL_Extern.setWindowHitRegions(window, regions);
     }
 
+    extern inline public static function raiseWindow(window:SDLWindowPointer):Void {
+        SDL_Extern.raiseWindow(window);
+    }
+
+    /** `SDL_FILEDIALOG_OPENFILE` */
+    public static inline var FILE_DIALOG_OPEN_FILE:Int = 0;
+    /** `SDL_FILEDIALOG_SAVEFILE` */
+    public static inline var FILE_DIALOG_SAVE_FILE:Int = 1;
+    /** `SDL_FILEDIALOG_OPENFOLDER` */
+    public static inline var FILE_DIALOG_OPEN_FOLDER:Int = 2;
+
+    /**
+     * Shows a file dialog (`SDL_ShowFileDialogWithProperties`) and returns its
+     * id, to poll with `fileDialogStatus`. `filters` is a flat list of
+     * `name, pattern` pairs (`"Images", "png;jpg"`).
+     */
+    extern inline public static function showFileDialog(window:SDLWindowPointer, type:Int, title:String, accept:String, location:String, filters:Array<String>, many:Bool):Int {
+        return SDL_Extern.showFileDialog(window, type, title, accept, location, filters, many);
+    }
+
+    /** 0 pending, 1 accepted, 2 cancelled, 3 failed, -1 unknown id. */
+    extern inline public static function fileDialogStatus(id:Int):Int {
+        return SDL_Extern.fileDialogStatus(id);
+    }
+
+    extern inline public static function fileDialogPaths(id:Int):Array<String> {
+        return SDL_Extern.fileDialogPaths(id);
+    }
+
+    extern inline public static function fileDialogError(id:Int):String {
+        return SDL_Extern.fileDialogError(id);
+    }
+
+    extern inline public static function releaseFileDialog(id:Int):Void {
+        SDL_Extern.releaseFileDialog(id);
+    }
+
     extern inline public static function setWindowFullscreenMode(window:SDLWindowPointer, mode:SDLDisplayModeConstPointer):Bool {
         return SDL_Extern.setWindowFullscreenMode(window, mode);
     }
@@ -1378,6 +1415,24 @@ class SDL {
 
     @:native('::linc::sdl::setWindowHitRegions')
     static function setWindowHitRegions(window:SDLWindowPointer, regions:Array<Float>):Void;
+
+    @:native('::linc::sdl::raiseWindow')
+    static function raiseWindow(window:SDLWindowPointer):Void;
+
+    @:native('::linc::sdl::showFileDialog')
+    static function showFileDialog(window:SDLWindowPointer, type:Int, title:String, accept:String, location:String, filters:Array<String>, many:Bool):Int;
+
+    @:native('::linc::sdl::fileDialogStatus')
+    static function fileDialogStatus(id:Int):Int;
+
+    @:native('::linc::sdl::fileDialogPaths')
+    static function fileDialogPaths(id:Int):Array<String>;
+
+    @:native('::linc::sdl::fileDialogError')
+    static function fileDialogError(id:Int):String;
+
+    @:native('::linc::sdl::releaseFileDialog')
+    static function releaseFileDialog(id:Int):Void;
 
     @:native('::linc::sdl::setWindowBordered')
     static function setWindowBordered(window:SDLWindowPointer, bordered:Bool):Void;

@@ -3,6 +3,7 @@
 
 #include <locale.h>
 #include <vector>
+#include <string>
 
 #if defined(SDL_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -186,6 +187,157 @@ namespace linc {
             bool empty = hitRegions.empty();
             SDL_UnlockMutex(hitRegionsMutex);
             SDL_SetWindowHitTest(window, empty ? NULL : hitTestCallback, NULL);
+        }
+
+        void raiseWindow(SDL_Window* window) {
+            SDL_RaiseWindow(window);
+        }
+
+        // File dialogs. SDL may run the callback on another thread (Windows,
+        // the Linux portal) or later (macOS sheets), so each dialog keeps its
+        // result here, guarded by a mutex, until the main loop polls it by id.
+        // The filters must stay valid until the callback runs.
+        struct FileDialogState {
+            int id;
+            int status; // 0 pending, 1 accepted, 2 cancelled, 3 failed
+            std::vector<std::string> paths;
+            std::string error;
+            std::vector<std::string> filterStrings;
+            std::vector<SDL_DialogFileFilter> filters;
+        };
+
+        static std::vector<FileDialogState*> fileDialogs;
+        static SDL_Mutex* fileDialogsMutex = NULL;
+        static int nextFileDialogId = 1;
+
+        static FileDialogState* findFileDialog(int id) {
+            for (size_t i = 0; i < fileDialogs.size(); i++) {
+                if (fileDialogs[i]->id == id) return fileDialogs[i];
+            }
+            return NULL;
+        }
+
+        static void SDLCALL fileDialogCallback(void* userdata, const char* const* filelist, int filter) {
+            int id = (int)(intptr_t)userdata;
+            SDL_LockMutex(fileDialogsMutex);
+            FileDialogState* state = findFileDialog(id);
+            if (state != NULL) {
+                if (filelist == NULL) {
+                    const char* err = SDL_GetError();
+                    state->error = err ? err : "";
+                    state->status = 3;
+                }
+                else if (*filelist == NULL) {
+                    state->status = 2;
+                }
+                else {
+                    for (const char* const* file = filelist; *file != NULL; file++) {
+                        state->paths.push_back(*file);
+                    }
+                    state->status = 1;
+                }
+            }
+            SDL_UnlockMutex(fileDialogsMutex);
+        }
+
+        int showFileDialog(SDL_Window* window, int type, ::String title, ::String accept, ::String location, ::Array<::String> filters, bool many) {
+            if (fileDialogsMutex == NULL) {
+                fileDialogsMutex = SDL_CreateMutex();
+            }
+            FileDialogState* state = new FileDialogState();
+            state->status = 0;
+            int count = filters != null() ? filters->length : 0;
+            for (int i = 0; i + 1 < count; i += 2) {
+                ::String name = filters[i];
+                ::String pattern = filters[i + 1];
+                state->filterStrings.push_back(name != null() ? name.utf8_str() : "");
+                state->filterStrings.push_back(pattern != null() ? pattern.utf8_str() : "");
+            }
+            // Pointers into filterStrings, which no longer changes
+            for (size_t i = 0; i + 1 < state->filterStrings.size(); i += 2) {
+                SDL_DialogFileFilter filter;
+                filter.name = state->filterStrings[i].c_str();
+                filter.pattern = state->filterStrings[i + 1].c_str();
+                state->filters.push_back(filter);
+            }
+            SDL_LockMutex(fileDialogsMutex);
+            int id = nextFileDialogId++;
+            state->id = id;
+            fileDialogs.push_back(state);
+            SDL_UnlockMutex(fileDialogsMutex);
+
+            SDL_PropertiesID props = SDL_CreateProperties();
+            if (!state->filters.empty()) {
+                SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, state->filters.data());
+                SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, (Sint64)state->filters.size());
+            }
+            if (window != NULL) {
+                SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
+            }
+            if (location != null() && location.length > 0) {
+                SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_LOCATION_STRING, location.utf8_str());
+            }
+            if (title != null() && title.length > 0) {
+                SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, title.utf8_str());
+            }
+            if (accept != null() && accept.length > 0) {
+                SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_ACCEPT_STRING, accept.utf8_str());
+            }
+            SDL_SetBooleanProperty(props, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, many);
+            SDL_ShowFileDialogWithProperties((SDL_FileDialogType)type, fileDialogCallback, (void*)(intptr_t)id, props);
+            SDL_DestroyProperties(props);
+            return id;
+        }
+
+        int fileDialogStatus(int id) {
+            if (fileDialogsMutex == NULL) return -1;
+            SDL_LockMutex(fileDialogsMutex);
+            FileDialogState* state = findFileDialog(id);
+            int status = state != NULL ? state->status : -1;
+            SDL_UnlockMutex(fileDialogsMutex);
+            return status;
+        }
+
+        ::Array<::String> fileDialogPaths(int id) {
+            ::Array<::String> result = ::Array_obj<::String>::__new(0, 0);
+            if (fileDialogsMutex == NULL) return result;
+            SDL_LockMutex(fileDialogsMutex);
+            FileDialogState* state = findFileDialog(id);
+            if (state != NULL) {
+                for (size_t i = 0; i < state->paths.size(); i++) {
+                    result->push(::String::create(state->paths[i].c_str()));
+                }
+            }
+            SDL_UnlockMutex(fileDialogsMutex);
+            return result;
+        }
+
+        ::String fileDialogError(int id) {
+            ::String result = ::String("");
+            if (fileDialogsMutex == NULL) return result;
+            SDL_LockMutex(fileDialogsMutex);
+            FileDialogState* state = findFileDialog(id);
+            if (state != NULL) {
+                result = ::String::create(state->error.c_str());
+            }
+            SDL_UnlockMutex(fileDialogsMutex);
+            return result;
+        }
+
+        void releaseFileDialog(int id) {
+            if (fileDialogsMutex == NULL) return;
+            SDL_LockMutex(fileDialogsMutex);
+            for (size_t i = 0; i < fileDialogs.size(); i++) {
+                if (fileDialogs[i]->id == id) {
+                    // A pending dialog keeps its state: its callback still writes to it
+                    if (fileDialogs[i]->status != 0) {
+                        delete fileDialogs[i];
+                        fileDialogs.erase(fileDialogs.begin() + i);
+                    }
+                    break;
+                }
+            }
+            SDL_UnlockMutex(fileDialogsMutex);
         }
 
         void setWindowBordered(SDL_Window* window, bool bordered) {

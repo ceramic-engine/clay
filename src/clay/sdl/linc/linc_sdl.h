@@ -72,6 +72,14 @@ namespace linc {
         bool isWindowMaximized(SDL_Window* window);
         bool showWindowSystemMenu(SDL_Window* window, int x, int y);
         void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
+        void raiseWindow(SDL_Window* window);
+
+        // File dialogs (polled by id from the main loop)
+        int showFileDialog(SDL_Window* window, int type, ::String title, ::String accept, ::String location, ::Array<::String> filters, bool many);
+        int fileDialogStatus(int id);
+        ::Array<::String> fileDialogPaths(int id);
+        ::String fileDialogError(int id);
+        void releaseFileDialog(int id);
         bool setWindowFullscreenMode(SDL_Window* window, const SDL_DisplayMode* mode);
         bool setWindowFullscreen(SDL_Window* window, bool fullscreen);
         bool showCursor();

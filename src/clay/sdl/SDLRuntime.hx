@@ -917,6 +917,83 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /**
+     * Brings the window to the front and gives it the keyboard focus
+     * (`SDL_RaiseWindow`; on macOS this activates the app). SDL does nothing
+     * for a hidden or minimized window, and hidden test windows
+     * (`clay_sdl_headless`) are never raised.
+     */
+    public function activateWindow():Void {
+
+        #if !clay_sdl_headless
+        SDL.raiseWindow(window);
+        #end
+
+    }
+
+    /** Whether the window has the keyboard focus (SDL focus events). */
+    public function isWindowFocused():Bool {
+
+        return windowFocused;
+
+    }
+
+    var pendingFileDialogs:Array<{id:Int, done:(paths:Array<String>, error:String)->Void}> = [];
+
+    /**
+     * Shows a native file dialog without blocking (`SDL_ShowFileDialogWithProperties`,
+     * attached to the window: a sheet on macOS).
+     *
+     * @param kind `SDL.FILE_DIALOG_OPEN_FILE`, `FILE_DIALOG_SAVE_FILE` or `FILE_DIALOG_OPEN_FOLDER`
+     * @param title Dialog title, or null
+     * @param accept Label of the accept button, or null
+     * @param location Initial folder (ending with a path separator) or file path, or null
+     * @param filters Flat list of `name, pattern` pairs (pattern: extensions separated by `;`, `*` for all), or null
+     * @param many Whether several entries can be chosen (open dialogs)
+     * @param done Called on the main thread with the chosen paths (empty when cancelled),
+     *             or with null paths and an error message when the dialog could not be shown.
+     *             Hidden test windows (`clay_sdl_headless`) never show a dialog: they get a cancellation.
+     */
+    public function showFileDialog(kind:Int, title:String, accept:String, location:String, filters:Array<String>, many:Bool, done:(paths:Array<String>, error:String)->Void):Void {
+
+        #if clay_sdl_headless
+        clay.Runner.runInMain(() -> done([], null));
+        #else
+        final id = SDL.showFileDialog(window, kind, title, accept, location, filters, many);
+        pendingFileDialogs.push({id: id, done: done});
+        #end
+
+    }
+
+    function pollFileDialogs():Void {
+
+        var i = 0;
+        while (i < pendingFileDialogs.length) {
+            final dialog = pendingFileDialogs[i];
+            final status = SDL.fileDialogStatus(dialog.id);
+            if (status == 0) {
+                i++;
+                continue;
+            }
+            pendingFileDialogs.splice(i, 1);
+            var paths:Array<String> = null;
+            var error:String = null;
+            if (status == 1) {
+                paths = SDL.fileDialogPaths(dialog.id);
+            }
+            else if (status == 2) {
+                paths = [];
+            }
+            else {
+                error = SDL.fileDialogError(dialog.id);
+                if (error == null || error.length == 0) error = 'the file dialog could not be shown';
+            }
+            SDL.releaseFileDialog(dialog.id);
+            dialog.done(paths, error);
+        }
+
+    }
+
     public function setCursorVisible(visible:Bool):Void {
 
         if (visible) {
@@ -1084,6 +1161,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
                 currentSdlEvent = null;
 
+            }
+
+            if (pendingFileDialogs.length > 0) {
+                pollFileDialogs();
             }
 
             var newTimestamp = timestamp();
