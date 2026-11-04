@@ -1529,7 +1529,7 @@ class SDL {
 
     #if (mac && !ios)
     @:native('::linc::sdl::setMenuCallbacks')
-    static function setMenuCallbacks(validate:cpp.Callable<Int->Int>, action:cpp.Callable<Int->Void>, willOpen:cpp.Callable<()->Void>):Void;
+    static function setMenuCallbacks(validate:cpp.Callable<(Int) -> Int>, action:cpp.Callable<(Int) -> Void>, willOpen:cpp.Callable<()->Void>):Void;
 
     @:native('::linc::sdl::menuBarBegin')
     static function menuBarBegin():Void;
