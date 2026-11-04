@@ -74,6 +74,9 @@ namespace linc {
         void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
         void raiseWindow(SDL_Window* window);
 
+        // System preferences
+        int getSystemTheme();
+
         // Native menu bar (macOS only: linc_sdl_menu_mac.mm)
         typedef ::cpp::Function < int(int) > InternalMenuValidateCallback;
         typedef ::cpp::Function < void(int) > InternalMenuActionCallback;
@@ -88,6 +91,16 @@ namespace linc {
         int menuBarItemState(int id);
         ::String menuBarDescribe();
         int menuBarTestKeyEquivalent(::String chars, int modifiers, int timestamp);
+        void dockMenuBegin();
+        int dockMenuAddItem(int parent, int kind, ::String title, ::String key, int modifiers, int role, int id, bool enabled, bool checked);
+        void dockMenuCommit();
+        ::String dockMenuDescribe();
+        bool dockMenuPerformItem(int id);
+
+        // System settings (macOS only: linc_sdl_system_mac.mm)
+        bool autoHideScrollbars();
+        int autoHideScrollbarsChangeCount();
+        void postScrollerStyleChange();
 
         // File dialogs (polled by id from the main loop)
         int showFileDialog(SDL_Window* window, int type, ::String title, ::String accept, ::String location, ::Array<::String> filters, bool many);

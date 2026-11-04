@@ -576,6 +576,22 @@ class SDL {
         SDL_Extern.raiseWindow(window);
     }
 
+    /** `SDL_SYSTEM_THEME_UNKNOWN` */
+    public static inline var SYSTEM_THEME_UNKNOWN:Int = 0;
+    /** `SDL_SYSTEM_THEME_LIGHT` */
+    public static inline var SYSTEM_THEME_LIGHT:Int = 1;
+    /** `SDL_SYSTEM_THEME_DARK` */
+    public static inline var SYSTEM_THEME_DARK:Int = 2;
+
+    /**
+     * The light or dark theme of the system (`SDL_GetSystemTheme`):
+     * `SYSTEM_THEME_LIGHT`, `SYSTEM_THEME_DARK` or `SYSTEM_THEME_UNKNOWN`.
+     * SDL sends `SDL_EVENT_SYSTEM_THEME_CHANGED` when it changes.
+     */
+    extern inline public static function getSystemTheme():Int {
+        return SDL_Extern.getSystemTheme();
+    }
+
     #if (mac && !ios)
 
     // Native menu bar (macOS): linc_sdl_menu_mac.mm
@@ -680,6 +696,68 @@ class SDL {
      */
     extern inline public static function menuBarTestKeyEquivalent(chars:String, modifiers:Int, timestamp:Int):Int {
         return SDL_Extern.menuBarTestKeyEquivalent(chars, modifiers, timestamp);
+    }
+
+    /** Starts building a new dock menu (handle 0 is its root). */
+    extern inline public static function dockMenuBegin():Void {
+        SDL_Extern.dockMenuBegin();
+    }
+
+    /** Adds an item to the dock menu, like `menuBarAddItem`. */
+    extern inline public static function dockMenuAddItem(parent:Int, kind:Int, title:String, key:String, modifiers:Int, role:Int, id:Int, enabled:Bool, checked:Bool):Int {
+        return SDL_Extern.dockMenuAddItem(parent, kind, title, key, modifiers, role, id, enabled, checked);
+    }
+
+    /**
+     * Installs the dock menu built since `dockMenuBegin`, given to AppKit by
+     * the application delegate (`applicationDockMenu:`). An empty menu
+     * removes it.
+     */
+    extern inline public static function dockMenuCommit():Void {
+        SDL_Extern.dockMenuCommit();
+    }
+
+    /**
+     * Test support: a text dump of the installed dock menu (first line:
+     * whether one is installed, whether the application delegate gives it to
+     * AppKit, whether its delegate is the menu handler; then one line per
+     * item like `menuBarDescribe`).
+     */
+    extern inline public static function dockMenuDescribe():String {
+        return SDL_Extern.dockMenuDescribe();
+    }
+
+    /**
+     * Test support: chooses the dock menu item `id` like a click would.
+     * Returns false if no such item.
+     */
+    extern inline public static function dockMenuPerformItem(id:Int):Bool {
+        return SDL_Extern.dockMenuPerformItem(id);
+    }
+
+    /**
+     * Whether the user prefers scrollbars that only show while scrolling
+     * (`NSScroller.preferredScrollerStyle` is overlay).
+     */
+    extern inline public static function autoHideScrollbars():Bool {
+        return SDL_Extern.autoHideScrollbars();
+    }
+
+    /**
+     * How many times the system said the preferred scroller style changed
+     * (`NSPreferredScrollerStyleDidChangeNotification`), counted once
+     * `autoHideScrollbars` was called.
+     */
+    extern inline public static function autoHideScrollbarsChangeCount():Int {
+        return SDL_Extern.autoHideScrollbarsChangeCount();
+    }
+
+    /**
+     * Test support: posts `NSPreferredScrollerStyleDidChangeNotification`
+     * as AppKit does when the setting changes.
+     */
+    extern inline public static function postScrollerStyleChange():Void {
+        SDL_Extern.postScrollerStyleChange();
     }
 
     #end
@@ -1527,6 +1605,9 @@ class SDL {
     @:native('::linc::sdl::raiseWindow')
     static function raiseWindow(window:SDLWindowPointer):Void;
 
+    @:native('::linc::sdl::getSystemTheme')
+    static function getSystemTheme():Int;
+
     #if (mac && !ios)
     @:native('::linc::sdl::setMenuCallbacks')
     static function setMenuCallbacks(validate:cpp.Callable<(Int) -> Int>, action:cpp.Callable<(Int) -> Void>, willOpen:cpp.Callable<()->Void>):Void;
@@ -1557,6 +1638,30 @@ class SDL {
 
     @:native('::linc::sdl::menuBarTestKeyEquivalent')
     static function menuBarTestKeyEquivalent(chars:String, modifiers:Int, timestamp:Int):Int;
+
+    @:native('::linc::sdl::dockMenuBegin')
+    static function dockMenuBegin():Void;
+
+    @:native('::linc::sdl::dockMenuAddItem')
+    static function dockMenuAddItem(parent:Int, kind:Int, title:String, key:String, modifiers:Int, role:Int, id:Int, enabled:Bool, checked:Bool):Int;
+
+    @:native('::linc::sdl::dockMenuCommit')
+    static function dockMenuCommit():Void;
+
+    @:native('::linc::sdl::dockMenuDescribe')
+    static function dockMenuDescribe():String;
+
+    @:native('::linc::sdl::dockMenuPerformItem')
+    static function dockMenuPerformItem(id:Int):Bool;
+
+    @:native('::linc::sdl::autoHideScrollbars')
+    static function autoHideScrollbars():Bool;
+
+    @:native('::linc::sdl::autoHideScrollbarsChangeCount')
+    static function autoHideScrollbarsChangeCount():Int;
+
+    @:native('::linc::sdl::postScrollerStyleChange')
+    static function postScrollerStyleChange():Void;
     #end
 
     @:native('::linc::sdl::showFileDialog')

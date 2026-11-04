@@ -491,6 +491,9 @@ class WebRuntime extends clay.base.BaseRuntime {
         js.Browser.window.addEventListener('focus', _ -> refreshWindowFocus());
         js.Browser.window.addEventListener('blur', _ -> refreshWindowFocus());
 
+        // System theme (prefers-color-scheme)
+        setupSystemTheme();
+
         // Key events
 
         js.Browser.document.addEventListener('keydown',  handleKeyDown);
@@ -601,6 +604,55 @@ class WebRuntime extends clay.base.BaseRuntime {
 
     /** No application menu bar in a browser: does nothing. */
     public function setMenuBar(menus:Array<clay.MenuItemSpec>):Void {}
+
+    /** No dock menu for a page: does nothing. */
+    public function setDockMenu(items:Array<clay.MenuItemSpec>):Void {}
+
+    var systemThemeQuery:Dynamic = null;
+
+    var systemThemeDark:Bool = false;
+
+    function setupSystemTheme():Void {
+
+        final window:Dynamic = js.Browser.window;
+        if (window.matchMedia == null) return;
+        systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (systemThemeQuery == null) return;
+        systemThemeDark = systemThemeQuery.matches == true;
+        final listener = (_) -> {
+            final dark = systemThemeQuery.matches == true;
+            if (dark != systemThemeDark) {
+                systemThemeDark = dark;
+                app.events.systemThemeChange(dark);
+            }
+        };
+        if (systemThemeQuery.addEventListener != null) {
+            systemThemeQuery.addEventListener('change', listener);
+        }
+        else if (systemThemeQuery.addListener != null) {
+            // Older Safari
+            systemThemeQuery.addListener(listener);
+        }
+
+    }
+
+    /**
+     * Whether the browser reports a dark color scheme
+     * (`matchMedia('(prefers-color-scheme: dark)')`); `events.systemThemeChange`
+     * is called when it changes.
+     */
+    public function isSystemThemeDark():Bool {
+        return systemThemeDark;
+    }
+
+    /**
+     * True: a page cannot read the system scrollbar preference, and apps
+     * drawing their own scrollbars in a canvas show them while scrolling
+     * (what GPUI's web platform answers).
+     */
+    public function autoHideScrollbars():Bool {
+        return true;
+    }
 
 /// Input handlers
 

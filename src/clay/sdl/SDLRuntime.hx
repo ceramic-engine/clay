@@ -938,6 +938,86 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    var systemThemeDark:Bool = false;
+
+    var systemThemeRead:Bool = false;
+
+    /**
+     * Whether the system uses a dark theme (`SDL_GetSystemTheme`; light when
+     * the system does not tell). `events.systemThemeChange` is called when
+     * SDL reports a change.
+     */
+    public function isSystemThemeDark():Bool {
+
+        if (!systemThemeRead) {
+            systemThemeRead = true;
+            systemThemeDark = SDL.getSystemTheme() == SDL.SYSTEM_THEME_DARK;
+        }
+        return systemThemeDark;
+
+    }
+
+    function handleSystemThemeChange():Void {
+
+        final dark = SDL.getSystemTheme() == SDL.SYSTEM_THEME_DARK;
+        if (!systemThemeRead || dark != systemThemeDark) {
+            systemThemeRead = true;
+            systemThemeDark = dark;
+            app.events.systemThemeChange(dark);
+        }
+
+    }
+
+    #if (mac && !ios)
+    var autoHideScrollbarsValue:Bool = false;
+
+    var autoHideScrollbarsRead:Bool = false;
+
+    var autoHideScrollbarsChanges:Int = 0;
+    #end
+
+    /**
+     * Whether the user prefers scrollbars that only show while scrolling.
+     *
+     * macOS: the preferred scroller style is overlay (System Settings,
+     * Appearance, "Show scroll bars"), and `events.autoHideScrollbarsChange`
+     * is called when it changes. iOS, tvOS and Android: true (scroll
+     * indicators only show while scrolling). Windows and Linux: false.
+     */
+    public function autoHideScrollbars():Bool {
+
+        #if (mac && !ios)
+        if (!autoHideScrollbarsRead) {
+            autoHideScrollbarsRead = true;
+            autoHideScrollbarsValue = SDL.autoHideScrollbars();
+            autoHideScrollbarsChanges = SDL.autoHideScrollbarsChangeCount();
+        }
+        return autoHideScrollbarsValue;
+        #elseif (ios || tvos || android)
+        return true;
+        #else
+        return false;
+        #end
+
+    }
+
+    #if (mac && !ios)
+    /** Reads the scroller style again after the system said it changed. */
+    function pollAutoHideScrollbars():Void {
+
+        final changes = SDL.autoHideScrollbarsChangeCount();
+        if (changes != autoHideScrollbarsChanges) {
+            autoHideScrollbarsChanges = changes;
+            final autoHide = SDL.autoHideScrollbars();
+            if (autoHide != autoHideScrollbarsValue) {
+                autoHideScrollbarsValue = autoHide;
+                app.events.autoHideScrollbarsChange(autoHide);
+            }
+        }
+
+    }
+    #end
+
     #if (mac && !ios)
     var menuBarInstalled:Bool = false;
 
@@ -963,10 +1043,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function setMenuBar(menus:Array<clay.MenuItemSpec>):Void {
 
         #if (mac && !ios)
-        if (!menuBarInstalled) {
-            menuBarInstalled = true;
-            SDL.setMenuCallbacks(handleMenuValidate, handleMenuAction, handleMenuWillOpen);
-        }
+        installMenuCallbacks();
+        menuBarInstalled = true;
         SDL.menuBarBegin();
         if (menus != null) {
             for (menu in menus) {
@@ -978,7 +1056,57 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /**
+     * Installs the menu shown when the app icon in the dock is right
+     * clicked (see `clay.MenuItemSpec`), replacing the current one; an empty
+     * list removes it.
+     *
+     * macOS: an `NSMenu` given by the application delegate
+     * (`applicationDockMenu:`). Its items call `events.menuAction(id)` and are
+     * validated with `events.menuItemEnabled(id)`, like the menu bar items
+     * (their ids must not collide). Elsewhere: does nothing.
+     */
+    public function setDockMenu(items:Array<clay.MenuItemSpec>):Void {
+
+        #if (mac && !ios)
+        installMenuCallbacks();
+        SDL.dockMenuBegin();
+        if (items != null) {
+            for (item in items) {
+                addDockMenuItem(0, item);
+            }
+        }
+        SDL.dockMenuCommit();
+        #end
+
+    }
+
     #if (mac && !ios)
+    var menuCallbacksInstalled:Bool = false;
+
+    function installMenuCallbacks():Void {
+
+        if (!menuCallbacksInstalled) {
+            menuCallbacksInstalled = true;
+            SDL.setMenuCallbacks(handleMenuValidate, handleMenuAction, handleMenuWillOpen);
+        }
+
+    }
+
+    function addDockMenuItem(parent:Int, item:clay.MenuItemSpec):Void {
+
+        final handle = SDL.dockMenuAddItem(
+            parent, item.kind, item.title != null ? item.title : '', item.key != null ? item.key : '',
+            item.modifiers, item.role, item.id, item.enabled, item.checked
+        );
+        if (handle > 0 && item.items != null) {
+            for (child in item.items) {
+                addDockMenuItem(handle, child);
+            }
+        }
+
+    }
+
     function addMenuBarItem(parent:Int, item:clay.MenuItemSpec):Void {
 
         final handle = SDL.menuBarAddItem(
@@ -1272,6 +1400,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 if (e.type == SDL.SDL_EVENT_QUIT) {
                     app.emitQuit();
                 }
+                else if (e.type == SDL.SDL_EVENT_SYSTEM_THEME_CHANGED) {
+                    handleSystemThemeChange();
+                }
 
                 currentSdlEvent = null;
 
@@ -1281,8 +1412,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
             if (menuBarInstalled) {
                 // Every key down pumped so far was delivered
                 SDL.clearMenuKeyEquivalents();
-                if (hasMenuCallbackError) rethrowMenuCallbackError();
             }
+            if (hasMenuCallbackError) rethrowMenuCallbackError();
+            if (autoHideScrollbarsRead) pollAutoHideScrollbars();
             #end
 
             if (pendingFileDialogs.length > 0) {

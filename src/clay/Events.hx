@@ -71,7 +71,22 @@ class Events {
 
     public function audioEvent(event:AudioEvent, handle:AudioHandle):Void {}
 
-    /** An item of the native menu bar (`runtime.setMenuBar`) was chosen. */
+    /**
+     * The light or dark theme of the system changed (see
+     * `runtime.isSystemThemeDark`).
+     */
+    public function systemThemeChange(dark:Bool):Void {}
+
+    /**
+     * Whether the user prefers scrollbars that only show while scrolling
+     * changed (see `runtime.autoHideScrollbars`).
+     */
+    public function autoHideScrollbarsChange(autoHide:Bool):Void {}
+
+    /**
+     * An item of the native menu bar (`runtime.setMenuBar`) or of the dock
+     * menu (`runtime.setDockMenu`) was chosen.
+     */
     public function menuAction(id:Int):Void {}
 
     /**
@@ -82,7 +97,7 @@ class Events {
      */
     public function menuKeyEquivalent(id:Int):Void {}
 
-    /** A menu of the native menu bar opens. */
+    /** A menu of the native menu bar, or the dock menu, opens. */
     public function menuWillOpen():Void {}
 
     /**

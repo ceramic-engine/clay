@@ -12,6 +12,11 @@
 // runtime; when that is not possible, items target a private handler
 // object instead.
 //
+// The dock menu (dockMenuBegin, dockMenuAddItem, dockMenuCommit) is built
+// the same way and given to AppKit by `applicationDockMenu:`, added to the
+// class of the application delegate like GPUI's delegate implements it. Its
+// items use the same selectors, validation and callbacks as the menu bar.
+//
 // Key equivalents: SDL hands every key down to the app (as an SDL event)
 // before AppKit dispatches it, and AppKit then offers it to the key window
 // and to the main menu (`performKeyEquivalent:`). A native window gets the
@@ -50,6 +55,10 @@ namespace linc {
 
 // Menus being built: index 0 is the root, other indices are submenu handles
 static NSMutableArray *_clayMenus = nil;
+
+// The dock menu being built (index 0 is its root) and the one installed
+static NSMutableArray *_clayDockMenus = nil;
+static NSMenu *_clayDockMenu = nil;
 
 // Handler object: delegate of every menu, target of the items when the
 // application delegate could not be given the item methods
@@ -244,6 +253,30 @@ static BOOL clayMenuGraftOnto(Class cls) {
     return YES;
 }
 
+static NSMenu *clayMenuDockMenu(id self, SEL _cmd, NSApplication *sender) {
+    return _clayDockMenu;
+}
+
+// Adds `applicationDockMenu:` to the class of the application delegate.
+// Returns NO when the class already has its own (another delegate than SDL's).
+static Class _clayDockMenuGraftedClass = Nil;
+
+static BOOL clayMenuGraftDockMenu(Class cls) {
+    if (cls == Nil) {
+        return NO;
+    }
+    if (cls == _clayDockMenuGraftedClass) {
+        return YES;
+    }
+    SEL selector = @selector(applicationDockMenu:);
+    if (class_respondsToSelector(cls, selector)) {
+        return NO;
+    }
+    class_addMethod(cls, selector, (IMP)clayMenuDockMenu, "@@:@");
+    _clayDockMenuGraftedClass = cls;
+    return YES;
+}
+
 static bool clayMenuKeyWatch(void *userdata, SDL_Event *event) {
     if (event->type == SDL_EVENT_KEY_DOWN && [NSThread isMainThread]) {
         NSEvent *current = [NSApp currentEvent];
@@ -388,12 +421,14 @@ namespace linc {
             }
         }
 
-        int menuBarAddItem(int parent, int kind, ::String title, ::String key, int modifiers, int role, int id, bool enabled, bool checked) {
+        // Adds an item to `menus` (the menu bar, or the dock menu when
+        // `isDock`: no Services or Window menu there)
+        static int clayMenuAddItem(NSMutableArray *menus, bool isDock, int parent, int kind, ::String title, ::String key, int modifiers, int role, int id, bool enabled, bool checked) {
             @autoreleasepool {
-                if (_clayMenus == nil || parent < 0 || parent >= (int)[_clayMenus count]) {
+                if (menus == nil || parent < 0 || parent >= (int)[menus count]) {
                     return 0;
                 }
-                NSMenu *menu = [_clayMenus objectAtIndex:parent];
+                NSMenu *menu = [menus objectAtIndex:parent];
                 NSString *nsTitle = clayMenuString(title);
 
                 if (kind == 1) {
@@ -411,13 +446,15 @@ namespace linc {
                         [item setEnabled:enabled ? YES : NO];
                     }
                     [menu addItem:item];
-                    if (kind == 3) {
+                    if (isDock) {
+                        // No Services or Window menu in the dock menu
+                    } else if (kind == 3) {
                         [NSApp setServicesMenu:submenu];
                     } else if (role == 7 && parent == 0) {
                         [NSApp setWindowsMenu:submenu];
                     }
-                    int handle = (int)[_clayMenus count];
-                    [_clayMenus addObject:submenu];
+                    int handle = (int)[menus count];
+                    [menus addObject:submenu];
                     CLAY_MENU_RELEASE(item);
                     CLAY_MENU_RELEASE(submenu);
                     return kind == 2 ? handle : 0;
@@ -454,6 +491,10 @@ namespace linc {
                 CLAY_MENU_RELEASE(item);
                 return 0;
             }
+        }
+
+        int menuBarAddItem(int parent, int kind, ::String title, ::String key, int modifiers, int role, int id, bool enabled, bool checked) {
+            return clayMenuAddItem(_clayMenus, false, parent, kind, title, key, modifiers, role, id, enabled, checked);
         }
 
         void menuBarCommit() {
@@ -550,6 +591,84 @@ namespace linc {
                 int id = clayMenuTakePending((Uint64)timestamp);
                 if (id >= 0) return id;
                 return handled ? -2 : -1;
+            }
+        }
+
+        void dockMenuBegin() {
+            @autoreleasepool {
+                if (_clayMenuHandler == nil) {
+                    _clayMenuHandler = [[ClayMenuHandler alloc] init];
+                }
+                Class delegateClass = [[NSApp delegate] class];
+                _clayMenuUseResponderChain = clayMenuGraftOnto(delegateClass);
+                clayMenuGraftDockMenu(delegateClass);
+                if (_clayDockMenus != nil) {
+                    CLAY_MENU_RELEASE(_clayDockMenus);
+                }
+                _clayDockMenus = [[NSMutableArray alloc] init];
+                // Like GPUI's dock menu, the application delegate is its
+                // delegate: opening it runs the menu will open callback
+                NSMenu *root = [[NSMenu alloc] initWithTitle:@""];
+                [root setDelegate:_clayMenuHandler];
+                [_clayDockMenus addObject:root];
+                CLAY_MENU_RELEASE(root);
+            }
+        }
+
+        int dockMenuAddItem(int parent, int kind, ::String title, ::String key, int modifiers, int role, int id, bool enabled, bool checked) {
+            return clayMenuAddItem(_clayDockMenus, true, parent, kind, title, key, modifiers, role, id, enabled, checked);
+        }
+
+        void dockMenuCommit() {
+            @autoreleasepool {
+                if (_clayDockMenus == nil || [_clayDockMenus count] == 0) {
+                    return;
+                }
+                NSMenu *root = [_clayDockMenus objectAtIndex:0];
+                if (_clayDockMenu != nil) {
+                    CLAY_MENU_RELEASE(_clayDockMenu);
+                }
+                // An empty dock menu shows only the system items
+                _clayDockMenu = [root numberOfItems] > 0 ? root : nil;
+                if (_clayDockMenu != nil) {
+                    #if !__has_feature(objc_arc)
+                    [_clayDockMenu retain];
+                    #endif
+                }
+            }
+        }
+
+        ::String dockMenuDescribe() {
+            @autoreleasepool {
+                NSMutableString *out = [NSMutableString string];
+                id delegate = [NSApp delegate];
+                NSMenu *provided = nil;
+                if (delegate != nil && [delegate respondsToSelector:@selector(applicationDockMenu:)]) {
+                    provided = [delegate applicationDockMenu:NSApp];
+                }
+                [out appendFormat:@"dock installed=%d provided=%d delegate=%d\n",
+                    _clayDockMenu != nil ? 1 : 0,
+                    (provided != nil && provided == _clayDockMenu) ? 1 : 0,
+                    (_clayDockMenu != nil && [_clayDockMenu delegate] == _clayMenuHandler) ? 1 : 0];
+                if (_clayDockMenu != nil) {
+                    clayMenuDescribe(_clayDockMenu, 1, out);
+                }
+                return ::String::create([out UTF8String]);
+            }
+        }
+
+        bool dockMenuPerformItem(int id) {
+            @autoreleasepool {
+                if (_clayDockMenu == nil) {
+                    return false;
+                }
+                NSMenu *owner = nil;
+                NSMenuItem *item = clayMenuFindItem(_clayDockMenu, id, &owner);
+                if (item == nil || owner == nil) {
+                    return false;
+                }
+                [owner performActionForItemAtIndex:[owner indexOfItem:item]];
+                return true;
             }
         }
 

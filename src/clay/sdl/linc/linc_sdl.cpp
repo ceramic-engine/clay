@@ -193,6 +193,10 @@ namespace linc {
             SDL_RaiseWindow(window);
         }
 
+        int getSystemTheme() {
+            return (int)SDL_GetSystemTheme();
+        }
+
         // File dialogs. SDL may run the callback on another thread (Windows,
         // the Linux portal) or later (macOS sheets), so each dialog keeps its
         // result here, guarded by a mutex, until the main loop polls it by id.
