@@ -352,7 +352,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setIntUniform(gpuShader, location, ints.get(name));
             #else
-            var location = dirtyInts.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyInts[dirtyInts.length - 1];
+            dirtyInts.resize(dirtyInts.length - 1);
             Clay.app.graphics.setIntUniform(gpuShader, location, ints.get(location));
             #end
         }
@@ -363,7 +365,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setIntArrayUniform(gpuShader, location, intArrays.get(name));
             #else
-            var location = dirtyIntArrays.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyIntArrays[dirtyIntArrays.length - 1];
+            dirtyIntArrays.resize(dirtyIntArrays.length - 1);
             Clay.app.graphics.setIntArrayUniform(gpuShader, location, intArrays.get(location));
             #end
         }
@@ -374,7 +378,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setFloatUniform(gpuShader, location, floats.get(name));
             #else
-            var location = dirtyFloats.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyFloats[dirtyFloats.length - 1];
+            dirtyFloats.resize(dirtyFloats.length - 1);
             Clay.app.graphics.setFloatUniform(gpuShader, location, floats.get(location));
             #end
         }
@@ -385,7 +391,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(name));
             #else
-            var location = dirtyFloatArrays.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyFloatArrays[dirtyFloatArrays.length - 1];
+            dirtyFloatArrays.resize(dirtyFloatArrays.length - 1);
             Clay.app.graphics.setFloatArrayUniform(gpuShader, location, floatArrays.get(location));
             #end
         }
@@ -397,7 +405,9 @@ class Uniforms {
             var value = vector2s.get(name);
             Clay.app.graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
             #else
-            var location = dirtyVector2s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyVector2s[dirtyVector2s.length - 1];
+            dirtyVector2s.resize(dirtyVector2s.length - 1);
             var value = vector2s.get(location);
             Clay.app.graphics.setVector2Uniform(gpuShader, location, value.x, value.y);
             #end
@@ -410,7 +420,9 @@ class Uniforms {
             var value = vector3s.get(name);
             Clay.app.graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
             #else
-            var location = dirtyVector3s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyVector3s[dirtyVector3s.length - 1];
+            dirtyVector3s.resize(dirtyVector3s.length - 1);
             var value = vector3s.get(location);
             Clay.app.graphics.setVector3Uniform(gpuShader, location, value.x, value.y, value.z);
             #end
@@ -423,7 +435,9 @@ class Uniforms {
             var value = vector4s.get(name);
             Clay.app.graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
             #else
-            var location = dirtyVector4s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyVector4s[dirtyVector4s.length - 1];
+            dirtyVector4s.resize(dirtyVector4s.length - 1);
             var value = vector4s.get(location);
             Clay.app.graphics.setVector4Uniform(gpuShader, location, value.x, value.y, value.z, value.w);
             #end
@@ -435,7 +449,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setMatrix2Uniform(gpuShader, location, matrix2s.get(name));
             #else
-            var location = dirtyMatrix2s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyMatrix2s[dirtyMatrix2s.length - 1];
+            dirtyMatrix2s.resize(dirtyMatrix2s.length - 1);
             Clay.app.graphics.setMatrix2Uniform(gpuShader, location, matrix2s.get(location));
             #end
         }
@@ -446,7 +462,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setMatrix3Uniform(gpuShader, location, matrix3s.get(name));
             #else
-            var location = dirtyMatrix3s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyMatrix3s[dirtyMatrix3s.length - 1];
+            dirtyMatrix3s.resize(dirtyMatrix3s.length - 1);
             Clay.app.graphics.setMatrix3Uniform(gpuShader, location, matrix3s.get(location));
             #end
         }
@@ -457,7 +475,9 @@ class Uniforms {
             var location = Clay.app.graphics.getUniformLocation(gpuShader, name);
             Clay.app.graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(name));
             #else
-            var location = dirtyMatrix4s.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var location = dirtyMatrix4s[dirtyMatrix4s.length - 1];
+            dirtyMatrix4s.resize(dirtyMatrix4s.length - 1);
             Clay.app.graphics.setMatrix4Uniform(gpuShader, location, matrix4s.get(location));
             #end
         }

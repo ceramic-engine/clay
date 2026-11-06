@@ -326,7 +326,9 @@ class SoloudAudio extends clay.base.BaseAudio {
         active = true;
 
         while (suspendedHandles.length > 0) {
-            var handle = suspendedHandles.pop();
+            // Last value without `pop()`, which boxes the Int it returns (`Null<Int>`) on hxcpp
+            var handle = suspendedHandles[suspendedHandles.length - 1];
+            suspendedHandles.resize(suspendedHandles.length - 1);
             unPause(handle);
         }
 
