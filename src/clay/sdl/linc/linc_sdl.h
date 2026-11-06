@@ -97,7 +97,8 @@ namespace linc {
         ::String dockMenuDescribe();
         bool dockMenuPerformItem(int id);
 
-        // System settings (macOS only: linc_sdl_system_mac.mm)
+        // System settings (macOS: linc_sdl_system_mac.mm; autoHideScrollbars
+        // also on Windows: linc_sdl_system_windows.cpp)
         bool autoHideScrollbars();
         int autoHideScrollbarsChangeCount();
         void postScrollerStyleChange();

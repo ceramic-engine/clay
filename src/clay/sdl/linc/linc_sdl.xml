@@ -10,6 +10,8 @@
         <file name="${LINC_SDL_PATH}linc/linc_sdl.cpp" />
         <file name="${LINC_SDL_PATH}linc/linc_sdl_menu_mac.mm" if="mac" unless="ios" />
         <file name="${LINC_SDL_PATH}linc/linc_sdl_system_mac.mm" if="mac" unless="ios" />
+        <!-- autoHideScrollbars on Windows: WinRT UISettings, registry fallback (untested) -->
+        <file name="${LINC_SDL_PATH}linc/linc_sdl_system_windows.cpp" if="windows" />
 
     </files>
 
@@ -27,6 +29,9 @@
         <section if="windows">
            <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-windows-x64/lib/SDL3.lib" unless="HXCPP_ARM64" />
            <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-windows-arm64/lib/SDL3.lib" if="HXCPP_ARM64" />
+           <!-- linc_sdl_system_windows.cpp: RoActivateInstance, WindowsCreateString (WinRT) and RegGetValueW -->
+           <lib name="runtimeobject.lib" />
+           <lib name="advapi32.lib" />
         </section>
 
         <section if="android">

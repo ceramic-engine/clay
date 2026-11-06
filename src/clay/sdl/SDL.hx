@@ -762,6 +762,18 @@ class SDL {
 
     #end
 
+    #if windows
+    /**
+     * Whether the user prefers scrollbars that only show while scrolling:
+     * `UISettings.AutoHideScrollBars` (WinRT), else the registry value
+     * `HKCU\Control Panel\Accessibility\DynamicScrollbars`, else false
+     * (`linc_sdl_system_windows.cpp`, untested).
+     */
+    extern inline public static function autoHideScrollbars():Bool {
+        return SDL_Extern.autoHideScrollbars();
+    }
+    #end
+
     /** `SDL_FILEDIALOG_OPENFILE` */
     public static inline var FILE_DIALOG_OPEN_FILE:Int = 0;
     /** `SDL_FILEDIALOG_SAVEFILE` */
@@ -1662,6 +1674,11 @@ class SDL {
 
     @:native('::linc::sdl::postScrollerStyleChange')
     static function postScrollerStyleChange():Void;
+    #end
+
+    #if windows
+    @:native('::linc::sdl::autoHideScrollbars')
+    static function autoHideScrollbars():Bool;
     #end
 
     @:native('::linc::sdl::showFileDialog')

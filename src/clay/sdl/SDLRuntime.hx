@@ -974,6 +974,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
     var autoHideScrollbarsRead:Bool = false;
 
     var autoHideScrollbarsChanges:Int = 0;
+    #elseif windows
+    var autoHideScrollbarsValue:Bool = false;
+
+    var autoHideScrollbarsRead:Bool = false;
     #end
 
     /**
@@ -981,8 +985,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
      *
      * macOS: the preferred scroller style is overlay (System Settings,
      * Appearance, "Show scroll bars"), and `events.autoHideScrollbarsChange`
-     * is called when it changes. iOS, tvOS and Android: true (scroll
-     * indicators only show while scrolling). Windows and Linux: false.
+     * is called when it changes. Windows: `UISettings.AutoHideScrollBars`
+     * (Settings, Accessibility, Visual effects, "Always show scrollbars"
+     * off), else the registry value `DynamicScrollbars`, else false; read
+     * once, like GPUI (untested: written without a Windows machine). iOS,
+     * tvOS and Android: true (scroll indicators only show while
+     * scrolling). Linux: false.
      */
     public function autoHideScrollbars():Bool {
 
@@ -991,6 +999,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
             autoHideScrollbarsRead = true;
             autoHideScrollbarsValue = SDL.autoHideScrollbars();
             autoHideScrollbarsChanges = SDL.autoHideScrollbarsChangeCount();
+        }
+        return autoHideScrollbarsValue;
+        #elseif windows
+        if (!autoHideScrollbarsRead) {
+            autoHideScrollbarsRead = true;
+            autoHideScrollbarsValue = SDL.autoHideScrollbars();
         }
         return autoHideScrollbarsValue;
         #elseif (ios || tvos || android)
