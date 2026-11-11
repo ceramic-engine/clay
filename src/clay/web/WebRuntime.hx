@@ -1693,6 +1693,11 @@ class WebRuntime extends clay.base.BaseRuntime {
         return false;
     }
 
+    /** Not available in a browser: does nothing and returns `false`. */
+    public function setWindowSize(width:Int, height:Int):Bool {
+        return false;
+    }
+
     /** Not available in a browser: does nothing. */
     public function showWindowMenu(x:Float, y:Float):Void {}
 

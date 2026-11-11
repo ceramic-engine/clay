@@ -685,8 +685,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
-    /** Resize the window so that its size matches the given logical size with the current display scale */
-    function resizeWindowToLogicalSize(width:Int, height:Int):Void {
+    /**
+     * Resize the window so that its size matches the given logical size with the current display scale.
+     * Returns `false` if the window already had the requested size.
+     */
+    function resizeWindowToLogicalSize(width:Int, height:Int):Bool {
 
         var scale = windowDevicePixelRatio();
         var density = SDL.getWindowPixelDensity(window);
@@ -703,7 +706,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
             untyped __cpp__('SDL_SetWindowSize({0}, {1}, {2})', window, targetWidth, targetHeight);
             untyped __cpp__('SDL_SyncWindow({0})', window);
             SDL.setDpiChangeHandlerBypass(false);
+            return true;
         }
+
+        return false;
 
     }
 
@@ -892,6 +898,48 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function isWindowMaximized():Bool {
 
         return SDL.isWindowMaximized(window);
+
+    }
+
+    /**
+     * Resizes the window to the given logical size (same unit as the `width`
+     * and `height` of the window config).
+     * Returns `true` if the size of the window did change, `false` if the request
+     * had no effect (mobile, fullscreen, same size, or refused by the system).
+     */
+    public function setWindowSize(width:Int, height:Int):Bool {
+
+        #if (ios || tvos || android)
+
+        return false;
+
+        #else
+
+        if (window == null || width <= 0 || height <= 0) {
+            return false;
+        }
+
+        if (app.config.window.fullscreen) {
+            // A fullscreen window cannot be resized
+            return false;
+        }
+
+        SDL.getWindowSizeInPixels(window, _sdlSize);
+        var prevW:Int = _sdlSize.w;
+        var prevH:Int = _sdlSize.h;
+
+        if (SDL.isWindowMaximized(window)) {
+            // A maximized window ignores size requests: restore it first
+            SDL.restoreWindow(window);
+            untyped __cpp__('SDL_SyncWindow({0})', window);
+        }
+
+        resizeWindowToLogicalSize(width, height);
+
+        SDL.getWindowSizeInPixels(window, _sdlSize);
+        return _sdlSize.w != prevW || _sdlSize.h != prevH;
+
+        #end
 
     }
 
