@@ -226,8 +226,12 @@ class WebRuntime extends clay.base.BaseRuntime {
         clearPendingKeyUps();
 
         // A frame without a tick would draw the same image again
-        if (ticked || !didEmitTickOnce)
+        if (ticked || !didEmitTickOnce) {
+            // When the app draws nothing (it then sets `renderSkipped`), nothing else
+            // touches the GL context here and the browser keeps the image of the canvas
+            app.renderSkipped = false;
             app.emitRender();
+        }
 
         return true;
 
