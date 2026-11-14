@@ -119,6 +119,13 @@ class Clay {
     public var immediateShutdown:Bool = false;
 
     /**
+     * Set to true by the app's render handler when it drew nothing this frame:
+     * the runtime then does not swap or present, and treats the app as idle.
+     * The runtime resets it to false before each `emitRender`.
+     */
+    public var renderSkipped:Bool = false;
+
+    /**
      * Used for update loop and update rate
      */
     var nextTick:Float = 0;
@@ -477,6 +484,16 @@ class Clay {
                 b: config.defaultClear.b,
                 a: config.defaultClear.a
             },
+            maxDrawables: config.maxDrawables,
+            waitDrawableFirst: config.waitDrawableFirst,
+            waitDrawableFirstSlowFrames: config.waitDrawableFirstSlowFrames,
+            waitDrawableFirstFastFrames: config.waitDrawableFirstFastFrames,
+            waitDrawableFirstBackoffCap: config.waitDrawableFirstBackoffCap,
+            framePacing: config.framePacing,
+            framePacingFloor: config.framePacingFloor,
+            framePacingMultiple: config.framePacingMultiple,
+            framePacingWindow: config.framePacingWindow,
+            framePacingMinWindow: config.framePacingMinWindow,
             #if clay_sdl
             opengl: {
                 major: config.opengl.major,

@@ -104,6 +104,66 @@ class SDLRuntime extends clay.base.BaseRuntime {
     var dwmFlushAvailable:Bool = false;
     #end
 
+    /**
+     * True after a frame whose render was skipped (see `Clay.renderSkipped`): nothing was
+     * presented, so nothing paces the loop. It then waits for events, one display period
+     * at a time, instead of spinning.
+     */
+    var idle:Bool = false;
+
+    /** While idle: time (`Timestamp.now()`) of the next tick when no discrete event comes before. */
+    var idleDeadline:Float = 0;
+
+    /** While idle: a discrete event (key, text, button) was polled since the last tick. */
+    var idleDiscreteEvent:Bool = false;
+
+    /** Time of the last tick made before its deadline because of a discrete event. */
+    var lastEarlyTick:Float = -1;
+
+    /** Period of the display the window is on, in seconds. 0 when unknown. */
+    var displayPeriod:Float = 0;
+
+    var displayPeriodDirty:Bool = true;
+
+    #if ((mac || ios || tvos) && gles_angle)
+    /** Value of `maximumDrawableCount` last given to the Metal layer (0: none yet) */
+    var appliedMaxDrawables:Int = 0;
+
+    /** The Metal layer may have been created again: set its drawable count again */
+    var maxDrawablesDirty:Bool = true;
+    #end
+
+    #if clay_wait_drawable_first
+
+    /**
+     * Margin frame pacing, see `clay.FramePacer`. Its counters (`frames`, `blockedFrames`,
+     * `pacedFrames`, `misses`, `pacedMisses`, `period`, `margin`) can be read to see what
+     * the loop does.
+     */
+    public var framePacer(default, null):clay.FramePacer = new clay.FramePacer();
+
+    /**
+     * Decides whether the loop waits for its drawable first, see `clay.DrawableWaitGate`
+     * (`waitFirst`, `disabled`, `drops`, `resumes`, `backoff`).
+     */
+    public var drawableWaitGate(default, null):clay.DrawableWaitGate = new clay.DrawableWaitGate();
+
+    /** A frame was presented and no drawable was waited for since */
+    var presented:Bool = false;
+
+    /** The current frame waited for its drawable at the start of the loop */
+    var waitedDrawableFirst:Bool = false;
+
+    /** The frame presented last had waited for its drawable at the start of the loop */
+    var lastFrameWaitedFirst:Bool = false;
+
+    /** Time the work of the current loop iteration started (after the waits) */
+    var frameWorkStart:Float = 0;
+
+    var drawableWaitOffLogged:Bool = false;
+
+    #end
+
 /// Lifecycle
 
     override function init() {
@@ -375,6 +435,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
         if (!createRenderContext(window, config.render)) {
             throw 'SDL / failed to create render context: ${SDL.getError()}';
         }
+
+        #if ((mac || ios || tvos) && gles_angle)
+        // The EGL surface exists: ANGLE created its Metal layer
+        applyMaxDrawables();
+        #end
 
         if (setVSync(config.render.vsync)) {
             Log.info('SDL / vsync ${config.render.vsync ? 'enabled' : 'disabled'}');
@@ -1405,6 +1470,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #if (clay_dwm_flush && windows)
         // Apply DwmFlush() after SwapBuffers for reliable windowed vsync on Windows
+        // (its return is the vsync signal a frame pacing on Windows would anchor on:
+        // see `waitDrawableFirst`, nothing is paced here for now)
         if (dwmFlushAvailable && !app.config.window.fullscreen) {
             dwmFlush();
         }
@@ -1439,11 +1506,231 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /**
+     * Period of the display the window is on, in seconds (read again after the window
+     * changed display or the display changed mode). 1/60 when the display does not tell.
+     */
+    function refreshPeriod():Float {
+
+        if (displayPeriodDirty) {
+            displayPeriodDirty = false;
+            var rate:Float = SDL.getWindowRefreshRate(window);
+            displayPeriod = rate > 1 ? 1.0 / rate : 0;
+        }
+        return displayPeriod > 0 ? displayPeriod : 1.0 / 60;
+
+    }
+
+    #if ((mac || ios || tvos) && gles_angle)
+    /**
+     * Sets the number of drawables of the Metal layer ANGLE renders to
+     * (`config.render.maxDrawables`: 2 or 3, 0 or less leaves the layer alone).
+     */
+    function applyMaxDrawables():Void {
+
+        maxDrawablesDirty = false;
+        var count = app.config.render.maxDrawables;
+        appliedMaxDrawables = count;
+        if (count <= 0) return;
+        var layers = SDL.setWindowMaxDrawables(window, count);
+        Log.debug('SDL / max drawables: ' + (count <= 2 ? 2 : 3) + ' (metal layers: ' + layers + ')');
+
+    }
+    #end
+
+    /**
+     * Whether an event makes an idle loop tick at once. Keys, text and buttons do. Motion
+     * (mouse, wheel, axis, finger moves) and everything else wait for the end of the period:
+     * a mouse reporting at 1000 Hz must not make the loop tick faster than the display.
+     */
+    inline function isDiscreteEvent(type:Int):Bool {
+
+        return type == SDL.SDL_EVENT_KEY_DOWN
+            || type == SDL.SDL_EVENT_KEY_UP
+            || type == SDL.SDL_EVENT_TEXT_INPUT
+            || type == SDL.SDL_EVENT_TEXT_EDITING
+            || type == SDL.SDL_EVENT_MOUSE_BUTTON_DOWN
+            || type == SDL.SDL_EVENT_MOUSE_BUTTON_UP
+            || type == SDL.SDL_EVENT_GAMEPAD_BUTTON_DOWN
+            || type == SDL.SDL_EVENT_GAMEPAD_BUTTON_UP
+            || type == SDL.SDL_EVENT_JOYSTICK_BUTTON_DOWN
+            || type == SDL.SDL_EVENT_JOYSTICK_BUTTON_UP
+            || type == SDL.SDL_EVENT_FINGER_DOWN
+            || type == SDL.SDL_EVENT_FINGER_UP
+            || type == SDL.SDL_EVENT_QUIT;
+
+    }
+
+    #if !(ios || tvos)
+    /**
+     * Idle (the last frame was not rendered): waits for an event until the next tick is
+     * due. Returns as soon as an event is in the queue: the loop polls it, then ticks at
+     * once for a discrete event, or comes back here for the rest of the period.
+     */
+    function waitWhileIdle():Void {
+
+        var remaining = idleDeadline - Timestamp.now();
+        if (remaining >= 0.001) {
+            if (remaining > 1.0) remaining = 1.0;
+            SDL.waitEventTimeout(Std.int(remaining * 1000));
+        }
+        else if (remaining > 0) {
+            // `Sys.sleep` enters a GC free zone by itself
+            Sys.sleep(remaining);
+        }
+
+    }
+    #end
+
+    /**
+     * While idle, after the events were polled: whether to tick now. At the end of the
+     * period, or before it for a discrete event, at most once per period.
+     */
+    function idleTickDue():Bool {
+
+        var now = Timestamp.now();
+        var discrete = idleDiscreteEvent;
+        idleDiscreteEvent = false;
+        if (now >= idleDeadline) return true;
+        // With a fixed update rate, the ticks stay on their clock (`Clay.shouldUpdate`)
+        if (discrete && app.config.updateRate <= 0 && now - lastEarlyTick >= refreshPeriod()) {
+            lastEarlyTick = now;
+            return true;
+        }
+        return false;
+
+    }
+
+    /** A tick was made (at `tickTime`) and its render was skipped or not. */
+    function updateIdle(skipped:Bool, tickTime:Float):Void {
+
+        if (!skipped) {
+            idle = false;
+            return;
+        }
+        idle = true;
+        if (app.config.updateRate > 0) {
+            idleDeadline = app.nextTick + timestampStart;
+        }
+        else {
+            idleDeadline = tickTime + refreshPeriod();
+        }
+
+    }
+
+    #if clay_wait_drawable_first
+
+    function syncPacingConfig():Void {
+
+        var render = app.config.render;
+        var gate = drawableWaitGate;
+        gate.slowFrames = render.waitDrawableFirstSlowFrames;
+        gate.fastFrames = render.waitDrawableFirstFastFrames;
+        gate.backoffCap = render.waitDrawableFirstBackoffCap;
+        var pacer = framePacer;
+        // No pacing with a fixed update rate (the ticks have their own clock), nor where
+        // the loop is a display link callback (iOS): sleeping there would hold the run loop
+        pacer.enabled = #if (ios || tvos) false #else render.framePacing && app.config.updateRate <= 0 #end;
+        pacer.floor = render.framePacingFloor;
+        pacer.multiple = render.framePacingMultiple;
+        pacer.window = render.framePacingWindow;
+        pacer.minWindow = render.framePacingMinWindow;
+        pacer.nominalPeriod = refreshPeriod();
+
+    }
+
+    /**
+     * Start of a frame that follows a presented frame: waits for the drawable now (a clear
+     * of the screen takes it, see `GLGraphicsDriver.clearScreenForDrawable`), before the
+     * input is read, then sleeps as long as the frame pacing allows.
+     *
+     * Not done while idle (the drawable is free, there is nothing to wait for), nor while
+     * frames are slow (`DrawableWaitGate`): the loop is then the same as without this.
+     *
+     * Windows: nothing to invert there, the wait is in the present at the end of the loop
+     * (and in `DwmFlush`). A pacing anchored on the return of `dwmFlush()` in `windowSwap`
+     * would plug in here: give that return to `framePacer.acquired()` and sleep the same way.
+     */
+    function waitDrawableFirst():Void {
+
+        var render = app.config.render;
+        var gate = drawableWaitGate;
+        if (!render.waitDrawableFirst || !render.vsync || !gate.active || app.hasShutdown || !app.config.runtime.autoSwap) return;
+        #if ios
+        if (mobileInBackground.load()) return;
+        #end
+
+        syncPacingConfig();
+
+        var color = render.defaultClear;
+        var start = Timestamp.now();
+        app.graphics.clearScreenForDrawable(color.r, color.g, color.b, color.a);
+        var end = Timestamp.now();
+        waitedDrawableFirst = true;
+
+        // The wait is expected to block from the second frame in a row that waits first
+        // (the first one after an idle period finds its drawable free)
+        gate.waitDone(end - start > clay.FramePacer.BLOCKED_WAIT, windowFocused && lastFrameWaitedFirst);
+        if (gate.disabled) {
+            if (!drawableWaitOffLogged) {
+                drawableWaitOffLogged = true;
+                Log.info('SDL / the wait for the drawable does not block at the start of the frame: wait first and frame pacing are off');
+            }
+            return;
+        }
+
+        var until = framePacer.acquired(start, end);
+        if (until > 0) {
+            var remaining = until - Timestamp.now();
+            if (remaining < 0.05) {
+                // `Sys.sleep` enters a GC free zone by itself (wrapping it in one crashes hxcpp)
+                if (remaining > 0.0006) Sys.sleep(remaining - 0.0005);
+                while (Timestamp.now() < until) {}
+            }
+        }
+
+    }
+
+    /** A frame was presented: its work time feeds the pacing and the slow frame rule. */
+    function framePresented(now:Float):Void {
+
+        syncPacingConfig();
+        var pacer = framePacer;
+        var work = now - frameWorkStart - app.graphics.screenClearTime;
+        if (!waitedDrawableFirst) pacer.interrupt();
+        pacer.frameDone(work, now);
+        var period = pacer.period > 0 ? pacer.period : refreshPeriod();
+        drawableWaitGate.frameDone(work, pacer.deadline(period), period, now);
+        presented = true;
+        lastFrameWaitedFirst = waitedDrawableFirst;
+
+    }
+
+    #end
+
     function loop(_) {
 
         var doUpdate = false;
+        var skipped = false;
 
         inline function _loop() {
+
+            #if !(ios || tvos)
+            if (idle) waitWhileIdle();
+            #end
+
+            #if ((mac || ios || tvos) && gles_angle)
+            if (maxDrawablesDirty || appliedMaxDrawables != app.config.render.maxDrawables) applyMaxDrawables();
+            #end
+
+            #if clay_wait_drawable_first
+            if (presented) {
+                presented = false;
+                waitDrawableFirst();
+            }
+            frameWorkStart = Timestamp.now();
+            app.graphics.screenClearTime = 0;
+            #end
 
             while (SDL.pollEvent(_sdlEvent)) {
 
@@ -1453,6 +1740,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
                 var e = new SDLEvent(_sdlEvent);
                 currentSdlEvent = e;
+
+                if (idle && isDiscreteEvent(e.type)) idleDiscreteEvent = true;
 
                 app.events.sdlEvent(cast _sdlEvent);
 
@@ -1484,10 +1773,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
 
             var newTimestamp = timestamp();
-            doUpdate = app.shouldUpdate(newTimestamp);
+            doUpdate = (!idle || idleTickDue()) && app.shouldUpdate(newTimestamp);
             if (doUpdate) {
                 app.emitTick(newTimestamp);
+                app.renderSkipped = false;
                 app.emitRender();
+                // The app drew nothing: nothing to present, and the loop goes idle
+                skipped = app.renderSkipped;
+                updateIdle(skipped, newTimestamp + timestampStart);
 
                 #if (mac || windows || linux)
                 #if clay_unfocused_native_sleep_after_render
@@ -1502,9 +1795,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 #end
             } else {
                 #if !clay_native_no_tick_sleep
+                #if (ios || tvos)
                 Sys.sleep(0.0001);
+                #else
+                // While idle the loop sleeps in `waitWhileIdle`
+                if (!idle) Sys.sleep(0.0001);
+                #end
                 #end
             }
+
+            #if clay_wait_drawable_first
+            var swapped = false;
+            #end
 
             if (app.config.runtime.autoSwap && !app.hasShutdown) {
 
@@ -1512,8 +1814,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 // iOS doesn't like it when we send GPU commands when app is in background
                 if (!mobileInBackground.load()) {
                 #end
-                    if (doUpdate) {
+                    if (doUpdate && !skipped) {
                         windowSwap();
+                        #if clay_wait_drawable_first
+                        swapped = true;
+                        #end
                     }
                 #if ios
                 }
@@ -1522,6 +1827,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             if (doUpdate) {
                 lastFrameTime = Timestamp.now();
+                #if clay_wait_drawable_first
+                if (swapped) {
+                    framePresented(lastFrameTime);
+                }
+                else {
+                    // Nothing presented: the chain of drawable waits is broken
+                    framePacer.interrupt();
+                    lastFrameWaitedFirst = false;
+                }
+                waitedDrawableFirst = false;
+                #end
             }
 
         }
@@ -1938,6 +2254,15 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
 /// Window
 
+    /** `SDL_EVENT_DISPLAY_FIRST` */
+    static inline var SDL_EVENT_DISPLAY_FIRST:Int = 0x151;
+    /** `SDL_EVENT_DISPLAY_LAST` */
+    static inline var SDL_EVENT_DISPLAY_LAST:Int = 0x158;
+    /** `SDL_EVENT_WINDOW_FIRST` */
+    static inline var SDL_EVENT_WINDOW_FIRST:Int = 0x202;
+    /** `SDL_EVENT_WINDOW_LAST` */
+    static inline var SDL_EVENT_WINDOW_LAST:Int = 0x21A;
+
     function handleWindowEvent(e:SDLEvent) {
 
         var data1 = e.windowData1;
@@ -2003,9 +2328,31 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 // Density change is picked up by the screen update of the next tick
                 updateWindowMetrics();
 
+            case SDL.SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+                // Another display: its refresh rate may differ
+                displayPeriodDirty = true;
+
             case _:
 
         }
+
+        var sdlType:Int = e.type;
+        if (sdlType >= SDL_EVENT_DISPLAY_FIRST && sdlType <= SDL_EVENT_DISPLAY_LAST) {
+            // A display was added, removed or changed mode
+            displayPeriodDirty = true;
+        }
+
+        #if ((mac || ios || tvos) && gles_angle)
+        if (sdlType >= SDL_EVENT_WINDOW_FIRST && sdlType <= SDL_EVENT_WINDOW_LAST
+            && sdlType != SDL.SDL_EVENT_WINDOW_MOVED
+            && sdlType != SDL.SDL_EVENT_WINDOW_MOUSE_ENTER
+            && sdlType != SDL.SDL_EVENT_WINDOW_MOUSE_LEAVE
+            && sdlType != SDL.SDL_EVENT_WINDOW_HIT_TEST) {
+            // The Metal layer may be created again when the window changes
+            // (size, display, fullscreen): its drawable count is set again
+            maxDrawablesDirty = true;
+        }
+        #end
 
         if (type != UNKNOWN) {
             app.emitWindowEvent(type, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), data1, data2);

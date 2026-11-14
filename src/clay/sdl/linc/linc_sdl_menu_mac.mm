@@ -120,6 +120,16 @@ static int clayMenuTakePending(Uint64 timestamp) {
     return -1;
 }
 
+// The menu callbacks run haxe code. They are called by AppKit while SDL pumps
+// the events, which can be inside the GC free zone of
+// `linc::sdl::waitEventTimeout` (the idle wait of the main loop): leave the
+// zone for the time of the call.
+struct ClayMenuHaxeCall {
+    bool wasFree;
+    ClayMenuHaxeCall() { wasFree = hx::TryExitGCFreeZone(); }
+    ~ClayMenuHaxeCall() { if (wasFree) hx::EnterGCFreeZone(); }
+};
+
 static void clayMenuHandleItem(id sender) {
     if (![sender isKindOfClass:[NSMenuItem class]]) {
         return;
@@ -130,6 +140,7 @@ static void clayMenuHandleItem(id sender) {
         return;
     }
     if (linc::sdl::_menuCallbacksSet) {
+        ClayMenuHaxeCall haxeCall;
         linc::sdl::_menuAction(tag);
     }
 }
@@ -142,6 +153,7 @@ static BOOL clayMenuValidateItem(NSMenuItem *item) {
     if (!linc::sdl::_menuCallbacksSet) {
         return NO;
     }
+    ClayMenuHaxeCall haxeCall;
     return linc::sdl::_menuValidate((int)[item tag]) != 0 ? YES : NO;
 }
 
@@ -176,6 +188,7 @@ static BOOL clayMenuValidateItem(NSMenuItem *item) {
 
 - (void)menuWillOpen:(NSMenu *)menu {
     if (linc::sdl::_menuCallbacksSet) {
+        ClayMenuHaxeCall haxeCall;
         linc::sdl::_menuWillOpen();
     }
 }

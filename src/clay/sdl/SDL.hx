@@ -939,6 +939,15 @@ class SDL {
         return SDL_Extern.pollEvent(event);
     }
 
+    /**
+     * Waits until an event is in the queue or `timeoutMs` milliseconds went by
+     * (`SDL_WaitEventTimeout`). Returns true when an event is there: it is left
+     * in the queue for `pollEvent`. The thread is in a GC free zone meanwhile.
+     */
+    extern inline public static function waitEventTimeout(timeoutMs:Int):Bool {
+        return SDL_Extern.waitEventTimeout(timeoutMs);
+    }
+
     extern inline public static function pumpEvents():Void {
         SDL_Extern.pumpEvents();
     }
@@ -1019,6 +1028,23 @@ class SDL {
 
     extern inline public static function getDisplayContentScale(displayID:SDLDisplayID):Float {
         return SDL_Extern.getDisplayContentScale(displayID);
+    }
+
+    /**
+     * Refresh rate, in Hz, of the current mode of the display the window is on.
+     * 0 when unknown.
+     */
+    extern inline public static function getWindowRefreshRate(window:SDLWindowPointer):Float {
+        return SDL_Extern.getWindowRefreshRate(window);
+    }
+
+    /**
+     * Sets `maximumDrawableCount` (2 or 3) on the Metal layers of the window
+     * (macOS and iOS, where ANGLE renders to a `CAMetalLayer`). Returns the
+     * number of Metal layers found, 0 on other platforms.
+     */
+    extern inline public static function setWindowMaxDrawables(window:SDLWindowPointer, count:Int):Int {
+        return SDL_Extern.setWindowMaxDrawables(window, count);
     }
 
     extern inline public static function getDisplayUsableBounds(displayID:SDLDisplayID, rect:SDLRect):Void {
@@ -1835,6 +1861,15 @@ class SDL {
 
     @:native('::linc::sdl::getDisplayContentScale')
     static function getDisplayContentScale(displayID:SDLDisplayID):Float;
+
+    @:native('::linc::sdl::waitEventTimeout')
+    static function waitEventTimeout(timeoutMs:Int):Bool;
+
+    @:native('::linc::sdl::getWindowRefreshRate')
+    static function getWindowRefreshRate(window:SDLWindowPointer):Float;
+
+    @:native('::linc::sdl::setWindowMaxDrawables')
+    static function setWindowMaxDrawables(window:SDLWindowPointer, count:Int):Int;
 
     @:native('::linc::sdl::getDisplayUsableBounds')
     static function getDisplayUsableBounds(displayID:SDLDisplayID, rect:SDLRectPointer):Void;

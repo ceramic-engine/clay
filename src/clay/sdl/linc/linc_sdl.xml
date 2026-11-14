@@ -10,6 +10,8 @@
         <file name="${LINC_SDL_PATH}linc/linc_sdl.cpp" />
         <file name="${LINC_SDL_PATH}linc/linc_sdl_menu_mac.mm" if="mac" unless="ios" />
         <file name="${LINC_SDL_PATH}linc/linc_sdl_system_mac.mm" if="mac" unless="ios" />
+        <!-- maximumDrawableCount of the CAMetalLayer ANGLE renders to (macOS and iOS) -->
+        <file name="${LINC_SDL_PATH}linc/linc_sdl_metal_layer.mm" if="mac || ios || tvos" />
         <!-- autoHideScrollbars on Windows: WinRT UISettings, registry fallback (untested) -->
         <file name="${LINC_SDL_PATH}linc/linc_sdl_system_windows.cpp" if="windows" />
 

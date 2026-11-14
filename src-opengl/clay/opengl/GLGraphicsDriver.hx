@@ -404,6 +404,12 @@ void main() {
         // declare it GC-free so a collection requested by another thread
         // never has to wait for it. glClear only takes a scalar mask, no
         // GC memory is involved.
+        #if (clay_wait_drawable_first && clay_sdl)
+        // Time the clears of the screen: the runtime takes the wait for the
+        // drawable out of the work time of the frame
+        var onScreen = (_boundFramebuffer == noFramebuffer);
+        var clearStart = onScreen ? timestamp.Timestamp.now() : 0.0;
+        #end
         #if cpp cpp.vm.Gc.enterGCFreeZone(); #end
         if (withDepth) {
             GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
@@ -411,11 +417,58 @@ void main() {
             GL.clear(GL.COLOR_BUFFER_BIT);
         }
         #if cpp cpp.vm.Gc.exitGCFreeZone(); #end
+        #if (clay_wait_drawable_first && clay_sdl)
+        if (onScreen) screenClearTime += timestamp.Timestamp.now() - clearStart;
+        #end
 
         if (withDepth) {
             GL.clearDepth(1.0);
         }
     }
+
+    #if (clay_wait_drawable_first && clay_sdl)
+
+    /**
+     * Seconds spent in clears of the screen (the default framebuffer) since the runtime
+     * last set it to 0. With a vsync throttled swapchain the first of them waits for the
+     * drawable (ANGLE Metal): the runtime uses this to know the work time of a frame
+     * without that wait.
+     */
+    public var screenClearTime:Float = 0;
+
+    /**
+     * Clears the color of the screen so that the wait for the drawable happens now.
+     *
+     * With ANGLE's Metal backend the drawable of the frame is taken (a blocking
+     * `nextDrawable`) when the first render pass on the default framebuffer starts, which
+     * a clear does. Called by the runtime at the start of a frame, before the input is
+     * read, so that what is drawn afterwards is as recent as possible.
+     *
+     * The state the previous frame left is not known, and ANGLE drops a clear that has
+     * nothing to write: the default framebuffer is bound through this driver (its cache
+     * stays right), the scissor test is disabled for the clear (and restored), the color
+     * mask is set to full (the value the batcher always leaves) and rasterizer discard is
+     * disabled (nothing in clay enables it).
+     */
+    public function clearScreenForDrawable(r:Float, g:Float, b:Float, a:Float):Void {
+        bindFramebuffer(noFramebuffer);
+        var scissor:Bool = GL.isEnabled(GL.SCISSOR_TEST);
+        if (scissor) GL.disable(GL.SCISSOR_TEST);
+        GL.colorMask(true, true, true, true);
+        #if linc_opengl_GLES
+        GL.disable(RASTERIZER_DISCARD);
+        #end
+        GL.clearColor(r, g, b, a);
+        #if cpp cpp.vm.Gc.enterGCFreeZone(); #end
+        GL.clear(GL.COLOR_BUFFER_BIT);
+        #if cpp cpp.vm.Gc.exitGCFreeZone(); #end
+        if (scissor) GL.enable(GL.SCISSOR_TEST);
+    }
+
+    /** `GL_RASTERIZER_DISCARD` (OpenGL ES 3.0) */
+    static inline var RASTERIZER_DISCARD:Int = 0x8C89;
+
+    #end
 
     /**
      * Sets the viewport dimensions.

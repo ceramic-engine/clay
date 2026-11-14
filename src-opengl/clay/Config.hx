@@ -49,6 +49,90 @@ class RenderConfig {
     /** If applicable on the current platform, enables vsync */
     var vsync:Bool = #if clay_no_vsync false #else true #end;
 
+    /**
+     * Number of drawables of the Metal layer the app renders to (macOS and iOS, ANGLE Metal):
+     * 2 or 3. macOS gives 3 by default: with vsync, a frame then waits behind two older ones
+     * before it is shown. With 2 it waits behind one. Ignored on other targets. default: 2
+     */
+    var maxDrawables:Int = 2;
+
+    /**
+     * Wait for the drawable at the start of the frame, before the input is read, instead of
+     * in the first draw call after the update: what is drawn is then one vsync more recent.
+     * Only where the runtime is compiled with `clay_wait_drawable_first` (macOS and iOS),
+     * ignored elsewhere. Can be changed while running. default: true
+     *
+     * A frame that starts at the drawable return has `period - framePacingFloor` for its work
+     * (the deadline). When frames take longer, waiting first costs a whole period per frame,
+     * so the runtime stops waiting first while frames are slow, see the settings below.
+     */
+    var waitDrawableFirst:Bool = true;
+
+    /**
+     * Frames in a row whose work exceeds the deadline (`period - framePacingFloor`) that stop
+     * the wait for the drawable first. One isolated long frame changes nothing.
+     * Unit: frames. default: 3
+     */
+    var waitDrawableFirstSlowFrames:Int = 3;
+
+    /**
+     * Frames in a row whose work is within the deadline (`period - framePacingFloor`) that
+     * resume the wait for the drawable first. Doubled each time waiting first is stopped
+     * again less than a second after it resumed (up to `waitDrawableFirstBackoffCap`), halved
+     * after each 5 seconds without a stop. Unit: frames. default: 8
+     */
+    var waitDrawableFirstFastFrames:Int = 8;
+
+    /**
+     * Longest run of fast frames needed to resume the wait for the drawable first, once
+     * doubled by the backoff. Unit: seconds of frames (2.0 is 120 frames at 60 Hz). default: 2.0
+     */
+    var waitDrawableFirstBackoffCap:Float = 2.0;
+
+    /**
+     * Margin frame pacing: after the drawable wait returned (a vsync), the loop sleeps until
+     * `next vsync - margin` before it reads the input, so the input shown is as recent as
+     * possible. `margin = framePacingFloor + framePacingMultiple x worst recent work`.
+     * Engages only when the margin fits in the period, with exactly the conditions of
+     * `clay.FramePacer`. Needs the wait for the drawable first, so it only exists where
+     * `clay_wait_drawable_first` is compiled and the runtime owns its loop (macOS), ignored
+     * elsewhere. Can be changed while running. default: true
+     */
+    var framePacing:Bool = true;
+
+    /**
+     * Fixed part of the pacing margin: the lead the compositor needs before a vsync, plus
+     * what is not measured (GPU time after the submit, wake up jitter). It is also what
+     * defines the deadline of a frame (`period - framePacingFloor`), used by the wait for the
+     * drawable first. Unit: seconds. default: 0.004
+     */
+    var framePacingFloor:Float = 0.004;
+
+    /**
+     * The worst recent work is multiplied by this in the pacing margin. Pacing engages only
+     * when `framePacingFloor + framePacingMultiple x worst work <= period`: at 60 Hz with the
+     * defaults, up to 6.3 ms of work per frame. It does not apply to the wait for the drawable
+     * first. default: 2.0
+     */
+    var framePacingMultiple:Float = 2.0;
+
+    /**
+     * Largest number of frames over which the worst work is taken for the pacing margin.
+     * A frame over the deadline counts as one full period and keeps pacing off while it is
+     * in the window. The window used starts at `framePacingMinWindow` and doubles, up to
+     * this, each time pacing fails less than a second after it engaged again.
+     * Unit: frames, not time (120 is 2 seconds at 60 Hz, 1 second at 120 Hz). default: 120
+     */
+    var framePacingWindow:Int = 120;
+
+    /**
+     * Smallest number of frames over which the worst work is taken for the pacing margin:
+     * after a long frame, pacing is tried again this many frames later (plus its lock of 5
+     * consistent vsync signals). The window halves back towards this after each 5 seconds
+     * without a frame over the deadline or a paced miss. Unit: frames. default: 8
+     */
+    var framePacingMinWindow:Int = 8;
+
     #if clay_web
 
     /** WebGL render context specific settings */

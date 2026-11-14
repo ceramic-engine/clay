@@ -581,6 +581,21 @@ namespace linc {
             return SDL_PollEvent(event);
         }
 
+        // Waits until an event is in the queue (it is left there) or the
+        // timeout elapsed. The thread is parked in a GC free zone meanwhile:
+        // it can sit here for a whole display period, and a collection asked
+        // by another thread must not wait for it. Code called back into haxe
+        // while the events are pumped leaves the zone first (the trampolines
+        // through hx::SetTopOfStack do it, the menu callbacks of
+        // linc_sdl_menu_mac.mm do it explicitly), hence the "try" on the way
+        // out: the zone may already have been left.
+        bool waitEventTimeout(int timeoutMs) {
+            hx::EnterGCFreeZone();
+            bool result = SDL_WaitEventTimeout(NULL, timeoutMs);
+            hx::TryExitGCFreeZone();
+            return result;
+        }
+
         void pumpEvents() {
             SDL_PumpEvents();
         }
@@ -641,6 +656,32 @@ namespace linc {
         void getDisplayUsableBounds(SDL_DisplayID displayID, SDL_Rect* rect) {
             SDL_GetDisplayUsableBounds(displayID, rect);
         }
+
+        // Refresh rate (Hz) of the current mode of the display the window is on,
+        // 0 when unknown
+        float getWindowRefreshRate(SDL_Window* window) {
+            SDL_DisplayID displayID = window != NULL ? SDL_GetDisplayForWindow(window) : 0;
+            if (displayID == 0) {
+                displayID = SDL_GetPrimaryDisplay();
+            }
+            if (displayID == 0) {
+                return 0.0f;
+            }
+            const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayID);
+            if (mode == NULL) {
+                return 0.0f;
+            }
+            if (mode->refresh_rate_numerator > 0 && mode->refresh_rate_denominator > 0) {
+                return (float)mode->refresh_rate_numerator / (float)mode->refresh_rate_denominator;
+            }
+            return mode->refresh_rate;
+        }
+
+        #if !defined(__APPLE__)
+        int setWindowMaxDrawables(SDL_Window* window, int count) {
+            return 0;
+        }
+        #endif
 
         // Between two animation callbacks the main thread sits in the native
         // run loop, where it never reaches a GC safe point: a collection

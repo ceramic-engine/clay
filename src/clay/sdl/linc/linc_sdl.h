@@ -146,6 +146,7 @@ namespace linc {
 
         // Events
         bool pollEvent(SDL_Event* event);
+        bool waitEventTimeout(int timeoutMs);
         void pumpEvents();
 
         // Joystick/Gamepad
@@ -165,6 +166,10 @@ namespace linc {
         // Display
         float getDisplayContentScale(SDL_DisplayID displayID);
         void getDisplayUsableBounds(SDL_DisplayID displayID, SDL_Rect* rect);
+        float getWindowRefreshRate(SDL_Window* window);
+
+        // Metal layer of the window (macOS and iOS: linc_sdl_metal_layer.mm)
+        int setWindowMaxDrawables(SDL_Window* window, int count);
 
         // Event handlers
         #if (defined(SDL_PLATFORM_IOS) || defined(SDL_PLATFORM_TVOS))
