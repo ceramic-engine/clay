@@ -19,6 +19,13 @@ class Events {
 
     public function render():Void {}
 
+    /**
+     * Whether the app already knows that it has something to draw at the next frame
+     * (a render was requested since the last one). `true` when unknown. Read by the web
+     * runtime after an early tick (`config.runtime.earlyTickOnInput`).
+     */
+    public function renderPending():Bool { return true; }
+
     public function freeze():Void {}
 
     public function unfreeze():Void {}

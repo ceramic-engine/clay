@@ -126,6 +126,16 @@ class Clay {
     public var renderSkipped:Bool = false;
 
     /**
+     * Whether continuous rendering is going on: every frame is drawn, or expected to be.
+     * `true` by default (an app that draws every frame). An app that renders on demand sets
+     * it to `false` at each tick while nothing animates: the web runtime then handles a
+     * discrete input event at once instead of at the next animation frame
+     * (`config.runtime.earlyTickOnInput`). Unlike `renderSkipped`, it stays `false` right
+     * after a frame drawn once (a caret that blinks, a list that opens).
+     */
+    public var renderContinuous:Bool = true;
+
+    /**
      * Used for update loop and update rate
      */
     var nextTick:Float = 0;

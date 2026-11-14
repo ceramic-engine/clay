@@ -135,6 +135,82 @@ class WebRuntime extends clay.base.BaseRuntime {
     static inline final FRAME_DIVIDER_SETTLE_FRAMES:Int = 30;
 
     /**
+     * Early tick on input (`config.runtime.earlyTickOnInput`, on by default). While no
+     * continuous rendering is going on (see `Clay.renderContinuous`: only an app that
+     * renders on demand is ever in that state), a discrete input event (key, text, mouse
+     * button, touch down or up) is handled at once: a tick and a render are run from the
+     * event handler instead of at the next animation frame, at most once per refresh
+     * period. Whatever is refused is handled by the next animation frame, as when the
+     * setting is off. See `earlyTick()`.
+     */
+
+    /** Time (`timestamp()`) of the last early tick, or -1 */
+    var lastEarlyTick:Float = -1;
+
+    /** Whether an early tick ran since the last animation frame */
+    var earlyTickSinceFrame:Bool = false;
+
+    /**
+     * Whether the time ticked is ahead of the frame times given by the browser: after an
+     * early tick, until an animation frame comes with a time of its own after it (frames
+     * that queued up behind a long early tick come with times in the past)
+     */
+    var tickedAheadOfFrames:Bool = false;
+
+    /** Whether a composition is going on in an editable element (between `compositionstart` and `compositionend`) */
+    var composing:Bool = false;
+
+    /** Whether an input event was given to the app since the last early tick */
+    var eventSinceEarlyTick:Bool = false;
+
+    /** Whether an early tick is waiting in a task (composing `input`, see `deferEarlyTick()`) */
+    var earlyTickDeferred:Bool = false;
+
+    /** Whether a tick or a render is running (an event dispatched from inside one never ticks) */
+    var inFrame:Bool = false;
+
+    /** Number of animation frames drawn in a row, up to `EARLY_TICK_MAX_DRAWN_FRAMES` */
+    var drawnFramesInARow:Int = 0;
+
+    /** Number of early ticks made so far (diagnostics) */
+    public var earlyTickCount(default, null):Int = 0;
+
+    /**
+     * Number of discrete events that came while nothing rendered continuously and were left
+     * to the next animation frame because an early tick already ran in this refresh period
+     * (diagnostics)
+     */
+    public var earlyTickRefusedCount(default, null):Int = 0;
+
+    /**
+     * Number of discrete events left to the next animation frame because they came less than
+     * `EARLY_TICK_MIN_DELTA` after the time of the last tick (diagnostics)
+     */
+    public var earlyTickTooSoonCount(default, null):Int = 0;
+
+    /**
+     * Number of animation frames that did not tick because they came less than
+     * `EARLY_TICK_MIN_DELTA` after an early tick, with nothing new to handle (diagnostics)
+     */
+    public var earlyTickMergedFrameCount(default, null):Int = 0;
+
+    /**
+     * No early tick less than this (seconds) after the time of the last tick. An animation
+     * frame that comes less than this after an early tick does not tick again, unless
+     * something happened since: no tick gets a tiny delta for nothing.
+     */
+    static inline final EARLY_TICK_MIN_DELTA:Float = 0.001;
+
+    /**
+     * This many animation frames drawn in a row count as continuous rendering, whatever
+     * `Clay.renderContinuous` says (an app that requests a render at every frame without
+     * saying that it animates): no early tick then. One drawn frame (a caret that blinks, a
+     * list that opens) does not prevent the early tick of the key that follows.
+     */
+    static inline final EARLY_TICK_MAX_DRAWN_FRAMES:Int = 2;
+
+
+    /**
      * Right mouse button state as seen by clay.
      *
      * Chromium 130 on macOS (Electron 33) dispatches `mousedown` and `contextmenu` for the right button
@@ -212,14 +288,57 @@ class WebRuntime extends clay.base.BaseRuntime {
         // The time of the frame given by the browser (on the beat of the display), never
         // behind the time already ticked
         var newTimestamp = t > 0 ? t / 1000.0 - timestampStart : timestamp();
+
+        // Only after an early tick (see `earlyTick()`), never when `earlyTickOnInput` is off
+        var afterEarlyTick = earlyTickSinceFrame || tickedAheadOfFrames;
+        var frameTimestamp = newTimestamp;
+        var leftToNextFrame = false;
+        if (afterEarlyTick) {
+            earlyTickSinceFrame = false;
+            // The refresh period is measured on the frame times given by the browser, which
+            // an early tick does not move
+            if (frameTimestamp < lastFrameTimestamp)
+                frameTimestamp = lastFrameTimestamp;
+            // The early tick ran after the time of this frame (its event was dispatched in
+            // the same frame, before this callback, or this frame queued up behind it):
+            // the time that really passed since, instead of a delta of zero
+            tickedAheadOfFrames = (newTimestamp <= app.timestamp);
+            if (tickedAheadOfFrames)
+                newTimestamp = timestamp();
+            var sinceLastTick = newTimestamp - app.timestamp;
+            if (sinceLastTick <= 0) {
+                // No time passed for the clock (browsers that round it): never a tick with
+                // a delta of zero, the next frame handles whatever came since
+                leftToNextFrame = true;
+            }
+            else if (sinceLastTick < EARLY_TICK_MIN_DELTA && !eventSinceEarlyTick && !app.events.renderPending()) {
+                // Nothing came since the early tick: its work is done, and what a tick does
+                // by itself (timers, animations) is left to the next frame instead of being
+                // run with a tiny delta
+                leftToNextFrame = true;
+            }
+            if (leftToNextFrame)
+                earlyTickMergedFrameCount++;
+            else
+                eventSinceEarlyTick = false;
+        }
+
         if (newTimestamp < app.timestamp)
             newTimestamp = app.timestamp;
 
-        var ticked = shouldTick(newTimestamp);
+        inFrame = true;
+
+        var ticked = shouldTick(afterEarlyTick ? frameTimestamp : newTimestamp);
+        if (leftToNextFrame && ticked) {
+            // The next frame ticks in its place
+            ticked = false;
+            framesSinceTick = frameDivider - 1;
+        }
         if (ticked) {
             if (wheelResampler != null)
                 sampleWheel(newTimestamp);
             didEmitTickOnce = true;
+            earlyTickDeferred = false;
             app.emitTick(newTimestamp);
         }
 
@@ -231,9 +350,192 @@ class WebRuntime extends clay.base.BaseRuntime {
             // touches the GL context here and the browser keeps the image of the canvas
             app.renderSkipped = false;
             app.emitRender();
+            if (app.renderSkipped)
+                drawnFramesInARow = 0;
+            else if (drawnFramesInARow < EARLY_TICK_MAX_DRAWN_FRAMES)
+                drawnFramesInARow++;
         }
 
+        inFrame = false;
+
         return true;
+
+    }
+
+    /**
+     * Called at the end of the handler of a discrete input event, once the event was given
+     * to the app (`config.runtime.earlyTickOnInput`): ticks and renders now, at most once
+     * per refresh period, when no continuous rendering is going on. The draw made here is
+     * shown by the browser at its next frame; the animation frame that follows ticks with
+     * the time passed since and finds nothing new to draw. Whatever is refused here is
+     * handled by the next animation frame, as when the setting is off.
+     * Returns whether it ticked.
+     */
+    function earlyTick():Bool {
+
+        if (!app.config.runtime.earlyTickOnInput)
+            return false;
+
+        // Something for the animation frame that follows an early tick (see `loop()`)
+        eventSinceEarlyTick = true;
+
+        if (inFrame || !app.ready || app.shuttingDown || app.hasShutdown || app.freeze || !didEmitTickOnce)
+            return false;
+
+        // Only when no continuous rendering is going on: the app renders on demand and
+        // nothing animates (`Clay.renderContinuous`, kept up to date by the app at each
+        // tick, true for an app that draws every frame), and the last animation frames
+        // were not all drawn. A frame drawn just before (a caret that blinks, a list that
+        // opens) does not prevent it. Otherwise the loop is on the beat of the display
+        // and the next animation frame handles the event.
+        if (app.renderContinuous || drawnFramesInARow >= EARLY_TICK_MAX_DRAWN_FRAMES)
+            return false;
+
+        // With a fixed update rate, the ticks stay on their beat (same rule as the native loop)
+        if (app.config.updateRate > 0 || frameIntervalCount == 0)
+            return false;
+
+        var now = timestamp();
+        if (lastEarlyTick >= 0 && now - lastEarlyTick < refreshPeriod()) {
+            earlyTickRefusedCount++;
+            return false;
+        }
+
+        // Never a delta of zero or below, and no tiny one: the time of the last tick is the
+        // time of an animation frame, in the past, but the event can come right after it,
+        // and a browser that rounds its clock can give the same value again (the clock of
+        // a tick made while the page was hidden differs too). The next frame handles it.
+        if (now - app.timestamp < EARLY_TICK_MIN_DELTA) {
+            earlyTickTooSoonCount++;
+            return false;
+        }
+
+        lastEarlyTick = now;
+        earlyTickSinceFrame = true;
+        eventSinceEarlyTick = false;
+        earlyTickDeferred = false;
+        earlyTickCount++;
+
+        inFrame = true;
+
+        app.emitTick(now);
+
+        // Same order as a frame: the key ups kept for "the next frame" come after the tick
+        clearPendingKeyUps();
+
+        // Not counted in `drawnFramesInARow`: only animation frames are
+        app.renderSkipped = false;
+        app.emitRender();
+
+        inFrame = false;
+
+        return true;
+
+    }
+
+    /**
+     * An event that never ticks early (mouse move, wheel, touch move) was given to the app:
+     * the animation frame that follows an early tick has something to handle.
+     */
+    inline function noteEventForEarlyTick():Void {
+
+        if (earlyTickSinceFrame)
+            eventSinceEarlyTick = true;
+
+    }
+
+    /**
+     * An early tick in a task run right after the current one. Used for the `input` events
+     * of a composition: the browser sends `compositionend` (the commit) in the same task as
+     * the last of them in Chromium and WebKit, and the commit must not find the early tick
+     * of the period already taken by the composed text it replaces. `compositionend` ticks
+     * at once, which cancels this one; so does an animation frame that comes first.
+     */
+    function deferEarlyTick():Void {
+
+        if (earlyTickDeferred || !app.config.runtime.earlyTickOnInput)
+            return;
+
+        earlyTickDeferred = true;
+        js.Browser.window.setTimeout(function() {
+            if (earlyTickDeferred) {
+                earlyTickDeferred = false;
+                earlyTick();
+            }
+        }, 0);
+
+    }
+
+    /**
+     * Whether the browser is expected to send a text event (`keypress`, then `input` when
+     * an editable element has the focus, or composition events) for this `keydown`. The
+     * early tick is then left to that event, so the key and its text are handled in one
+     * tick. When the text event never comes, the next animation frame handles the key.
+     */
+    function keyDownExpectsText(ev:js.html.KeyboardEvent):Bool {
+
+        if (ev.defaultPrevented)
+            return false;
+
+        // IME (229: the key is processed by the input method) and dead keys
+        var key:String = ev.key;
+        if (ev.isComposing || ev.keyCode == 229 || key == 'Dead' || key == 'Process')
+            return true;
+
+        if (key == null || key.length != 1)
+            return false;
+
+        // A shortcut, unless ctrl comes from AltGr (reported as ctrl + alt on Windows)
+        if (ev.metaKey)
+            return false;
+        if (ev.ctrlKey && !ev.getModifierState('AltGraph'))
+            return false;
+
+        return true;
+
+    }
+
+    /** Whether an editable element has the focus: a `keypress` is then followed by `input`. */
+    function editableHasFocus():Bool {
+
+        var active:Dynamic = js.Browser.document.activeElement;
+        if (active == null)
+            return false;
+        var tag:String = active.tagName;
+        return tag == 'TEXTAREA' || tag == 'INPUT' || active.isContentEditable == true;
+
+    }
+
+    /** `input`, `compositionstart` and `compositionend`, seen at the document after the listeners of their target */
+    function handleTextEventForEarlyTick(ev:js.html.Event) {
+
+        if (skipKeyboardEvents)
+            return;
+
+        var type = ev.type;
+        if (type == 'compositionstart') {
+            composing = true;
+            noteEventForEarlyTick();
+            return;
+        }
+        if (type == 'compositionend') {
+            composing = false;
+        }
+        else if (type == 'input') {
+            // Composed text (not committed yet), in the event orders of Chromium (every
+            // `input` comes before `compositionend`, with `isComposing`), of WebKit
+            // (`deleteCompositionText` and `insertFromComposition` come with `isComposing`
+            // false, before `compositionend`) and of Firefox (an `insertCompositionText`
+            // comes after `compositionend`)
+            var inputType:String = untyped ev.inputType;
+            if (composing || untyped ev.isComposing == true || (inputType != null && inputType.indexOf('Composition') != -1)) {
+                noteEventForEarlyTick();
+                deferEarlyTick();
+                return;
+            }
+        }
+
+        earlyTick();
 
     }
 
@@ -504,6 +806,15 @@ class WebRuntime extends clay.base.BaseRuntime {
         js.Browser.document.addEventListener('keyup',    handleKeyUp);
         js.Browser.document.addEventListener('keypress', handleKeyPress);
 
+        // Early tick on input: text committed to an editable element (the hidden textarea
+        // used while text editing). These bubble to the document after the listeners of
+        // the element.
+        if (app.config.runtime.earlyTickOnInput) {
+            js.Browser.document.addEventListener('input', handleTextEventForEarlyTick);
+            js.Browser.document.addEventListener('compositionstart', handleTextEventForEarlyTick);
+            js.Browser.document.addEventListener('compositionend', handleTextEventForEarlyTick);
+        }
+
         loadKeyboardLayout();
 
         // Mouse events
@@ -770,6 +1081,8 @@ class WebRuntime extends clay.base.BaseRuntime {
             webWindowId
         );
 
+        earlyTick();
+
     }
 
     function handleMouseUp(ev:js.html.MouseEvent) {
@@ -798,12 +1111,16 @@ class WebRuntime extends clay.base.BaseRuntime {
             webWindowId
         );
 
+        earlyTick();
+
     }
 
     function handleMouseMove(ev:js.html.MouseEvent) {
 
         if (skipMouseEvents)
             return;
+
+        noteEventForEarlyTick();
 
         refreshWindowBoundsForMouseEvent();
 
@@ -844,6 +1161,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         if (skipMouseEvents)
             return;
+
+        noteEventForEarlyTick();
 
         syncRightButton(ev);
 
@@ -957,6 +1276,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         }
 
+        earlyTick();
+
     }
 
     function handleTouchEnd(ev:js.html.TouchEvent) {
@@ -993,6 +1314,8 @@ class WebRuntime extends clay.base.BaseRuntime {
 
         }
 
+        earlyTick();
+
     }
 
     /**
@@ -1000,6 +1323,8 @@ class WebRuntime extends clay.base.BaseRuntime {
      * no `touchend` follows for them.
      */
     function handleTouchCancel(ev:js.html.TouchEvent) {
+
+        noteEventForEarlyTick();
 
         var bound = window.getBoundingClientRect();
         for (touch in ev.changedTouches) {
@@ -1032,6 +1357,8 @@ class WebRuntime extends clay.base.BaseRuntime {
     }
 
     function handleTouchMove(ev:js.html.TouchEvent) {
+
+        noteEventForEarlyTick();
 
         if (app.config.runtime.preventDefaultTouches) {
             ev.preventDefault();
@@ -1138,6 +1465,14 @@ class WebRuntime extends clay.base.BaseRuntime {
         );
         currentKeyEvent = null;
 
+        if (app.config.runtime.earlyTickOnInput) {
+            // A key that produces text is handled with its text event (keypress, input)
+            if (keyDownExpectsText(ev))
+                noteEventForEarlyTick();
+            else
+                earlyTick();
+        }
+
     }
 
     function handleKeyUp(ev:js.html.KeyboardEvent) {
@@ -1165,6 +1500,8 @@ class WebRuntime extends clay.base.BaseRuntime {
                 webWindowId
             );
             currentKeyEvent = null;
+
+            earlyTick();
         }
 
     }
@@ -1185,6 +1522,14 @@ class WebRuntime extends clay.base.BaseRuntime {
                 webWindowId
             );
 
+        }
+
+        if (app.config.runtime.earlyTickOnInput) {
+            // With an editable element focused, the text comes with the `input` event that follows
+            if (ev.defaultPrevented || !editableHasFocus())
+                earlyTick();
+            else
+                noteEventForEarlyTick();
         }
 
     }
@@ -1835,6 +2180,7 @@ class WebRuntime extends clay.base.BaseRuntime {
             preventDefaultMouseWheel: #if clay_allow_default_mouse_wheel false #else true #end,
             preventDefaultTouches: #if clay_allow_default_touches false #else true #end,
             wheelResampling: false,
+            earlyTickOnInput: true,
             preventDefaultKeys: [
                 KeyCode.LEFT, KeyCode.RIGHT, KeyCode.UP, KeyCode.DOWN,
                 KeyCode.BACKSPACE, KeyCode.TAB, KeyCode.DELETE, KeyCode.SPACE
