@@ -1689,13 +1689,33 @@ class SDLRuntime extends clay.base.BaseRuntime {
         if (until > 0) {
             var remaining = until - Timestamp.now();
             if (remaining < 0.05) {
-                // `Sys.sleep` enters a GC free zone by itself (wrapping it in one crashes hxcpp)
-                if (remaining > 0.0006) Sys.sleep(remaining - 0.0005);
-                while (Timestamp.now() < until) {}
+                // One sleep, no spinning. A sleep wakes up late, by an amount that is steady on
+                // a given system (about 1 ms on macOS): the sleep is shortened by the largest
+                // lateness seen lately, so the wake up lands on the target. What is left of
+                // the error is what the floor of the margin is for. `Sys.sleep` enters a GC
+                // free zone by itself (wrapping it in one crashes hxcpp)
+                var sleepFor = remaining - pacingSleepLateness;
+                if (sleepFor > 0) {
+                    var asked = Timestamp.now() + sleepFor;
+                    Sys.sleep(sleepFor);
+                    var late = Timestamp.now() - asked;
+                    if (late < 0) late = 0;
+                    else if (late > PACING_SLEEP_LATENESS_MAX) late = PACING_SLEEP_LATENESS_MAX;
+                    // Up at once, down slowly (a tenth of the gap per frame)
+                    if (late > pacingSleepLateness) pacingSleepLateness = late;
+                    else pacingSleepLateness += (late - pacingSleepLateness) * 0.1;
+                }
             }
         }
 
     }
+
+    /** How late the pacing sleep woke up lately, in seconds: taken off the next sleeps. */
+    var pacingSleepLateness:Float = 0.001;
+
+    /** A sleep later than this is an accident (the system was busy), not a lateness to learn. */
+    static inline final PACING_SLEEP_LATENESS_MAX:Float = 0.003;
+
 
     /** A frame was presented: its work time feeds the pacing and the slow frame rule. */
     function framePresented(now:Float):Void {
