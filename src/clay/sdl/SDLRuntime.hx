@@ -1531,6 +1531,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
         maxDrawablesDirty = false;
         var count = app.config.render.maxDrawables;
         appliedMaxDrawables = count;
+        #if (ios || tvos)
+        // The loop is a display link callback there: with two drawables the wait for
+        // the drawable blocks inside the callback, which then misses every other
+        // vsync (measured on an iPhone 14: 30 frames per second instead of 60)
+        return;
+        #end
         if (count <= 0) return;
         var layers = SDL.setWindowMaxDrawables(window, count);
         Log.debug('SDL / max drawables: ' + (count <= 2 ? 2 : 3) + ' (metal layers: ' + layers + ')');

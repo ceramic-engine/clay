@@ -50,9 +50,11 @@ class RenderConfig {
     var vsync:Bool = #if clay_no_vsync false #else true #end;
 
     /**
-     * Number of drawables of the Metal layer the app renders to (macOS and iOS, ANGLE Metal):
+     * Number of drawables of the Metal layer the app renders to (macOS, ANGLE Metal):
      * 2 or 3. macOS gives 3 by default: with vsync, a frame then waits behind two older ones
-     * before it is shown. With 2 it waits behind one. Ignored on other targets. default: 2
+     * before it is shown. With 2 it waits behind one. Ignored on other targets, iOS
+     * included (its loop is a display link callback, which two drawables slow down to
+     * half the frame rate). default: 2
      */
     var maxDrawables:Int = 2;
 
