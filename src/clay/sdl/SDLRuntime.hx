@@ -276,6 +276,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.setHint(SDL.SDL_HINT_OPENGL_ES_DRIVER, "1");
         #end
 
+        #if mac
+        // Keep the momentum of trackpad and Magic Mouse scrolling, like every
+        // other macOS app (SDL drops the momentum events by default)
+        SDL.setHint(SDL.SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
+        #end
+
         // Init value pointers
         _sdlEvent = untyped __cpp__('new SDL_Event()');
         _sdlSize = untyped __cpp__('new ::linc::sdl::SDLSize()');
