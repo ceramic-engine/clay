@@ -2143,6 +2143,11 @@ class WebRuntime extends clay.base.BaseRuntime {
         return '';
     }
 
+    /** Not available in a browser: an empty string. */
+    public function windowTitleBarCanMoveAt(x:Int, y:Int):String {
+        return '';
+    }
+
     /** Not available in a browser: does nothing. */
     public function setWindowBorderless(borderless:Bool):Void {}
 

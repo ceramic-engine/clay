@@ -13,6 +13,7 @@
 // value keeps the default place of the system on that axis.
 
 #import <AppKit/AppKit.h>
+#import <objc/runtime.h>
 
 #ifndef HXCPP_H
 #include <hxcpp.h>
@@ -27,6 +28,73 @@ static BOOL _clayTitleBarButtonsMoved = NO;
 // Not retained: the window of the app lives as long as the app
 static __unsafe_unretained NSWindow *_clayTitleBarWindow = nil;
 static NSMutableArray *_clayTitleBarObservers = nil;
+
+// Overlay style and window drags. With a full size content view, AppKit
+// moves the window when a press in the title bar strip (about 28 points at
+// the top) is dragged and the view under the mouse answers YES to
+// `mouseDownCanMoveWindow`. SDL's view always answers YES (it relies on
+// toggling `movableByWindowBackground` for its drag areas), so a drag that
+// starts on a control drawn in that strip, a tab for instance, moved the
+// window instead. In overlay style the view answers from the window's hit
+// regions instead: YES only on a draggable region. Without hit regions, and
+// in the default style, the answer of SDL is kept.
+static SDL_Window *_claySdlWindow = NULL;
+static IMP _claySdlMouseDownCanMoveWindow = NULL;
+
+// Whether a press at `location` (window coordinates of AppKit, from the
+// bottom) may move `nsWindow`: 1 or 0 from the hit regions in overlay style,
+// -1 when the answer of SDL applies
+static int clayCanMoveWindowAt(NSWindow *nsWindow, NSPoint location) {
+    if (_clayTitleBarStyle != 1 || _claySdlWindow == NULL || nsWindow == nil || nsWindow != _clayTitleBarWindow) {
+        return -1;
+    }
+    // Window coordinates from the top, computed like SDL's own hit test
+    const int height = (int)[[nsWindow contentView] frame].size.height;
+    const int kind = linc::sdl::windowHitKindAt(_claySdlWindow, (int)location.x, height - (((int)location.y) - 1));
+    if (kind < 0) {
+        return -1;
+    }
+    return kind == SDL_HITTEST_DRAGGABLE ? 1 : 0;
+}
+
+static BOOL clayMouseDownCanMoveWindow(id self, SEL _cmd) {
+    NSWindow *nsWindow = [(NSView *)self window];
+    if (nsWindow != nil) {
+        NSPoint location = [nsWindow mouseLocationOutsideOfEventStream];
+        NSEvent *event = [NSApp currentEvent];
+        if (event != nil && [event window] == nsWindow) {
+            location = [event locationInWindow];
+        }
+        const int answer = clayCanMoveWindowAt(nsWindow, location);
+        if (answer >= 0) {
+            return answer == 1 ? YES : NO;
+        }
+    }
+    if (_claySdlMouseDownCanMoveWindow != NULL) {
+        return ((BOOL (*)(id, SEL))_claySdlMouseDownCanMoveWindow)(self, _cmd);
+    }
+    return YES;
+}
+
+// Replaces `mouseDownCanMoveWindow` of the class of the window's content
+// view (SDL's view), once
+static void clayInstallMouseDownCanMoveWindow(NSWindow *nsWindow) {
+    if (_claySdlMouseDownCanMoveWindow != NULL) {
+        return;
+    }
+    NSView *contentView = [nsWindow contentView];
+    if (contentView == nil) {
+        return;
+    }
+    Class viewClass = [contentView class];
+    SEL selector = @selector(mouseDownCanMoveWindow);
+    Method method = class_getInstanceMethod(viewClass, selector);
+    if (method == NULL) {
+        return;
+    }
+    _claySdlMouseDownCanMoveWindow = method_getImplementation(method);
+    class_replaceMethod(viewClass, selector, (IMP)clayMouseDownCanMoveWindow, method_getTypeEncoding(method));
+}
 
 static NSWindow *clayCocoaWindow(SDL_Window *window) {
     if (window == NULL) {
@@ -176,6 +244,8 @@ namespace linc {
                     [nsWindow setTitlebarAppearsTransparent:YES];
                     [nsWindow setTitleVisibility:NSWindowTitleHidden];
                     clayObserveTitleBarWindow(nsWindow);
+                    _claySdlWindow = window;
+                    clayInstallMouseDownCanMoveWindow(nsWindow);
                 }
                 else {
                     if ((mask & NSWindowStyleMaskFullSizeContentView) != 0) {
@@ -185,6 +255,30 @@ namespace linc {
                     [nsWindow setTitleVisibility:NSWindowTitleVisible];
                 }
                 clayLayoutTitleBarButtons(nsWindow);
+            }
+        }
+
+        // For tests: whether a press at (x, y), window coordinates from the
+        // top in points, may move the window, as the content view answers
+        // AppKit (1 or 0), and whether the answer comes from the hit regions
+        // ("1 regions", "0 regions") or from SDL ("1 sdl")
+        ::String windowTitleBarCanMoveAt(SDL_Window* window, int x, int y) {
+            @autoreleasepool {
+                NSWindow *nsWindow = clayCocoaWindow(window);
+                if (nsWindow == nil) {
+                    return ::String("");
+                }
+                const int height = (int)[[nsWindow contentView] frame].size.height;
+                // Back to AppKit's coordinates, the inverse of the conversion above
+                const NSPoint location = NSMakePoint(x, height - y + 1);
+                const int answer = clayCanMoveWindowAt(nsWindow, location);
+                if (answer >= 0) {
+                    return ::String(answer == 1 ? "1 regions" : "0 regions");
+                }
+                const BOOL sdl = _claySdlMouseDownCanMoveWindow != NULL
+                    ? ((BOOL (*)(id, SEL))_claySdlMouseDownCanMoveWindow)([nsWindow contentView], @selector(mouseDownCanMoveWindow))
+                    : [[nsWindow contentView] mouseDownCanMoveWindow];
+                return ::String(sdl ? "1 sdl" : "0 sdl");
             }
         }
 

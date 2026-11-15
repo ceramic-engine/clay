@@ -1216,6 +1216,20 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     /**
+     * Test support: whether a press at (`x`, `y`) may move the window
+     * (macOS, see `SDL.windowTitleBarCanMoveAt`), an empty string elsewhere.
+     */
+    public function windowTitleBarCanMoveAt(x:Int, y:Int):String {
+
+        #if (mac && !ios)
+        return window != null ? SDL.windowTitleBarCanMoveAt(window, x, y) : '';
+        #else
+        return '';
+        #end
+
+    }
+
+    /**
      * Preferred locales of the user as BCP 47 tags, most wanted first
      * (`SDL_GetPreferredLocales`), empty when the system does not tell.
      */

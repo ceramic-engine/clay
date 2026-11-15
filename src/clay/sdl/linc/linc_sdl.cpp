@@ -189,6 +189,22 @@ namespace linc {
             SDL_SetWindowHitTest(window, empty ? NULL : hitTestCallback, NULL);
         }
 
+        // The kind of the hit region at a point in window coordinates, the
+        // way the hit test answers SDL, or -1 when no region is set
+        int windowHitKindAt(SDL_Window* window, int x, int y) {
+            if (hitRegionsMutex == NULL) {
+                return -1;
+            }
+            SDL_LockMutex(hitRegionsMutex);
+            bool empty = hitRegions.empty();
+            SDL_UnlockMutex(hitRegionsMutex);
+            if (empty) {
+                return -1;
+            }
+            SDL_Point point = { x, y };
+            return (int)hitTestCallback(window, &point, NULL);
+        }
+
         void raiseWindow(SDL_Window* window) {
             SDL_RaiseWindow(window);
         }

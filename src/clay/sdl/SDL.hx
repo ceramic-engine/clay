@@ -637,6 +637,16 @@ class SDL {
     }
 
     /**
+     * Test support: whether a press at (`x`, `y`), window coordinates from
+     * the top left corner in points, may move the window, as its content
+     * view answers AppKit: `1 regions` or `0 regions` when the hit regions
+     * decide (overlay title bar), `1 sdl` or `0 sdl` otherwise.
+     */
+    extern inline public static function windowTitleBarCanMoveAt(window:SDLWindowPointer, x:Int, y:Int):String {
+        return SDL_Extern.windowTitleBarCanMoveAt(window, x, y);
+    }
+
+    /**
      * Installs the monitor that records the phase of the scroll events
      * (`linc_sdl_scroll_mac.mm`). Phase values: 0 none (a mouse wheel),
      * 1 gesture began, 2 gesture, 3 gesture ended, 4 gesture cancelled,
@@ -1772,6 +1782,9 @@ class SDL {
 
     @:native('::linc::sdl::windowTitleBarDescribe')
     static function windowTitleBarDescribe(window:SDLWindowPointer):String;
+
+    @:native('::linc::sdl::windowTitleBarCanMoveAt')
+    static function windowTitleBarCanMoveAt(window:SDLWindowPointer, x:Int, y:Int):String;
 
     @:native('::linc::sdl::installScrollPhaseMonitor')
     static function installScrollPhaseMonitor():Bool;

@@ -72,6 +72,7 @@ namespace linc {
         bool isWindowMaximized(SDL_Window* window);
         bool showWindowSystemMenu(SDL_Window* window, int x, int y);
         void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
+        int windowHitKindAt(SDL_Window* window, int x, int y);
         void raiseWindow(SDL_Window* window);
 
         // Usable bounds (x, y, width, height) of the display the window is on
@@ -83,6 +84,7 @@ namespace linc {
         // Title bar of the window (macOS only: linc_sdl_window_mac.mm)
         void setWindowTitleBarStyle(SDL_Window* window, int style, float buttonsX, float buttonsY);
         ::String windowTitleBarDescribe(SDL_Window* window);
+        ::String windowTitleBarCanMoveAt(SDL_Window* window, int x, int y);
 
         // Phase of the scroll events (macOS only: linc_sdl_scroll_mac.mm)
         bool installScrollPhaseMonitor();
