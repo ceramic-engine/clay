@@ -12,7 +12,8 @@ package clay;
  *   `insert`, `f1` to `f35`); `null` or empty for none.
  * - `modifiers`: 1 shift, 2 control, 4 alt (option), 8 meta (command).
  * - `role`: 0 none, 1 cut, 2 copy, 3 paste, 4 select all, 5 undo, 6 redo
- *   (actions), 7 the Window menu (top level submenus).
+ *   (actions), 7 the Window menu (top level submenus), 8 hide, 9 hide
+ *   others, 10 show all (actions the system handles itself on macOS).
  * - `id`: reported back by `events.menuAction`, `events.menuKeyEquivalent`
  *   and `events.menuItemEnabled`.
  */

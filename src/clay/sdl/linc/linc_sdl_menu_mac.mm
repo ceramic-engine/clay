@@ -479,6 +479,11 @@ namespace linc {
                     case 2: selector = @selector(copy:); break;
                     case 3: selector = @selector(paste:); break;
                     case 4: selector = @selector(selectAll:); break;
+                    // Hide, Hide Others, Show All: sent to the application
+                    // object, which does the work (no callback to the app)
+                    case 8: selector = @selector(hide:); break;
+                    case 9: selector = @selector(hideOtherApplications:); break;
+                    case 10: selector = @selector(unhideAllApplications:); break;
                     // Undo and redo: no native text view to act on, like GPUI
                     default: selector = @selector(clayMenuItem:); break;
                 }
@@ -492,7 +497,9 @@ namespace linc {
                     }
                     [item setKeyEquivalentModifierMask:clayMenuModifierMask(modifiers)];
                 }
-                if (!_clayMenuUseResponderChain) {
+                if (role >= 8 && role <= 10) {
+                    [item setTarget:NSApp];
+                } else if (!_clayMenuUseResponderChain) {
                     [item setTarget:_clayMenuHandler];
                 }
                 if (checked) {
