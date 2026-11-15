@@ -12,6 +12,8 @@
         <file name="${LINC_SDL_PATH}linc/linc_sdl_system_mac.mm" if="mac" unless="ios" />
         <!-- Overlay title bar and position of the window buttons (macOS) -->
         <file name="${LINC_SDL_PATH}linc/linc_sdl_window_mac.mm" if="mac" unless="ios" />
+        <!-- Phase of the scroll events (gesture, momentum) that SDL drops (macOS) -->
+        <file name="${LINC_SDL_PATH}linc/linc_sdl_scroll_mac.mm" if="mac" unless="ios" />
         <!-- maximumDrawableCount of the CAMetalLayer ANGLE renders to (macOS and iOS) -->
         <file name="${LINC_SDL_PATH}linc/linc_sdl_metal_layer.mm" if="mac || ios || tvos" />
         <!-- autoHideScrollbars on Windows: WinRT UISettings, registry fallback (untested) -->

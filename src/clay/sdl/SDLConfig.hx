@@ -11,5 +11,12 @@ class SDLConfig {
      * Toggle auto window swap
      */
     public var autoSwap:Bool = true;
+
+    /**
+     * macOS: keep the momentum of trackpad and Magic Mouse scrolling (the
+     * scroll events macOS sends after the fingers leave the trackpad),
+     * through `SDL_HINT_MAC_SCROLL_MOMENTUM`. Read once, when SDL starts.
+     */
+    public var scrollMomentum:Bool = true;
     
 }

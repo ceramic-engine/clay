@@ -84,6 +84,14 @@ namespace linc {
         void setWindowTitleBarStyle(SDL_Window* window, int style, float buttonsX, float buttonsY);
         ::String windowTitleBarDescribe(SDL_Window* window);
 
+        // Phase of the scroll events (macOS only: linc_sdl_scroll_mac.mm)
+        bool installScrollPhaseMonitor();
+        int takeScrollPhase(float x, float y);
+        int takeLoneScrollPhase();
+        void flushScrollPhases();
+        bool scrollPhaseTestPost(SDL_Window* window, int phase, int momentumPhase, int deltaX, int deltaY, bool pixels);
+        int scrollPhaseTestDelivered();
+
         // System preferences
         int getSystemTheme();
 

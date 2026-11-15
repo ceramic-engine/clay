@@ -636,6 +636,55 @@ class SDL {
         return SDL_Extern.windowTitleBarDescribe(window);
     }
 
+    /**
+     * Installs the monitor that records the phase of the scroll events
+     * (`linc_sdl_scroll_mac.mm`). Phase values: 0 none (a mouse wheel),
+     * 1 gesture began, 2 gesture, 3 gesture ended, 4 gesture cancelled,
+     * 5 momentum began, 6 momentum, 7 momentum ended, 8 gesture may begin
+     * (the fingers touch the trackpad). Returns false if it failed.
+     */
+    extern inline public static function installScrollPhaseMonitor():Bool {
+        return SDL_Extern.installScrollPhaseMonitor();
+    }
+
+    /**
+     * The phase of the `SDL_EVENT_MOUSE_WHEEL` being handled, from its
+     * deltas (`wheel.x`, `wheel.y`), 0 if no recorded event matches. Zero
+     * delta events recorded before it become available to
+     * `takeLoneScrollPhase` first.
+     */
+    extern inline public static function takeScrollPhase(x:Float, y:Float):Int {
+        return SDL_Extern.takeScrollPhase(x, y);
+    }
+
+    /**
+     * The next scroll event with zero deltas (SDL drops them) to forward:
+     * `phase | (windowID << 8)`, or -1 if none.
+     */
+    extern inline public static function takeLoneScrollPhase():Int {
+        return SDL_Extern.takeLoneScrollPhase();
+    }
+
+    /** Called once the SDL events of a pump are handled, see `linc_sdl_scroll_mac.mm`. */
+    extern inline public static function flushScrollPhases():Void {
+        SDL_Extern.flushScrollPhases();
+    }
+
+    /**
+     * Test support: posts a scroll event to this process only
+     * (`CGEventPostToPid`), with the `kCGScrollWheelEventScrollPhase` and
+     * `kCGScrollWheelEventMomentumPhase` fields given (CoreGraphics values),
+     * handed to `window` even when it is hidden.
+     */
+    extern inline public static function scrollPhaseTestPost(window:SDLWindowPointer, phase:Int, momentumPhase:Int, deltaX:Int, deltaY:Int, pixels:Bool):Bool {
+        return SDL_Extern.scrollPhaseTestPost(window, phase, momentumPhase, deltaX, deltaY, pixels);
+    }
+
+    /** Test support: number of events posted by `scrollPhaseTestPost` that reached the monitor. */
+    extern inline public static function scrollPhaseTestDelivered():Int {
+        return SDL_Extern.scrollPhaseTestDelivered();
+    }
+
     #end
 
     #if (mac && !ios)
@@ -1705,6 +1754,24 @@ class SDL {
 
     @:native('::linc::sdl::windowTitleBarDescribe')
     static function windowTitleBarDescribe(window:SDLWindowPointer):String;
+
+    @:native('::linc::sdl::installScrollPhaseMonitor')
+    static function installScrollPhaseMonitor():Bool;
+
+    @:native('::linc::sdl::takeScrollPhase')
+    static function takeScrollPhase(x:cpp.Float32, y:cpp.Float32):Int;
+
+    @:native('::linc::sdl::takeLoneScrollPhase')
+    static function takeLoneScrollPhase():Int;
+
+    @:native('::linc::sdl::flushScrollPhases')
+    static function flushScrollPhases():Void;
+
+    @:native('::linc::sdl::scrollPhaseTestPost')
+    static function scrollPhaseTestPost(window:SDLWindowPointer, phase:Int, momentumPhase:Int, deltaX:Int, deltaY:Int, pixels:Bool):Bool;
+
+    @:native('::linc::sdl::scrollPhaseTestDelivered')
+    static function scrollPhaseTestDelivered():Int;
     #end
 
     #if (mac && !ios)

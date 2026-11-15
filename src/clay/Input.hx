@@ -72,12 +72,26 @@ class Input {
      * `deltaX` and `deltaY` are positive when the content should move up or
      * left (the browser `wheel` sign); `unit` is 0 for logical pixels
      * (trackpads, smooth scrolling) and 1 for lines (notched mouse wheels).
+     * `phase` is the phase of the gesture the event belongs to, readable as
+     * `mouseScrollPhase` while `Events.mouseScroll` runs.
      */
-    inline public function emitMouseScroll(deltaX:Float, deltaY:Float, unit:Int, timestamp:Float, windowId:Int) {
+    inline public function emitMouseScroll(deltaX:Float, deltaY:Float, unit:Int, timestamp:Float, windowId:Int, phase:Int = 0) {
 
+        mouseScrollPhase = phase;
         app.events.mouseScroll(deltaX, deltaY, unit, timestamp, windowId);
+        mouseScrollPhase = 0;
 
     }
+
+    /**
+     * Phase of the scroll event being emitted (valid while
+     * `Events.mouseScroll` runs, 0 otherwise): 0 none (a mouse wheel, or a
+     * platform that does not tell), 1 gesture began, 2 gesture, 3 gesture
+     * ended, 4 gesture cancelled, 5 momentum began, 6 momentum, 7 momentum
+     * ended, 8 gesture may begin (the fingers touch the trackpad). Only the
+     * SDL runtime on macOS reports phases (`linc_sdl_scroll_mac.mm`).
+     */
+    public var mouseScrollPhase(default, null):Int = 0;
 
     inline public function emitTouchDown(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
 

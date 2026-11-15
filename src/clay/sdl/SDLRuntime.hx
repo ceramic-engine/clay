@@ -278,8 +278,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #if mac
         // Keep the momentum of trackpad and Magic Mouse scrolling, like every
-        // other macOS app (SDL drops the momentum events by default)
-        SDL.setHint(SDL.SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
+        // other macOS app (SDL drops the momentum events by default). SDL
+        // reads the hint once, when it starts.
+        SDL.setHint(SDL.SDL_HINT_MAC_SCROLL_MOMENTUM, app.config.runtime.scrollMomentum ? "1" : "0");
         #end
 
         // Init value pointers
@@ -438,6 +439,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
         #if (mac && !ios)
         if (windowConfig.titleBarStyle != 0) {
             SDL.setWindowTitleBarStyle(window, windowConfig.titleBarStyle, windowConfig.titleBarButtonsX, windowConfig.titleBarButtonsY);
+        }
+        // Phase of the scroll events (gesture, momentum), see SDL_EVENT_MOUSE_WHEEL
+        if (!SDL.installScrollPhaseMonitor()) {
+            Log.warning('SDL / failed to install the scroll phase monitor');
         }
         #end
 
@@ -2023,6 +2028,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
             }
 
             #if (mac && !ios)
+            // Scroll events without deltas that came after the last wheel event
+            SDL.flushScrollPhases();
+            emitLoneScrollPhases();
             if (menuBarInstalled) {
                 // Every key down pumped so far was delivered
                 SDL.clearMenuKeyEquivalents();
@@ -2219,6 +2227,14 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 }
 
             case SDL.SDL_EVENT_MOUSE_WHEEL:
+                #if (mac && !ios)
+                // The phase recorded for this event (taken even when mouse
+                // events are skipped, to stay in step with the events)
+                final scrollPhase = SDL.takeScrollPhase(e.wheelX, e.wheelY);
+                emitLoneScrollPhases();
+                #else
+                final scrollPhase = 0;
+                #end
                 if (!skipMouseEvents) {
                     // Raw scroll deltas, positive when the content moves up or left
                     // (SDL's y is positive away from the user). On macOS SDL
@@ -2237,10 +2253,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                         lastPreciseScrollTime = now;
                     }
                     if (whole && now - lastPreciseScrollTime > 0.5) {
-                        app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
+                        app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), scrollPhase);
                     }
                     else {
-                        app.input.emitMouseScroll(e.wheelX * 10.0, -e.wheelY * 10.0, 0, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
+                        app.input.emitMouseScroll(e.wheelX * 10.0, -e.wheelY * 10.0, 0, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), scrollPhase);
                     }
                     #else
                     app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID));
@@ -2681,6 +2697,26 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    #end
+
+    #if (mac && !ios)
+    /**
+     * Forwards the scroll events whose deltas are both zero, which SDL drops
+     * (`SDL_SendMouseWheel`), as `mouseScroll` events of zero pixels with
+     * their phase: the fingers touching the trackpad, the end of a gesture
+     * or of its momentum. No `mouseWheel` event goes with them.
+     */
+    function emitLoneScrollPhases():Void {
+        var value = SDL.takeLoneScrollPhase();
+        while (value >= 0) {
+            if (!skipMouseEvents) {
+                // Same unit as the timestamps of the SDL events above
+                final ticks:Int = untyped __cpp__('(int)SDL_GetTicksNS()');
+                app.input.emitMouseScroll(0, 0, 0, ticks / 1000.0, value >> 8, value & 0xFF);
+            }
+            value = SDL.takeLoneScrollPhase();
+        }
+    }
     #end
 
 /// Helpers
