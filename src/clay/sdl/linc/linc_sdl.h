@@ -74,6 +74,16 @@ namespace linc {
         void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
         void raiseWindow(SDL_Window* window);
 
+        // Usable bounds (x, y, width, height) of the display the window is on
+        bool getWindowDisplayUsableBounds(SDL_Window* window, ::Array<int> result);
+
+        // Preferred locales of the user as BCP 47 tags, most wanted first
+        ::Array<::String> getPreferredLocales();
+
+        // Title bar of the window (macOS only: linc_sdl_window_mac.mm)
+        void setWindowTitleBarStyle(SDL_Window* window, int style, float buttonsX, float buttonsY);
+        ::String windowTitleBarDescribe(SDL_Window* window);
+
         // System preferences
         int getSystemTheme();
 

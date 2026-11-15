@@ -197,6 +197,49 @@ namespace linc {
             return (int)SDL_GetSystemTheme();
         }
 
+        // Usable bounds of the display the window is on (without the menu
+        // bar, the dock or the task bar), in desktop coordinates, written as
+        // x, y, width, height. Returns false when the system does not tell.
+        bool getWindowDisplayUsableBounds(SDL_Window* window, ::Array<int> result) {
+            if (window == NULL || result == null()) {
+                return false;
+            }
+            SDL_DisplayID display = SDL_GetDisplayForWindow(window);
+            SDL_Rect rect;
+            if (display == 0 || !SDL_GetDisplayUsableBounds(display, &rect)) {
+                return false;
+            }
+            result[0] = rect.x;
+            result[1] = rect.y;
+            result[2] = rect.w;
+            result[3] = rect.h;
+            return true;
+        }
+
+        // Preferred locales of the user (SDL_GetPreferredLocales) as BCP 47
+        // tags: the language, then the country when SDL gives one ("fr-FR",
+        // "en"), most wanted first. Empty when the system does not tell.
+        ::Array<::String> getPreferredLocales() {
+            ::Array<::String> result = ::Array_obj<::String>::__new(0, 0);
+            int count = 0;
+            SDL_Locale** locales = SDL_GetPreferredLocales(&count);
+            if (locales != NULL) {
+                for (int i = 0; i < count; i++) {
+                    if (locales[i] == NULL || locales[i]->language == NULL || locales[i]->language[0] == 0) {
+                        continue;
+                    }
+                    std::string tag(locales[i]->language);
+                    if (locales[i]->country != NULL && locales[i]->country[0] != 0) {
+                        tag += "-";
+                        tag += locales[i]->country;
+                    }
+                    result->push(::String::create(tag.c_str()));
+                }
+                SDL_free(locales);
+            }
+            return result;
+        }
+
         // File dialogs. SDL may run the callback on another thread (Windows,
         // the Linux portal) or later (macOS sheets), so each dialog keeps its
         // result here, guarded by a mutex, until the main loop polls it by id.

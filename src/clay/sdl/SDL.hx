@@ -592,6 +592,52 @@ class SDL {
         return SDL_Extern.getSystemTheme();
     }
 
+    /**
+     * Writes into `result` the usable bounds (`x, y, width, height`) of the
+     * display the window is on, in desktop coordinates. Returns `false`
+     * when the system does not tell.
+     */
+    extern inline public static function getWindowDisplayUsableBounds(window:SDLWindowPointer, result:Array<Int>):Bool {
+        return SDL_Extern.getWindowDisplayUsableBounds(window, result);
+    }
+
+    /**
+     * Preferred locales of the user (`SDL_GetPreferredLocales`) as BCP 47
+     * tags, most wanted first: the language, then the country when SDL
+     * gives one (`fr-FR`, `en`). Empty when the system does not tell.
+     */
+    extern inline public static function getPreferredLocales():Array<String> {
+        return SDL_Extern.getPreferredLocales();
+    }
+
+    #if (mac && !ios)
+
+    /**
+     * Title bar of the window on macOS (`linc_sdl_window_mac.mm`). `style`:
+     * 0 the title bar of the system, 1 overlay (full size content view,
+     * transparent title bar, hidden title). With the overlay style,
+     * `buttonsX` is the distance from the left edge of the window to the
+     * left of the close button and `buttonsY` the distance from the top edge
+     * of the window to the top of the buttons, in points (negative: the
+     * place the system gives). The position is applied again when AppKit
+     * lays the title bar out (resize, leaving fullscreen...).
+     */
+    extern inline public static function setWindowTitleBarStyle(window:SDLWindowPointer, style:Int, buttonsX:Float, buttonsY:Float):Void {
+        SDL_Extern.setWindowTitleBarStyle(window, style, buttonsX, buttonsY);
+    }
+
+    /**
+     * Test support: the state of the title bar read back from AppKit, like
+     * `style=1 fullSize=1 transparent=1 titleHidden=1 close=12,10 spacing=20`
+     * (`close`: left and top of the close button from the top left corner
+     * of the window).
+     */
+    extern inline public static function windowTitleBarDescribe(window:SDLWindowPointer):String {
+        return SDL_Extern.windowTitleBarDescribe(window);
+    }
+
+    #end
+
     #if (mac && !ios)
 
     // Native menu bar (macOS): linc_sdl_menu_mac.mm
@@ -1645,6 +1691,20 @@ class SDL {
 
     @:native('::linc::sdl::getSystemTheme')
     static function getSystemTheme():Int;
+
+    @:native('::linc::sdl::getWindowDisplayUsableBounds')
+    static function getWindowDisplayUsableBounds(window:SDLWindowPointer, result:Array<Int>):Bool;
+
+    @:native('::linc::sdl::getPreferredLocales')
+    static function getPreferredLocales():Array<String>;
+
+    #if (mac && !ios)
+    @:native('::linc::sdl::setWindowTitleBarStyle')
+    static function setWindowTitleBarStyle(window:SDLWindowPointer, style:Int, buttonsX:cpp.Float32, buttonsY:cpp.Float32):Void;
+
+    @:native('::linc::sdl::windowTitleBarDescribe')
+    static function windowTitleBarDescribe(window:SDLWindowPointer):String;
+    #end
 
     #if (mac && !ios)
     @:native('::linc::sdl::setMenuCallbacks')

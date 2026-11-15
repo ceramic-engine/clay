@@ -417,6 +417,19 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         untyped __cpp__('SDL_SyncWindow({0})', window);
 
+        windowHidden = windowConfig.startsHidden;
+        windowMinW = windowConfig.minWidth;
+        windowMinH = windowConfig.minHeight;
+        if (windowMinW > 0 || windowMinH > 0) {
+            applyWindowMinimumSize();
+        }
+
+        #if (mac && !ios)
+        if (windowConfig.titleBarStyle != 0) {
+            SDL.setWindowTitleBarStyle(window, windowConfig.titleBarStyle, windowConfig.titleBarButtonsX, windowConfig.titleBarButtonsY);
+        }
+        #end
+
         #if !clay_no_display_scale
         if (windowCoordsArePixels && !windowConfig.fullscreen) {
             // The window may have been created on a display with a different
@@ -518,6 +531,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #if clay_sdl_headless
         untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_HIDDEN);
+        #else
+        if (config.startsHidden) untyped __cpp__('{0} |= {1}', flags, SDL.SDL_WINDOW_HIDDEN);
         #end
 
         #if (gles_angle && ios)
@@ -720,6 +735,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.getWindowPosition(window, _sdlPoint);
         config.x = _sdlPoint.x;
         config.y = _sdlPoint.y;
+        windowPosX = _sdlPoint.x;
+        windowPosY = _sdlPoint.y;
 
         var scale = windowDevicePixelRatio();
         config.width = Math.round(windowW / scale);
@@ -957,6 +974,209 @@ class SDLRuntime extends clay.base.BaseRuntime {
     public function restoreWindow():Void {
 
         SDL.restoreWindow(window);
+
+    }
+
+    var windowPosX:Int = 0;
+
+    var windowPosY:Int = 0;
+
+    /**
+     * Horizontal position of the window (its content area) in the desktop
+     * coordinates of the system (`SDL_GetWindowPosition`: points on macOS
+     * and Wayland, pixels on Windows and X11), updated when the window moves.
+     */
+    public function windowPositionX():Int {
+
+        return windowPosX;
+
+    }
+
+    /** Vertical position of the window, see `windowPositionX`. */
+    public function windowPositionY():Int {
+
+        return windowPosY;
+
+    }
+
+    /**
+     * Moves the window to the given position, in desktop coordinates (see
+     * `windowPositionX`). A `MOVED` window event follows when the position changes.
+     * Returns `false` when the window cannot be moved (mobile, fullscreen,
+     * refused by the system).
+     */
+    public function setWindowPosition(x:Int, y:Int):Bool {
+
+        #if (ios || tvos || android)
+
+        return false;
+
+        #else
+
+        if (window == null || app.config.window.fullscreen) {
+            return false;
+        }
+
+        final result:Bool = untyped __cpp__('SDL_SetWindowPosition({0}, {1}, {2})', window, x, y);
+        if (result) {
+            untyped __cpp__('SDL_SyncWindow({0})', window);
+            SDL.getWindowPosition(window, _sdlPoint);
+            windowPosX = _sdlPoint.x;
+            windowPosY = _sdlPoint.y;
+        }
+        return result;
+
+        #end
+
+    }
+
+    /**
+     * Writes into `result` the usable bounds (`x, y, width, height`, without
+     * the menu bar, the dock or the task bar) of the display the window is
+     * on, in desktop coordinates (see `windowPositionX`). Returns `false` when the
+     * system does not tell.
+     */
+    public function windowDisplayUsableBounds(result:Array<Int>):Bool {
+
+        if (window == null) {
+            return false;
+        }
+
+        while (result.length < 4) result.push(0);
+        return SDL.getWindowDisplayUsableBounds(window, result);
+
+    }
+
+    /**
+     * Number of desktop coordinate units (see `windowPositionX`) per logical unit of
+     * the window size: 1 where the system counts in points (macOS, Wayland),
+     * the display scale where it counts in pixels (Windows, X11).
+     */
+    public function windowDesktopScale():Float {
+
+        #if clay_no_display_scale
+        return 1.0;
+        #else
+        return windowCoordsArePixels ? windowDevicePixelRatio() : 1.0;
+        #end
+
+    }
+
+    var windowMinW:Int = 0;
+
+    var windowMinH:Int = 0;
+
+    /**
+     * Sets the smallest size the user can give to the window, in logical
+     * units (same unit as the `width` and `height` of the window config);
+     * 0 removes the minimum on that axis.
+     */
+    public function setWindowMinimumSize(width:Int, height:Int):Void {
+
+        windowMinW = width > 0 ? width : 0;
+        windowMinH = height > 0 ? height : 0;
+        app.config.window.minWidth = windowMinW;
+        app.config.window.minHeight = windowMinH;
+        applyWindowMinimumSize();
+
+    }
+
+    function applyWindowMinimumSize():Void {
+
+        #if !(ios || tvos || android)
+        if (window == null) return;
+        // Logical units to window coordinates, like `resizeWindowToLogicalSize`
+        var scale = windowDevicePixelRatio();
+        var density = SDL.getWindowPixelDensity(window);
+        if (density <= 0) {
+            density = 1.0;
+        }
+        final minW:Int = Math.round(windowMinW * scale / density);
+        final minH:Int = Math.round(windowMinH * scale / density);
+        untyped __cpp__('SDL_SetWindowMinimumSize({0}, {1}, {2})', window, minW, minH);
+        #end
+
+    }
+
+    /** Whether the window was created hidden (`config.window.startsHidden`) and is not shown yet. */
+    var windowHidden:Bool = false;
+
+    var showWindowAfterFrame:Bool = false;
+
+    /**
+     * Shows a window created hidden (`config.window.startsHidden`) right
+     * after the next frame is presented, so that its first visible content
+     * is a drawn frame. Does nothing if the window is already shown. Hidden
+     * test windows (`clay_sdl_headless`) are never shown.
+     */
+    public function showWindowAfterNextFrame():Void {
+
+        if (windowHidden) {
+            showWindowAfterFrame = true;
+        }
+
+    }
+
+    /**
+     * Shows now a window created hidden (`config.window.startsHidden`).
+     * Hidden test windows (`clay_sdl_headless`) are never shown.
+     */
+    public function showWindow():Void {
+
+        showWindowAfterFrame = false;
+        if (!windowHidden) return;
+        windowHidden = false;
+        #if !clay_sdl_headless
+        if (window != null) {
+            untyped __cpp__('SDL_ShowWindow({0})', window);
+        }
+        #end
+
+    }
+
+    /**
+     * Title bar of the window on macOS; does nothing elsewhere. `style`: 0
+     * the title bar of the system, 1 overlay (the content takes the whole
+     * window, the title bar is transparent and the title hidden). With the
+     * overlay style, `buttonsX` and `buttonsY` are the distances from the
+     * left and top edges of the window to the left of the close button and
+     * to the top of the window buttons, in points (negative: the place the
+     * system gives). The position is kept through resizes and fullscreen.
+     */
+    public function setWindowTitleBarStyle(style:Int, buttonsX:Float, buttonsY:Float):Void {
+
+        app.config.window.titleBarStyle = style;
+        app.config.window.titleBarButtonsX = buttonsX;
+        app.config.window.titleBarButtonsY = buttonsY;
+        #if (mac && !ios)
+        if (window != null) {
+            SDL.setWindowTitleBarStyle(window, style, buttonsX, buttonsY);
+        }
+        #end
+
+    }
+
+    /**
+     * Test support: the state of the title bar read back from the system
+     * (macOS, see `SDL.windowTitleBarDescribe`), an empty string elsewhere.
+     */
+    public function windowTitleBarDescribe():String {
+
+        #if (mac && !ios)
+        return window != null ? SDL.windowTitleBarDescribe(window) : '';
+        #else
+        return '';
+        #end
+
+    }
+
+    /**
+     * Preferred locales of the user as BCP 47 tags, most wanted first
+     * (`SDL_GetPreferredLocales`), empty when the system does not tell.
+     */
+    public function preferredLocales():Array<String> {
+
+        return SDL.getPreferredLocales();
 
     }
 
@@ -1384,6 +1604,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         app.config.window.borderless = borderless;
         SDL.setWindowBordered(window, !borderless);
+        #if (mac && !ios)
+        if (!borderless && app.config.window.titleBarStyle != 0) {
+            // The title bar is created again by AppKit: style it again
+            SDL.setWindowTitleBarStyle(window, app.config.window.titleBarStyle, app.config.window.titleBarButtonsX, app.config.window.titleBarButtonsY);
+        }
+        #end
 
     }
 
@@ -1842,6 +2068,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 #end
                     if (doUpdate && !skipped) {
                         windowSwap();
+                        if (showWindowAfterFrame) showWindow();
                         #if clay_wait_drawable_first
                         swapped = true;
                         #end
@@ -2308,6 +2535,8 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_MOVED:
                 type = MOVED;
+                windowPosX = data1;
+                windowPosY = data2;
 
             case SDL.SDL_EVENT_WINDOW_MINIMIZED:
                 type = MINIMIZED;
@@ -2353,6 +2582,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
             case SDL.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
                 // Density change is picked up by the screen update of the next tick
                 updateWindowMetrics();
+                if (windowCoordsArePixels && (windowMinW > 0 || windowMinH > 0)) {
+                    // The minimum size is kept in logical units
+                    applyWindowMinimumSize();
+                }
 
             case SDL.SDL_EVENT_WINDOW_DISPLAY_CHANGED:
                 // Another display: its refresh rate may differ

@@ -253,6 +253,13 @@ class Clay {
 
         shuttingDown = true;
 
+        if (!terminatingEmitted) {
+            // The app ends (quit event, window closed, explicit shutdown):
+            // tell it while everything still works
+            terminatingEmitted = true;
+            events.appEvent(AppEventType.TERMINATING);
+        }
+
         io.shutdown();
         audio.shutdown();
         input.shutdown();
@@ -351,7 +358,15 @@ class Clay {
 
     }
 
+    /** Whether `events.appEvent(TERMINATING)` was already called (it is called once). */
+    var terminatingEmitted:Bool = false;
+
     function emitAppEvent(type:AppEventType):Void {
+
+        if (type == AppEventType.TERMINATING) {
+            if (terminatingEmitted) return;
+            terminatingEmitted = true;
+        }
 
         events.appEvent(type);
 
@@ -472,6 +487,12 @@ class Clay {
             width: config.width,
             height: config.height,
             title: '' + config.title,
+            minWidth: config.minWidth,
+            minHeight: config.minHeight,
+            startsHidden: config.startsHidden,
+            titleBarStyle: config.titleBarStyle,
+            titleBarButtonsX: config.titleBarButtonsX,
+            titleBarButtonsY: config.titleBarButtonsY,
             noInput: config.noInput,
             backgroundSleep: config.backgroundSleep
         };

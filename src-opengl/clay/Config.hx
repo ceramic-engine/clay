@@ -297,6 +297,28 @@ class WindowConfig {
     /** window title, default: 'clay app' */
     var title:String = null;
 
+    /** minimum width the user can give to the window, in logical units (0: no minimum). default: 0 */
+    var minWidth:Int = 0;
+
+    /** minimum height the user can give to the window, in logical units (0: no minimum). default: 0 */
+    var minHeight:Int = 0;
+
+    /** create the window hidden: it is shown by `runtime.showWindowAfterNextFrame()`
+        (after a frame was presented) or `runtime.showWindow()`. default: false */
+    var startsHidden:Bool = false;
+
+    /** title bar of the window on macOS: 0 the title bar of the system, 1 overlay
+        (the content takes the whole window, transparent title bar, hidden title). default: 0 */
+    var titleBarStyle:Int = 0;
+
+    /** with the overlay title bar on macOS: distance from the left edge of the window to
+        the left of the close button, in points (negative: the place the system gives). default: -1 */
+    var titleBarButtonsX:Float = -1;
+
+    /** with the overlay title bar on macOS: distance from the top edge of the window to
+        the top of the window buttons, in points (negative: the place the system gives). default: -1 */
+    var titleBarButtonsY:Float = -1;
+
     /** disables input arriving at/from this window. default: false */
     var noInput:Bool = false;
 

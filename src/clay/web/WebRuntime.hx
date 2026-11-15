@@ -2053,6 +2053,75 @@ class WebRuntime extends clay.base.BaseRuntime {
     /** Not available in a browser: does nothing. */
     public function setWindowHitRegions(regions:Array<Float>):Void {}
 
+    /** A page does not know where its window is: 0. */
+    public function windowPositionX():Int {
+        return 0;
+    }
+
+    /** A page does not know where its window is: 0. */
+    public function windowPositionY():Int {
+        return 0;
+    }
+
+    /** Not available in a browser: does nothing and returns `false`. */
+    public function setWindowPosition(x:Int, y:Int):Bool {
+        return false;
+    }
+
+    /** Not available in a browser: returns `false`. */
+    public function windowDisplayUsableBounds(result:Array<Int>):Bool {
+        return false;
+    }
+
+    /** Not available in a browser: 1. */
+    public function windowDesktopScale():Float {
+        return 1.0;
+    }
+
+    /** Not available in a browser: does nothing. */
+    public function setWindowMinimumSize(width:Int, height:Int):Void {}
+
+    /** A page is never created hidden: does nothing. */
+    public function showWindowAfterNextFrame():Void {}
+
+    /** A page is never created hidden: does nothing. */
+    public function showWindow():Void {}
+
+    /** Not available in a browser: does nothing. */
+    public function setWindowTitleBarStyle(style:Int, buttonsX:Float, buttonsY:Float):Void {}
+
+    /** Not available in a browser: an empty string. */
+    public function windowTitleBarDescribe():String {
+        return '';
+    }
+
+    /** Not available in a browser: does nothing. */
+    public function setWindowBorderless(borderless:Bool):Void {}
+
+    /**
+     * Preferred languages of the user as BCP 47 tags, most wanted first
+     * (`navigator.languages`, else `navigator.language`).
+     */
+    public function preferredLocales():Array<String> {
+
+        final result:Array<String> = [];
+        final nav:Dynamic = js.Syntax.code("(typeof navigator !== 'undefined') ? navigator : null");
+        if (nav != null) {
+            final languages:Array<Dynamic> = nav.languages;
+            if (languages != null) {
+                for (i in 0...languages.length) {
+                    final tag:Dynamic = languages[i];
+                    if (tag != null && tag != '') result.push(Std.string(tag));
+                }
+            }
+            if (result.length == 0 && nav.language != null && nav.language != '') {
+                result.push(Std.string(nav.language));
+            }
+        }
+        return result;
+
+    }
+
     /**
      * Key codes of the physical keys with the current layout, as reported by the browser
      * keyboard layout map (`navigator.keyboard.getLayoutMap()`, Chromium and Electron).
