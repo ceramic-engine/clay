@@ -310,7 +310,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         #if (soloud_use_sdl || sdl_enable_audio)
         // Init audio
-        if (!SDL.initSubSystem(SDL.SDL_INIT_AUDIO)) {
+        if (!app.config.audio) {
+            Log.debug('SDL / audio disabled by config');
+        } else if (!SDL.initSubSystem(SDL.SDL_INIT_AUDIO)) {
             Log.warning('SDL / failed to init audio: ${SDL.getError()}');
         } else {
             Log.debug('SDL / init audio');

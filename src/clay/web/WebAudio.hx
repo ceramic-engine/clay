@@ -84,6 +84,12 @@ class WebAudio extends clay.base.BaseAudio {
     }
 
     override function init() {
+        if (!app.config.audio) {
+            // No AudioContext is created
+            enabled = false;
+            Log.debug('Audio / disabled by config');
+            return;
+        }
         initWebAudio();
         createDefaultBus();
     }
@@ -157,6 +163,8 @@ class WebAudio extends clay.base.BaseAudio {
     }
 
     override function shutdown():Void {
+        if (!enabled)
+            return;
         // Clean up all busses
         for (bus in busses) {
             if (bus.workletNode != null) {

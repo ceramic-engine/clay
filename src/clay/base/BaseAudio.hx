@@ -18,6 +18,13 @@ class BaseAudio {
      */
     public var app(default, null):Clay;
 
+    /**
+     * Whether audio was initialized: false when the app was configured with
+     * `config.audio = false`. Audio playback is then unavailable for the
+     * whole run (unlike `active`, which also turns false while suspended).
+     */
+    public var enabled(default, null):Bool = true;
+
     function new(app:Clay) {
 
         this.app = app;

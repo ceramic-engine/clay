@@ -63,6 +63,13 @@ class SoloudAudio extends clay.base.BaseAudio {
 
         super.init();
 
+        if (!app.config.audio) {
+            // No SoLoud instance, no audio device and no audio thread
+            enabled = false;
+            Log.debug('Audio / disabled by config');
+            return;
+        }
+
         soloud = Soloud.create();
         var result = SoloudAudioBackend.init(soloud);
         if (result == 0)
@@ -75,6 +82,11 @@ class SoloudAudio extends clay.base.BaseAudio {
     }
 
     override function shutdown() {
+
+        if (!enabled) {
+            super.shutdown();
+            return;
+        }
 
         soloud.deinit();
         soloud.destroy();
@@ -178,6 +190,8 @@ class SoloudAudio extends clay.base.BaseAudio {
         attachHaxeThread:Bool = true
     ):Void {
 
+        if (!enabled) return;
+
         var bus = resolveBus(busIndex).bus;
         var filter = Soloud.createFilterFunction(
             busIndex,
@@ -193,6 +207,9 @@ class SoloudAudio extends clay.base.BaseAudio {
     // TODO destroy bus filter
 
     function _play(source:AudioSource, volume:Float, paused:Bool, loop:Bool, busIndex:Int):AudioHandle {
+
+        // Audio disabled by config: nothing to play on
+        if (!enabled) return -1;
 
         var data:SoloudAudioData = cast source.data;
         var handle = handleSeq;

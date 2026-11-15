@@ -152,6 +152,61 @@ class WebIO extends BaseIO {
 
     }
 
+    #if clay_web_use_electron_fs
+
+    /**
+     * Inside Electron, the same folder as `SDL_GetPrefPath` gives a native
+     * build of the app: `<appData>/<org>/<app>/` on macOS
+     * (`~/Library/Application Support`) and Windows (`%APPDATA%`),
+     * `$XDG_DATA_HOME/<org>/<app>/` (else `~/.local/share/...`) on Linux.
+     * The folder is created when missing, and the path ends with a
+     * separator, like SDL's. `null` outside Electron.
+     */
+    override function appPathPrefs():String {
+
+        bindElectronRemote();
+
+        if (electronRemote == null)
+            return null;
+
+        try {
+            final process:Dynamic = js.Syntax.code("{0}.process", electronRemote);
+            final path:Dynamic = js.Syntax.code("{0}.require('path')", electronRemote);
+            final fs:Dynamic = js.Syntax.code("{0}.require('fs')", electronRemote);
+            final platform:String = process.platform;
+
+            var base:String = null;
+            if (platform == 'linux') {
+                final xdg:String = process.env.XDG_DATA_HOME;
+                if (xdg != null && xdg != '') {
+                    base = xdg;
+                }
+                else {
+                    final os:Dynamic = js.Syntax.code("{0}.require('os')", electronRemote);
+                    base = path.join(os.homedir(), '.local', 'share');
+                }
+            }
+            else {
+                base = js.Syntax.code("{0}.app.getPath('appData')", electronRemote);
+            }
+
+            final appId = Clay.app.appId;
+            final storageName = Clay.app.appStorageName;
+            final org = StorageNames.prefOrg(appId, storageName);
+            final name = StorageNames.prefApp(appId, storageName);
+
+            final dir:String = org != '' ? path.join(base, org, name) : path.join(base, name);
+            js.Syntax.code("{0}.mkdirSync({1}, {recursive: true})", fs, dir);
+            return dir + path.sep;
+        }
+        catch (e:Dynamic) {
+            return null;
+        }
+
+    }
+
+    #end
+
 /// Internal
 
     #if clay_web_use_electron_fs
