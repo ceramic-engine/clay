@@ -85,6 +85,13 @@ class Clay {
     public var appId(default, null):String;
 
     /**
+     * Optional name of the app storage folder, used as is (not split at its dots)
+     * instead of the folder derived from `appId`. `null` when the `clay_app_storage_name`
+     * define is not set, which keeps the folder derived from `appId`.
+     */
+    public var appStorageName(default, null):Null<String> = null;
+
+    /**
      * Main window screen width, in logical units.
      * Rounded up so that it always covers the whole window (`screenWidth * screenDensity >= screenPixelWidth`)
      */
@@ -385,6 +392,12 @@ class Clay {
         else {
             this.appId = rawAppId;
         }
+
+        var rawStorageName:Null<String> = Macros.definedValue('clay_app_storage_name');
+        if (rawStorageName != null && rawStorageName.startsWith('"')) {
+            rawStorageName = Json.parse(rawStorageName);
+        }
+        this.appStorageName = StorageNames.normalize(rawStorageName);
 
     }
 

@@ -33,11 +33,10 @@ class SDLIO extends NativeIO {
 
     override function appPathPrefs():String {
 
-        var parts = Clay.app.appId.split('.');
-        var appName = parts.pop();
-        var org = parts.join('.');
+        final appId = Clay.app.appId;
+        final storageName = Clay.app.appStorageName;
 
-        return SDL.getPrefPath(org, appName);
+        return SDL.getPrefPath(StorageNames.prefOrg(appId, storageName), StorageNames.prefApp(appId, storageName));
 
     }
 
