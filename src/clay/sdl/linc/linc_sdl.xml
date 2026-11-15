@@ -30,6 +30,10 @@
 
         <lib name="${LINC_SDL_PATH}../../../../../bin/sdl/sdl3-mac-universal/lib/libSDL3.dylib" if="mac" />
 
+        <!-- Unused code and data are left out of the executable (macOS). Opt out: clay_no_dead_strip.
+             iOS: the app is linked by Xcode, whose Release configuration strips already. -->
+        <flag value="-Wl,-dead_strip" if="mac" unless="ios || tvos || clay_no_dead_strip" />
+
         <vflag name="-framework" value="SDL3" if="ios" />
 
         <section if="windows">
