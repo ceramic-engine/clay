@@ -1174,6 +1174,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
         #if !clay_sdl_headless
         if (window != null) {
             untyped __cpp__('SDL_ShowWindow({0})', window);
+            #if (mac && !ios)
+            // Showing does not activate the app: since macOS 14 nothing else
+            // brings an app whose window was hidden at launch to the front
+            // (SDL no longer activates it), so its window stayed behind
+            // until the dock icon was clicked. Raising activates the app.
+            SDL.raiseWindow(window);
+            #end
         }
         #end
 

@@ -126,6 +126,8 @@ static void clayUpdateMovable(NSWindow *nsWindow) {
     if ([nsWindow isMovable] != movable) {
         [nsWindow setMovable:movable];
     }
+    // The drags are then started here (clayMouseDown), not by SDL
+    linc::sdl::setWindowDragsHandledByApp(!movable);
 }
 
 static NSWindow *clayCocoaWindow(SDL_Window *window) {

@@ -157,7 +157,19 @@ namespace linc {
         static std::vector<float> hitRegions;
         static SDL_Mutex* hitRegionsMutex = NULL;
 
-        static SDL_HitTestResult SDLCALL hitTestCallback(SDL_Window* window, const SDL_Point* area, void* data) {
+        // True while the app moves the window itself from its draggable
+        // regions (macOS overlay title bar, see linc_sdl_window_mac.mm): SDL
+        // is then told those regions are normal, else it would drop the
+        // mouse moves over them (the hover of a control would never end)
+        // and arm its own window drag
+        static bool windowDragsHandledByApp = false;
+
+        void setWindowDragsHandledByApp(bool handled) {
+            windowDragsHandledByApp = handled;
+        }
+
+        // The kind of the region at `area`, the last matching region wins
+        static SDL_HitTestResult hitKindAt(const SDL_Point* area) {
             SDL_HitTestResult result = SDL_HITTEST_NORMAL;
             SDL_LockMutex(hitRegionsMutex);
             for (int i = (int)hitRegions.size() - 5; i >= 0; i -= 5) {
@@ -169,6 +181,14 @@ namespace linc {
                 }
             }
             SDL_UnlockMutex(hitRegionsMutex);
+            return result;
+        }
+
+        static SDL_HitTestResult SDLCALL hitTestCallback(SDL_Window* window, const SDL_Point* area, void* data) {
+            SDL_HitTestResult result = hitKindAt(area);
+            if (result == SDL_HITTEST_DRAGGABLE && windowDragsHandledByApp) {
+                return SDL_HITTEST_NORMAL;
+            }
             return result;
         }
 
@@ -206,7 +226,7 @@ namespace linc {
                 return -1;
             }
             SDL_Point point = { x, y };
-            return (int)hitTestCallback(window, &point, NULL);
+            return (int)hitKindAt(&point);
         }
 
         void raiseWindow(SDL_Window* window) {
