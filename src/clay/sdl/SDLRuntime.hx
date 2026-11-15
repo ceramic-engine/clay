@@ -340,12 +340,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
             Log.debug('SDL / init gamepad');
         }
 
-        // Init haptic
+        #if !clay_sdl_no_haptic
+        // Init haptic. Nothing in clay calls the haptic API (gamepad rumble goes through
+        // the gamepad API), and on macOS this init alone takes about 160 ms of the launch
+        // (it looks for force feedback devices): an app that wants a short launch sets the
+        // define `clay_sdl_no_haptic`.
         if (!SDL.initSubSystem(SDL.SDL_INIT_HAPTIC)) {
             Log.warning('SDL / failed to init haptic: ${SDL.getError()}');
         } else {
             Log.debug('SDL / init haptic');
         }
+        #end
 
         // Mobile events
         #if (android || ios || tvos)
