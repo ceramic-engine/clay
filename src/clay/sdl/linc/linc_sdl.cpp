@@ -187,6 +187,10 @@ namespace linc {
             bool empty = hitRegions.empty();
             SDL_UnlockMutex(hitRegionsMutex);
             SDL_SetWindowHitTest(window, empty ? NULL : hitTestCallback, NULL);
+            #if defined(__APPLE__) && !TARGET_OS_IPHONE
+            // The overlay title bar moves the window from the regions
+            windowHitRegionsChanged(window);
+            #endif
         }
 
         // The kind of the hit region at a point in window coordinates, the

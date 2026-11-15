@@ -29,21 +29,24 @@ static BOOL _clayTitleBarButtonsMoved = NO;
 static __unsafe_unretained NSWindow *_clayTitleBarWindow = nil;
 static NSMutableArray *_clayTitleBarObservers = nil;
 
-// Overlay style and window drags. With a full size content view, AppKit
-// moves the window when a press in the title bar strip (about 28 points at
-// the top) is dragged and the view under the mouse answers YES to
-// `mouseDownCanMoveWindow`. SDL's view always answers YES (it relies on
-// toggling `movableByWindowBackground` for its drag areas), so a drag that
-// starts on a control drawn in that strip, a tab for instance, moved the
-// window instead. In overlay style the view answers from the window's hit
-// regions instead: YES only on a draggable region. Without hit regions, and
-// in the default style, the answer of SDL is kept.
+// Overlay style and window drags. With a full size content view, the views
+// of AppKit's title bar (about 34 points at the top) lie above the content
+// view: a press there reaches the content view, and AppKit also starts a
+// window move when the mouse is dragged. A drag that starts on a control
+// drawn in that strip, a tab for instance, moved the window instead of the
+// tab. In overlay style with hit regions, the window is therefore not
+// movable by the system (`setMovable:NO`, as Chromium does for its own title
+// bars), and a press on a draggable region starts the move explicitly
+// (`performWindowDragWithEvent:`); a double click there does what the
+// system's title bar does (zoom or minimize, from the user's preference).
+// Without hit regions, and in the default style, the window stays movable
+// by the system and nothing changes.
 static SDL_Window *_claySdlWindow = NULL;
-static IMP _claySdlMouseDownCanMoveWindow = NULL;
+static IMP _claySdlMouseDown = NULL;
 
 // Whether a press at `location` (window coordinates of AppKit, from the
-// bottom) may move `nsWindow`: 1 or 0 from the hit regions in overlay style,
-// -1 when the answer of SDL applies
+// bottom) is on a draggable region: 1 or 0 from the hit regions in overlay
+// style, -1 when the system decides
 static int clayCanMoveWindowAt(NSWindow *nsWindow, NSPoint location) {
     if (_clayTitleBarStyle != 1 || _claySdlWindow == NULL || nsWindow == nil || nsWindow != _clayTitleBarWindow) {
         return -1;
@@ -57,29 +60,46 @@ static int clayCanMoveWindowAt(NSWindow *nsWindow, NSPoint location) {
     return kind == SDL_HITTEST_DRAGGABLE ? 1 : 0;
 }
 
-static BOOL clayMouseDownCanMoveWindow(id self, SEL _cmd) {
-    NSWindow *nsWindow = [(NSView *)self window];
-    if (nsWindow != nil) {
-        NSPoint location = [nsWindow mouseLocationOutsideOfEventStream];
-        NSEvent *event = [NSApp currentEvent];
-        if (event != nil && [event window] == nsWindow) {
-            location = [event locationInWindow];
+// The system's title bar double click: the user's preference
+static void clayTitleBarDoubleClick(NSWindow *nsWindow) {
+    NSString *action = [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleActionOnDoubleClick"];
+    if (action == nil) {
+        // Older systems: a boolean for minimize
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"AppleMiniaturizeOnDoubleClick"]) {
+            action = @"Minimize";
         }
-        const int answer = clayCanMoveWindowAt(nsWindow, location);
-        if (answer >= 0) {
-            return answer == 1 ? YES : NO;
+        else {
+            action = @"Maximize";
         }
     }
-    if (_claySdlMouseDownCanMoveWindow != NULL) {
-        return ((BOOL (*)(id, SEL))_claySdlMouseDownCanMoveWindow)(self, _cmd);
+    if ([action isEqualToString:@"Minimize"]) {
+        [nsWindow performMiniaturize:nil];
     }
-    return YES;
+    else if ([action isEqualToString:@"Maximize"] || [action isEqualToString:@"Fill"]) {
+        [nsWindow performZoom:nil];
+    }
 }
 
-// Replaces `mouseDownCanMoveWindow` of the class of the window's content
-// view (SDL's view), once
-static void clayInstallMouseDownCanMoveWindow(NSWindow *nsWindow) {
-    if (_claySdlMouseDownCanMoveWindow != NULL) {
+static void clayMouseDown(id self, SEL _cmd, NSEvent *event) {
+    NSWindow *nsWindow = [(NSView *)self window];
+    if (nsWindow != nil && ![nsWindow isMovable] && clayCanMoveWindowAt(nsWindow, [event locationInWindow]) == 1) {
+        if ([event clickCount] == 2) {
+            clayTitleBarDoubleClick(nsWindow);
+        }
+        else {
+            [nsWindow performWindowDragWithEvent:event];
+        }
+        return;
+    }
+    if (_claySdlMouseDown != NULL) {
+        ((void (*)(id, SEL, NSEvent *))_claySdlMouseDown)(self, _cmd, event);
+    }
+}
+
+// Replaces `mouseDown:` of the class of the window's content view (SDL's
+// view), once
+static void clayInstallMouseDown(NSWindow *nsWindow) {
+    if (_claySdlMouseDown != NULL) {
         return;
     }
     NSView *contentView = [nsWindow contentView];
@@ -87,13 +107,25 @@ static void clayInstallMouseDownCanMoveWindow(NSWindow *nsWindow) {
         return;
     }
     Class viewClass = [contentView class];
-    SEL selector = @selector(mouseDownCanMoveWindow);
+    SEL selector = @selector(mouseDown:);
     Method method = class_getInstanceMethod(viewClass, selector);
     if (method == NULL) {
         return;
     }
-    _claySdlMouseDownCanMoveWindow = method_getImplementation(method);
-    class_replaceMethod(viewClass, selector, (IMP)clayMouseDownCanMoveWindow, method_getTypeEncoding(method));
+    _claySdlMouseDown = method_getImplementation(method);
+    class_replaceMethod(viewClass, selector, (IMP)clayMouseDown, method_getTypeEncoding(method));
+}
+
+// Movable by the system unless the overlay title bar has hit regions
+static void clayUpdateMovable(NSWindow *nsWindow) {
+    if (nsWindow == nil) {
+        return;
+    }
+    const BOOL regions = _claySdlWindow != NULL && linc::sdl::windowHitKindAt(_claySdlWindow, 0, 0) >= 0;
+    const BOOL movable = !(_clayTitleBarStyle == 1 && regions);
+    if ([nsWindow isMovable] != movable) {
+        [nsWindow setMovable:movable];
+    }
 }
 
 static NSWindow *clayCocoaWindow(SDL_Window *window) {
@@ -245,7 +277,7 @@ namespace linc {
                     [nsWindow setTitleVisibility:NSWindowTitleHidden];
                     clayObserveTitleBarWindow(nsWindow);
                     _claySdlWindow = window;
-                    clayInstallMouseDownCanMoveWindow(nsWindow);
+                    clayInstallMouseDown(nsWindow);
                 }
                 else {
                     if ((mask & NSWindowStyleMaskFullSizeContentView) != 0) {
@@ -255,13 +287,21 @@ namespace linc {
                     [nsWindow setTitleVisibility:NSWindowTitleVisible];
                 }
                 clayLayoutTitleBarButtons(nsWindow);
+                clayUpdateMovable(nsWindow);
+            }
+        }
+
+        // Called when the hit regions change (linc_sdl.cpp)
+        void windowHitRegionsChanged(SDL_Window* window) {
+            @autoreleasepool {
+                clayUpdateMovable(clayCocoaWindow(window));
             }
         }
 
         // For tests: whether a press at (x, y), window coordinates from the
-        // top in points, may move the window, as the content view answers
-        // AppKit (1 or 0), and whether the answer comes from the hit regions
-        // ("1 regions", "0 regions") or from SDL ("1 sdl")
+        // top in points, moves the window (1 or 0), and what decides: the
+        // hit regions of an overlay title bar ("1 regions", "0 regions"), or
+        // the system, the window being movable or not ("1 system")
         ::String windowTitleBarCanMoveAt(SDL_Window* window, int x, int y) {
             @autoreleasepool {
                 NSWindow *nsWindow = clayCocoaWindow(window);
@@ -275,10 +315,7 @@ namespace linc {
                 if (answer >= 0) {
                     return ::String(answer == 1 ? "1 regions" : "0 regions");
                 }
-                const BOOL sdl = _claySdlMouseDownCanMoveWindow != NULL
-                    ? ((BOOL (*)(id, SEL))_claySdlMouseDownCanMoveWindow)([nsWindow contentView], @selector(mouseDownCanMoveWindow))
-                    : [[nsWindow contentView] mouseDownCanMoveWindow];
-                return ::String(sdl ? "1 sdl" : "0 sdl");
+                return ::String([nsWindow isMovable] ? "1 system" : "0 system");
             }
         }
 
