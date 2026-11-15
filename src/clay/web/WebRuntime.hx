@@ -289,6 +289,12 @@ class WebRuntime extends clay.base.BaseRuntime {
         // behind the time already ticked
         var newTimestamp = t > 0 ? t / 1000.0 - timestampStart : timestamp();
 
+        // Throttled (`config.idleUpdateRate`, off by default): nothing to do in this frame
+        if (throttleInterval > 0 && skipThrottledFrame(newTimestamp)) {
+            recordFrameTime(newTimestamp);
+            return true;
+        }
+
         // Only after an early tick (see `earlyTick()`), never when `earlyTickOnInput` is off
         var afterEarlyTick = earlyTickSinceFrame || tickedAheadOfFrames;
         var frameTimestamp = newTimestamp;
@@ -354,6 +360,8 @@ class WebRuntime extends clay.base.BaseRuntime {
                 drawnFramesInARow = 0;
             else if (drawnFramesInARow < EARLY_TICK_MAX_DRAWN_FRAMES)
                 drawnFramesInARow++;
+            if (ticked)
+                throttleInterval = app.throttleInterval(newTimestamp, !app.renderSkipped);
         }
 
         inFrame = false;
@@ -549,13 +557,7 @@ class WebRuntime extends clay.base.BaseRuntime {
      */
     function shouldTick(newTimestamp:Float):Bool {
 
-        if (lastFrameTimestamp >= 0 && newTimestamp > lastFrameTimestamp) {
-            frameIntervals[frameIntervalIndex] = newTimestamp - lastFrameTimestamp;
-            frameIntervalIndex = (frameIntervalIndex + 1) % FRAME_INTERVAL_COUNT;
-            if (frameIntervalCount < FRAME_INTERVAL_COUNT)
-                frameIntervalCount++;
-        }
-        lastFrameTimestamp = newTimestamp;
+        recordFrameTime(newTimestamp);
 
         var updateRate = app.config.updateRate;
         if (updateRate > 0 && frameIntervalCount > 0) {
@@ -582,6 +584,52 @@ class WebRuntime extends clay.base.BaseRuntime {
         if (framesSinceTick < frameDivider)
             return false;
         framesSinceTick = 0;
+        return true;
+
+    }
+
+    /** The time of an animation frame: measures the refresh period. */
+    function recordFrameTime(newTimestamp:Float):Void {
+
+        if (lastFrameTimestamp >= 0 && newTimestamp > lastFrameTimestamp) {
+            frameIntervals[frameIntervalIndex] = newTimestamp - lastFrameTimestamp;
+            frameIntervalIndex = (frameIntervalIndex + 1) % FRAME_INTERVAL_COUNT;
+            if (frameIntervalCount < FRAME_INTERVAL_COUNT)
+                frameIntervalCount++;
+        }
+        lastFrameTimestamp = newTimestamp;
+
+    }
+
+    /**
+     * Interval to keep between the last tick and the next one while throttled
+     * (`config.idleUpdateRate`, see `clay.IdleThrottle`), 0 when not throttled. Given by
+     * `Clay.throttleInterval()` after each tick of an animation frame.
+     */
+    var throttleInterval:Float = 0;
+
+    /**
+     * While throttled: whether the animation frame at `now` skips its tick and its render.
+     * It does not when something happened since the last tick (an input or window event,
+     * work posted with `Runner.runInMain`, a render request), when the interval passed, or
+     * when the next timer of the app is due.
+     */
+    function skipThrottledFrame(now:Float):Bool {
+
+        if (!app.ready || !didEmitTickOnce || earlyTickSinceFrame || tickedAheadOfFrames)
+            return false;
+        if (app.throttle.activityPending || app.events.renderPending()) {
+            throttleInterval = 0;
+            return false;
+        }
+        var since = now - app.timestamp;
+        // Half a period early: the frame that comes closest to the interval ticks
+        var half = frameIntervalCount > 0 ? refreshPeriod() * 0.5 : 0.008;
+        if (since >= throttleInterval - half)
+            return false;
+        var work = app.nextWorkDelay;
+        if (work >= 0 && since >= work)
+            return false;
         return true;
 
     }

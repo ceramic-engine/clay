@@ -1,6 +1,7 @@
 package clay.sdl;
 
 import clay.Config;
+import clay.IdleThrottle;
 import clay.Types;
 import clay.sdl.SDL;
 import cpp.Float32;
@@ -113,6 +114,28 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     /** While idle: time (`Timestamp.now()`) of the next tick when no discrete event comes before. */
     var idleDeadline:Float = 0;
+
+    /**
+     * While idle: the time of the next tick without the throttle (`config.idleUpdateRate`).
+     * Activity (an input or window event, a wake from another thread) brings the deadline
+     * of a throttled loop back to it.
+     */
+    var idleBaseDeadline:Float = 0;
+
+    /** Whether the wake event is registered (see `wake()`). */
+    static var wakeReady:Bool = false;
+
+    /**
+     * Wakes the idle wait of the main loop at once, from any thread (work posted with
+     * `Runner.runInMain`). Only while the throttle is on (`config.idleUpdateRate`): without
+     * it the loop waits one display period at most, as before.
+     */
+    public static function wake():Void {
+
+        if (wakeReady && Clay.app != null && Clay.app.config.idleUpdateRate > 0)
+            SDL.pushWakeEvent();
+
+    }
 
     /** While idle: a discrete event (key, text, button) was polled since the last tick. */
     var idleDiscreteEvent:Bool = false;
@@ -300,6 +323,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
         } else {
             Log.debug('SDL / init events');
         }
+
+        // Event that wakes the idle wait when work is posted from another thread
+        SDL.initWakeEvent();
+        wakeReady = true;
 
         // Init video
         if (!SDL.initSubSystem(SDL.SDL_INIT_VIDEO)) {
@@ -1854,7 +1881,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
     /** A tick was made (at `tickTime`) and its render was skipped or not. */
     function updateIdle(skipped:Bool, tickTime:Float):Void {
 
-        if (!skipped) {
+        // Throttled (`config.idleUpdateRate`, off by default: 0 then)
+        var interval = app.throttleInterval(Timestamp.now(), !skipped);
+
+        if (!skipped && interval <= 0) {
             idle = false;
             return;
         }
@@ -1864,6 +1894,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
         else {
             idleDeadline = tickTime + refreshPeriod();
+        }
+        idleBaseDeadline = idleDeadline;
+        if (interval > 0) {
+            idleDeadline = IdleThrottle.deadline(idleBaseDeadline, tickTime, interval, app.nextWorkDelay);
         }
 
     }
@@ -2011,6 +2045,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 var e = new SDLEvent(_sdlEvent);
                 currentSdlEvent = e;
 
+                // Work posted from another thread (see `wake()`)
+                if (SDL.isWakeEvent(_sdlEvent)) {
+                    app.throttle.markActive();
+                    currentSdlEvent = null;
+                    continue;
+                }
+
                 if (idle && isDiscreteEvent(e.type)) idleDiscreteEvent = true;
 
                 app.events.sdlEvent(cast _sdlEvent);
@@ -2045,6 +2086,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 pollFileDialogs();
             }
 
+            // Throttled and something happened: the next tick comes as without the throttle
+            if (idle && app.throttle.activityPending && idleDeadline > idleBaseDeadline) {
+                idleDeadline = idleBaseDeadline;
+            }
+
             var newTimestamp = timestamp();
             doUpdate = (!idle || idleTickDue()) && app.shouldUpdate(newTimestamp);
             if (doUpdate) {
@@ -2056,12 +2102,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 updateIdle(skipped, newTimestamp + timestampStart);
 
                 #if (mac || windows || linux)
-                #if clay_unfocused_native_sleep_after_render
-                if (!windowFocused) {
-                    var spent = Timestamp.now() - lastFrameTime;
-                    if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
-                }
-                #elseif clay_native_sleep_after_render
+                // The rate while unfocused is `config.idleUpdateRate` (the former define
+                // `clay_unfocused_native_sleep_after_render` is gone: nothing set it)
+                #if clay_native_sleep_after_render
                 var spent = Timestamp.now() - lastFrameTime;
                 if (spent < minFrameTime) Sys.sleep(minFrameTime - spent);
                 #end

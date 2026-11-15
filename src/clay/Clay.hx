@@ -143,6 +143,33 @@ class Clay {
     public var renderContinuous:Bool = true;
 
     /**
+     * The throttled state of the loop (`config.idleUpdateRate`, off by default). Its rate and
+     * delay are copied from the config at each tick.
+     */
+    public var throttle(default, null):IdleThrottle = new IdleThrottle();
+
+    /**
+     * Seconds from the tick that just ran to the next work the app has due (its next timer),
+     * or -1 when none. Set by the app at each tick: a throttled loop does not wait past it.
+     * Only read while `config.idleUpdateRate` is above 0.
+     */
+    public var nextWorkDelay:Float = -1;
+
+    /**
+     * Reads the throttle settings of the config and returns the interval to keep before the
+     * next tick (see `IdleThrottle.interval()`), 0 when not throttled. Called by the
+     * runtime once per tick, after it.
+     */
+    public function throttleInterval(now:Float, drawn:Bool):Float {
+
+        var throttle = this.throttle;
+        throttle.rate = config.idleUpdateRate;
+        throttle.delay = config.idleDelay;
+        return throttle.interval(now, drawn, renderContinuous);
+
+    }
+
+    /**
      * Used for update loop and update rate
      */
     var nextTick:Float = 0;
@@ -313,7 +340,8 @@ class Clay {
             return;
 
         #if clay_native
-        if (windowInBackground && config.window.backgroundSleep != 0) {
+        // The throttle (`config.idleUpdateRate`) replaces the sleep while unfocused
+        if (windowInBackground && config.window.backgroundSleep != 0 && config.idleUpdateRate <= 0) {
             Sys.sleep(config.window.backgroundSleep);
         }
         #end
@@ -346,6 +374,19 @@ class Clay {
     }
 
     function emitWindowEvent(type:WindowEventType, timestamp:Float, windowId:Int, x:Int, y:Int):Void {
+
+        switch type {
+            case FOCUS_GAINED:
+                throttle.focusChanged(true);
+            case FOCUS_LOST:
+                throttle.focusChanged(false);
+            case HIDDEN | MINIMIZED:
+                throttle.visibilityChanged(false);
+            case SHOWN | RESTORED:
+                throttle.visibilityChanged(true);
+            case _:
+                throttle.markActive();
+        }
 
         #if clay_native
         switch type {

@@ -98,8 +98,22 @@ class Runner {
 
         #if (cpp || cs)
         queue.push(_fn);
+        wakeMain();
         #else
         Immediate.push(_fn);
+        if (Clay.app != null) Clay.app.throttle.markActive();
+        #end
+
+    }
+
+    /**
+     * Work was posted for the main thread: its loop wakes at once if it is waiting while
+     * throttled (`config.idleUpdateRate`). Can be called from any thread.
+     */
+    public static function wakeMain():Void {
+
+        #if (clay_sdl && cpp)
+        clay.sdl.SDLRuntime.wake();
         #end
 
     }

@@ -26,11 +26,15 @@ class Input {
 
     inline public function emitKeyDown(keyCode:KeyCode, scanCode:ScanCode, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
 
+        app.throttle.markActive();
+
         app.events.keyDown(keyCode, scanCode, repeat, mod, timestamp, windowId);
 
     }
 
     inline public function emitKeyUp(keyCode:KeyCode, scanCode:ScanCode, repeat:Bool, mod:ModState, timestamp:Float, windowId:Int) {
+
+        app.throttle.markActive();
 
         app.events.keyUp(keyCode, scanCode, repeat, mod, timestamp, windowId);
 
@@ -38,11 +42,15 @@ class Input {
 
     inline public function emitText(text:String, start:Int, length:Int, type:TextEventType, timestamp:Float, windowId:Int) {
 
+        app.throttle.markActive();
+
         app.events.text(text, start, length, type, timestamp, windowId);
 
     }
 
     inline public function emitMouseMove(x:Int, y:Int, xrel:Int, yrel:Int, timestamp:Float, windowId:Int) {
+
+        app.throttle.markActive();
 
         app.events.mouseMove(x, y, xrel, yrel, timestamp, windowId);
 
@@ -50,17 +58,23 @@ class Input {
 
     inline public function emitMouseDown(x:Int, y:Int, button:Int, timestamp:Float, windowId:Int) {
 
+        app.throttle.markActive();
+
         app.events.mouseDown(x, y, button, timestamp, windowId);
 
     }
 
     inline public function emitMouseUp(x:Int, y:Int, button:Int, timestamp:Float, windowId:Int) {
 
+        app.throttle.markActive();
+
         app.events.mouseUp(x, y, button, timestamp, windowId);
 
     }
 
     inline public function emitMouseWheel(x:Float, y:Float, timestamp:Float, windowId:Int) {
+
+        app.throttle.markActive();
 
         app.events.mouseWheel(x, y, timestamp, windowId);
 
@@ -76,6 +90,8 @@ class Input {
      * `mouseScrollPhase` while `Events.mouseScroll` runs.
      */
     inline public function emitMouseScroll(deltaX:Float, deltaY:Float, unit:Int, timestamp:Float, windowId:Int, phase:Int = 0) {
+
+        app.throttle.markActive();
 
         mouseScrollPhase = phase;
         app.events.mouseScroll(deltaX, deltaY, unit, timestamp, windowId);
@@ -95,11 +111,15 @@ class Input {
 
     inline public function emitTouchDown(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
 
+        app.throttle.markActive();
+
         app.events.touchDown(x, y, dx, dy, touchId, timestamp);
 
     }
 
     inline public function emitTouchUp(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
+
+        app.throttle.markActive();
 
         app.events.touchUp(x, y, dx, dy, touchId, timestamp);
 
@@ -107,11 +127,15 @@ class Input {
 
     inline public function emitTouchMove(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
 
+        app.throttle.markActive();
+
         app.events.touchMove(x, y, dx, dy, touchId, timestamp);
 
     }
 
     inline public function emitTouchCancel(x:Float, y:Float, dx:Float, dy:Float, touchId:Int, timestamp:Float) {
+
+        app.throttle.markActive();
 
         app.events.touchCancel(x, y, dx, dy, touchId, timestamp);
 
@@ -119,11 +143,15 @@ class Input {
 
     inline public function emitGamepadAxis(gamepad:Int, axis:Int, value:Float, timestamp:Float) {
 
+        app.throttle.markActive();
+
         app.events.gamepadAxis(gamepad, axis, value, timestamp);
 
     }
 
     inline public function emitGamepadDown(gamepad:Int, button:Int, value:Float, timestamp:Float) {
+
+        app.throttle.markActive();
 
         app.events.gamepadDown(gamepad, button, value, timestamp);
 
@@ -131,17 +159,23 @@ class Input {
 
     inline public function emitGamepadUp(gamepad:Int, button:Int, value:Float, timestamp:Float) {
 
+        app.throttle.markActive();
+
         app.events.gamepadUp(gamepad, button, value, timestamp);
 
     }
 
     inline public function emitGamepadGyro(gamepad:Int, dx:Float, dy:Float, dz:Float, timestamp:Float) {
 
+        app.throttle.markActive();
+
         app.events.gamepadGyro(gamepad, dx, dy, dz, timestamp);
 
     }
 
     inline public function emitGamepadDevice(gamepad:Int, name:String, type:GamepadDeviceEventType, timestamp:Float) {
+
+        app.throttle.markActive();
 
         app.events.gamepadDevice(gamepad, name, type, timestamp);
 

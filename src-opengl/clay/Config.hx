@@ -355,4 +355,28 @@ class Config {
      */
     var updateRate:Float = 0;
 
+    /**
+     * The most ticks per second while the app is at rest or its window in the background
+     * (see `clay.IdleThrottle`). Only meaningful for an app that sets `Clay.renderSkipped`
+     * when it draws nothing. Can be changed at any time.
+     * default: 0 (no cap: the loop behaves as without it)
+     */
+    var idleUpdateRate:Float = 0;
+
+    /**
+     * With `idleUpdateRate`: seconds at the normal rate after the last activity (input,
+     * window event, work posted from another thread, continuous render). Can be changed at
+     * any time. default: 0.5
+     */
+    var idleDelay:Float = 0.5;
+
+    /**
+     * Whether audio is initialized. When false, no audio device, audio
+     * thread or web audio context is created (native: neither SoLoud's
+     * backend nor SDL's audio subsystem starts), `app.audio.active` stays
+     * false and `app.audio.enabled` is false. Read once, at startup.
+     * default: true
+     */
+    var audio:Bool = true;
+
 }

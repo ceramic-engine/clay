@@ -165,6 +165,9 @@ namespace linc {
         // Events
         bool pollEvent(SDL_Event* event);
         bool waitEventTimeout(int timeoutMs);
+        void initWakeEvent();
+        bool pushWakeEvent();
+        bool isWakeEvent(SDL_Event* event);
         void pumpEvents();
 
         // Joystick/Gamepad

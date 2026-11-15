@@ -1043,6 +1043,24 @@ class SDL {
         return SDL_Extern.waitEventTimeout(timeoutMs);
     }
 
+    /** Registers the event type of `pushWakeEvent()`. Main thread, once SDL is initialized. */
+    extern inline public static function initWakeEvent():Void {
+        SDL_Extern.initWakeEvent();
+    }
+
+    /**
+     * Pushes an event that wakes the idle wait of the main loop (`waitEventTimeout`). Can be
+     * called from any thread. Does nothing while one is already in the queue.
+     */
+    extern inline public static function pushWakeEvent():Bool {
+        return SDL_Extern.pushWakeEvent();
+    }
+
+    /** Whether `event` is the event of `pushWakeEvent()` (another one can then be pushed). */
+    extern inline public static function isWakeEvent(event:SDLEventPointer):Bool {
+        return SDL_Extern.isWakeEvent(event);
+    }
+
     extern inline public static function pumpEvents():Void {
         SDL_Extern.pumpEvents();
     }
@@ -1992,6 +2010,15 @@ class SDL {
 
     @:native('::linc::sdl::waitEventTimeout')
     static function waitEventTimeout(timeoutMs:Int):Bool;
+
+    @:native('::linc::sdl::initWakeEvent')
+    static function initWakeEvent():Void;
+
+    @:native('::linc::sdl::pushWakeEvent')
+    static function pushWakeEvent():Bool;
+
+    @:native('::linc::sdl::isWakeEvent')
+    static function isWakeEvent(event:SDLEventPointer):Bool;
 
     @:native('::linc::sdl::getWindowRefreshRate')
     static function getWindowRefreshRate(window:SDLWindowPointer):Float;

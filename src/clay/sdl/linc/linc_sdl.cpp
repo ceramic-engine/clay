@@ -639,6 +639,38 @@ namespace linc {
             return result;
         }
 
+        // Wake event: pushed from any thread (`clay.Runner.runInMain`) so that the
+        // idle wait of the main loop returns at once. One at most in the queue.
+        static Uint32 wakeEventType = 0;
+        static SDL_AtomicInt wakeEventQueued;
+
+        void initWakeEvent() {
+            if (wakeEventType == 0) {
+                wakeEventType = SDL_RegisterEvents(1);
+                SDL_SetAtomicInt(&wakeEventQueued, 0);
+            }
+        }
+
+        bool pushWakeEvent() {
+            if (wakeEventType == 0 || wakeEventType == (Uint32)-1) return false;
+            if (!SDL_CompareAndSwapAtomicInt(&wakeEventQueued, 0, 1)) return false;
+            SDL_Event event;
+            SDL_zero(event);
+            event.type = wakeEventType;
+            event.user.timestamp = SDL_GetTicksNS();
+            if (!SDL_PushEvent(&event)) {
+                SDL_SetAtomicInt(&wakeEventQueued, 0);
+                return false;
+            }
+            return true;
+        }
+
+        bool isWakeEvent(SDL_Event* event) {
+            if (wakeEventType == 0 || event->type != wakeEventType) return false;
+            SDL_SetAtomicInt(&wakeEventQueued, 0);
+            return true;
+        }
+
         void pumpEvents() {
             SDL_PumpEvents();
         }
