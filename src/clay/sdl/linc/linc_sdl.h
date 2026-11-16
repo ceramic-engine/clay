@@ -206,6 +206,12 @@ namespace linc {
         typedef ::cpp::Function < int(::cpp::Pointer<SDL_Event>) > InternalEventWatcherCallback;
         bool setEventWatch(SDL_Window* window, InternalEventWatcherCallback eventWatcher);
 
+        // Called during a live resize of the window (desktop), when SDL asks
+        // the app to draw from its event watchers: the main loop is held by
+        // the system meanwhile
+        typedef ::cpp::Function < void() > InternalLiveResizeCallback;
+        bool setLiveResizeCallback(SDL_Window* window, InternalLiveResizeCallback callback);
+
         // Base path
         ::String getBasePath();
 

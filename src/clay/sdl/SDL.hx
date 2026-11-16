@@ -1144,6 +1144,21 @@ class SDL {
     }
     #end
 
+    static var liveResizeCallback:()->Void = null;
+
+    static function handleLiveResize():Void {
+        liveResizeCallback();
+    }
+
+    /**
+     * Calls `callback` during a live resize of the window (desktop), each time SDL asks
+     * the app to draw from its event watchers: the system holds the main loop meanwhile.
+     */
+    public static function setLiveResizeCallback(window:SDLWindowPointer, callback:()->Void):Bool {
+        SDL.liveResizeCallback = callback;
+        return SDL_Extern.setLiveResizeCallback(window, cpp.Callable.fromStaticFunction(handleLiveResize));
+    }
+
     static var eventWatcher:(event:UInt32)->Void = null;
 
     static function handleEventWatch(e:SDLEvent):Int {
@@ -2028,6 +2043,9 @@ class SDL {
 
     @:native('::linc::sdl::setEventWatch')
     static function setEventWatch(window:SDLWindowPointer, eventWatcher:cpp.Callable<SDLEvent->Int>):Bool;
+
+    @:native('::linc::sdl::setLiveResizeCallback')
+    static function setLiveResizeCallback(window:SDLWindowPointer, callback:cpp.Callable<()->Void>):Bool;
 
     @:native('::linc::sdl::getDisplayContentScale')
     static function getDisplayContentScale(displayID:SDLDisplayID):Float;

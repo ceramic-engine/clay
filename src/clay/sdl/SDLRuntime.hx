@@ -391,6 +391,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
         // Mobile events
         #if (android || ios || tvos)
         SDL.setEventWatch(window, handleSdlEventWatch);
+        #else
+        // Frames drawn while the user resizes the window (the system holds the loop)
+        SDL.setLiveResizeCallback(window, liveResizeFrame);
         #end
 
         Log.success('SDL / init success');
@@ -2755,6 +2758,49 @@ class SDLRuntime extends clay.base.BaseRuntime {
         }
 
     }
+
+/// Live resize
+
+    #if !(android || ios || tvos)
+
+    var inLiveResizeFrame:Bool = false;
+
+    /**
+     * Draws a frame while the user resizes the window: the system holds the main thread
+     * in its own loop (macOS live resize, Windows modal size loop), so `loop()` gets no
+     * tick, and SDL asks the app to draw from its event watchers instead (an `EXPOSED`
+     * event with data1 = 1). Without it the content stays at its former size until the
+     * mouse is released. The events queued meanwhile are handled by the next loop tick.
+     */
+    function liveResizeFrame():Void {
+
+        if (inLiveResizeFrame || app.shuttingDown || app.hasShutdown || window == null) return;
+        inLiveResizeFrame = true;
+        try {
+            updateWindowMetrics();
+            var newTimestamp = timestamp();
+            app.emitTick(newTimestamp);
+            app.renderSkipped = false;
+            app.emitRender();
+            if (app.config.runtime.autoSwap && !app.renderSkipped) {
+                windowSwap();
+                if (showWindowAfterFrame) showWindow();
+            }
+            lastFrameTime = Timestamp.now();
+        }
+        catch (e:Dynamic) {
+            inLiveResizeFrame = false;
+            if (app.config.runtime.uncaughtErrorHandler != null) {
+                app.config.runtime.uncaughtErrorHandler(e);
+                return;
+            }
+            throw e;
+        }
+        inLiveResizeFrame = false;
+
+    }
+
+    #end
 
 /// Mobile
 

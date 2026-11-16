@@ -848,6 +848,41 @@ namespace linc {
         }
         #endif
 
+        // Live resize. While the user resizes a window, the system keeps the
+        // main thread in its own loop (macOS live resize, Windows modal size
+        // loop) and the app's loop gets no tick: SDL then sends
+        // SDL_EVENT_WINDOW_EXPOSED with data1 = 1 to the event watchers, from
+        // which the app can draw. The callback runs haxe code while SDL pumps
+        // the events, possibly inside the GC free zone of waitEventTimeout:
+        // the zone is left for the time of the call, like the menu callbacks
+        // (the stack top of the main thread is not touched: the haxe frames
+        // of the loop are still below).
+        static InternalLiveResizeCallback _liveResizeCallback;
+        static bool _liveResizeSet = false;
+        static bool _liveResizeBound = false;
+        static bool _liveResizeRunning = false;
+
+        static bool _liveResizeWatch(void* userdata, SDL_Event* event) {
+            if (event->type == SDL_EVENT_WINDOW_EXPOSED && event->window.data1 == 1 && _liveResizeSet && !_liveResizeRunning) {
+                _liveResizeRunning = true;
+                bool wasFree = hx::TryExitGCFreeZone();
+                _liveResizeCallback();
+                if (wasFree) hx::EnterGCFreeZone();
+                _liveResizeRunning = false;
+            }
+            return true;
+        }
+
+        bool setLiveResizeCallback(SDL_Window* window, InternalLiveResizeCallback callback) {
+            _liveResizeCallback = callback;
+            _liveResizeSet = true;
+            if (!_liveResizeBound) {
+                _liveResizeBound = true;
+                return SDL_AddEventWatch(_liveResizeWatch, NULL);
+            }
+            return true;
+        }
+
         bool _setEventWatch_didBind = false;
         static InternalEventWatcherCallback _setEventWatch_eventWatcher;
 
