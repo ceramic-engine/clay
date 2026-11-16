@@ -371,6 +371,16 @@ class Config {
     var idleDelay:Float = 0.5;
 
     /**
+     * Seconds after the window stops being visible (hidden, minimized, fully covered by
+     * other windows or on another space) before the native loop sleeps: it then makes no
+     * tick until an OS event or work posted from another thread (`Runner.runInMain`), and
+     * the timers of the app are frozen. Below 0: never asleep (default). Native only (the
+     * browser already stops the animation frames of a hidden page). Can be changed at any
+     * time. default: -1
+     */
+    var hiddenSleepDelay:Float = -1;
+
+    /**
      * Whether audio is initialized. When false, no audio device, audio
      * thread or web audio context is created (native: neither SoLoud's
      * backend nor SDL's audio subsystem starts), `app.audio.active` stays

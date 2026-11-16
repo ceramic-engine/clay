@@ -132,7 +132,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
      */
     public static function wake():Void {
 
-        if (wakeReady && Clay.app != null && Clay.app.config.idleUpdateRate > 0)
+        if (wakeReady && Clay.app != null && (Clay.app.config.idleUpdateRate > 0 || Clay.app.config.hiddenSleepDelay >= 0))
             SDL.pushWakeEvent();
 
     }
@@ -1867,6 +1867,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
      */
     function waitWhileIdle():Void {
 
+        if (idleDeadline == IdleThrottle.SLEEP) {
+            // Asleep (`config.hiddenSleepDelay`): no tick until an event comes (an OS
+            // event, or the wake event of work posted from another thread). -1: no timeout
+            SDL.waitEventTimeout(-1);
+            return;
+        }
+
         var remaining = idleDeadline - Timestamp.now();
         if (remaining >= 0.001) {
             if (remaining > 1.0) remaining = 1.0;
@@ -2625,6 +2632,9 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
             case SDL.SDL_EVENT_WINDOW_EXPOSED:
                 type = EXPOSED;
+
+            case SDL.SDL_EVENT_WINDOW_OCCLUDED:
+                type = OCCLUDED;
 
             case SDL.SDL_EVENT_WINDOW_MOVED:
                 type = MOVED;

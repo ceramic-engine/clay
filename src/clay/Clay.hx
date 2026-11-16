@@ -165,6 +165,7 @@ class Clay {
         var throttle = this.throttle;
         throttle.rate = config.idleUpdateRate;
         throttle.delay = config.idleDelay;
+        throttle.sleepDelay = config.hiddenSleepDelay;
         return throttle.interval(now, drawn, renderContinuous);
 
     }
@@ -378,15 +379,30 @@ class Clay {
         switch type {
             case FOCUS_GAINED:
                 throttle.focusChanged(true);
+                // A window that gets the focus is on screen
+                windowOccluded = false;
             case FOCUS_LOST:
                 throttle.focusChanged(false);
-            case HIDDEN | MINIMIZED:
-                throttle.visibilityChanged(false);
-            case SHOWN | RESTORED:
-                throttle.visibilityChanged(true);
+            case HIDDEN:
+                windowHidden = true;
+            case SHOWN:
+                windowHidden = false;
+            case MINIMIZED:
+                windowMinimized = true;
+            case RESTORED:
+                windowMinimized = false;
+            case OCCLUDED:
+                windowOccluded = true;
+            case EXPOSED:
+                windowOccluded = false;
             case _:
-                throttle.markActive();
         }
+        var visible = !windowHidden && !windowMinimized && !windowOccluded;
+        if (visible != windowVisible) {
+            windowVisible = visible;
+            throttle.visibilityChanged(visible);
+        }
+        throttle.markActive();
 
         #if clay_native
         switch type {
@@ -423,6 +439,19 @@ class Clay {
 /// Internal
 
     var windowInBackground = false;
+
+    /**
+     * Whether the window is visible: not hidden, not minimized and not fully covered by other
+     * windows or on another space (`OCCLUDED`, emitted by macOS among others). Updated with
+     * the window events, before `events.windowEvent()`.
+     */
+    public var windowVisible(default, null):Bool = true;
+
+    var windowHidden = false;
+
+    var windowMinimized = false;
+
+    var windowOccluded = false;
 
     function extractAppId():Void {
 

@@ -23,6 +23,9 @@ class IdleThrottleTest {
         testFocusLostThrottlesAtOnce();
         testInputWhileUnfocused();
         testHidden();
+        testSleepOffByDefault();
+        testSleepWhenHidden();
+        testSleepLoop();
         testDeadline();
         testRateChangedAtRuntime();
 
@@ -148,6 +151,101 @@ class IdleThrottleTest {
         check(near(t.interval(0.02, false, false), 0.25), 'hidden: even after activity');
         t.visibilityChanged(true);
         check(t.interval(0.03, false, false) == 0, 'shown: normal rate');
+    }
+
+    /** Without a sleep delay (default), a hidden window is only throttled, never asleep. */
+    static function testSleepOffByDefault() {
+        var t = new IdleThrottle();
+        check(t.sleepDelay < 0, 'sleep off by default');
+        t.rate = 10;
+        t.interval(0, false, false);
+        t.visibilityChanged(false);
+        for (i in 1...100) {
+            var interval = t.interval(i * 1.0, false, false);
+            check(near(interval, 0.1), 'no sleep delay: throttled at ' + i);
+        }
+        check(!t.asleep, 'never asleep without a sleep delay');
+        check(IdleThrottle.deadline(10.016, 10, 0.1, 0.05) != IdleThrottle.SLEEP, 'deadline of a throttle is finite');
+    }
+
+    static function testSleepWhenHidden() {
+        var t = new IdleThrottle();
+        t.rate = 10;
+        t.sleepDelay = 2;
+        check(t.enabled, 'a sleep delay enables the throttle');
+        t.interval(0, false, false);
+        t.visibilityChanged(false);
+        check(near(t.interval(1, false, false), 0.1), 'hidden before the delay: throttled');
+        check(!t.asleep, 'not asleep before the delay');
+        check(near(t.interval(2.9, false, false), 0.1), 'still throttled just before the delay');
+        check(t.interval(3, false, false) == IdleThrottle.SLEEP, 'asleep once hidden for the delay');
+        check(t.asleep, 'asleep flag');
+        // Timers are frozen: the deadline ignores the next work
+        check(IdleThrottle.deadline(3.016, 3, IdleThrottle.SLEEP, 0.05) == IdleThrottle.SLEEP, 'asleep: timers do not wake');
+        // Work posted from another thread: one tick, asleep again after it
+        t.markActive();
+        check(t.interval(10, true, true) == IdleThrottle.SLEEP, 'asleep again after a wake while hidden');
+        check(!t.activityPending, 'activity consumed while asleep');
+        t.visibilityChanged(true);
+        check(t.activityPending, 'visible again: activity');
+        check(t.interval(11, false, false) == 0, 'visible again: normal rate at once');
+        check(!t.asleep, 'visible again: awake');
+        // Hidden again: the delay starts again
+        t.visibilityChanged(false);
+        check(t.interval(12, false, false) != IdleThrottle.SLEEP, 'hidden again: delay starts again');
+        check(t.interval(14, false, false) == IdleThrottle.SLEEP, 'hidden again: asleep after the delay');
+        // Without a rate, a sleep delay alone
+        var u = new IdleThrottle();
+        u.sleepDelay = 0;
+        check(u.interval(0, false, false) == 0, 'no rate: normal rate while visible');
+        u.visibilityChanged(false);
+        check(u.interval(0.1, false, false) == IdleThrottle.SLEEP, 'no rate, delay 0: asleep at once');
+    }
+
+    /**
+     * The native loop as `SDLRuntime` drives it: a tick, then a wait until its deadline or an
+     * event. Counts the ticks of 60 seconds hidden, with a timer due every 0.5 s.
+     */
+    static function testSleepLoop() {
+        var t = new IdleThrottle();
+        t.rate = 10;
+        t.sleepDelay = 2;
+        var period = 1 / 60;
+        var now = 0.0;
+        t.interval(now, false, false);
+        t.visibilityChanged(false);
+        var ticks = 0;
+        var ticksAsleep = 0;
+        // A wake event (thread callback) at 30 s, the window visible again at 60 s
+        var wakeAt = 30.0;
+        var visibleAt = 60.0;
+        var woke = false;
+        while (now < visibleAt) {
+            var timer = 0.5 - (now % 0.5);
+            var interval = t.interval(now, false, false);
+            var deadline = interval > 0 ? IdleThrottle.deadline(now + period, now, interval, timer) : now + period;
+            if (deadline == IdleThrottle.SLEEP) {
+                // Waits for an event without a timeout
+                if (!woke && wakeAt < visibleAt) {
+                    now = wakeAt;
+                    woke = true;
+                    t.markActive();
+                }
+                else {
+                    now = visibleAt;
+                    break;
+                }
+            }
+            else {
+                now = deadline;
+            }
+            ticks++;
+            if (now > 2.5 && now < visibleAt) ticksAsleep++;
+        }
+        check(ticksAsleep == 1, 'asleep: one tick in 57 s, the one of the wake (got ' + ticksAsleep + ')');
+        check(ticks < 2 * 10 + 10, 'throttled ticks before the sleep only (got ' + ticks + ')');
+        t.visibilityChanged(true);
+        check(t.interval(now, false, false) == 0, 'visible: normal rate resumes at once');
     }
 
     static function testDeadline() {

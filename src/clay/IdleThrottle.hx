@@ -13,7 +13,13 @@ package clay;
  * - at once when the window loses the focus, and then for every tick, drawn or not, until
  *   an input event comes (it gives `delay` seconds at the normal rate again) or the focus
  *   comes back;
- * - at once while the window is hidden or minimized, for every tick.
+ * - at once while the window is hidden, minimized or occluded, for every tick.
+ *
+ * With a sleep delay (`sleepDelay`, off by default), the loop sleeps once the window was not
+ * visible for that long: `interval()` returns `SLEEP` and the loop waits for an event without
+ * a timeout (the next timer of the app is not waited for). Activity while asleep (an event,
+ * work posted from another thread) gives one tick, then the loop sleeps again until the
+ * window is visible.
  *
  * Activity is an input event (keys, text, mouse moves and buttons, wheel, touches, gamepads),
  * a window event, work posted from another thread (`Runner.runInMain`) and, while the window
@@ -44,8 +50,20 @@ class IdleThrottle {
     /** Whether the window lost the focus (and did not get it back). */
     public var unfocused(default, null):Bool = false;
 
-    /** Whether the window is hidden or minimized. */
+    /** Whether the window is hidden, minimized or occluded (not visible at all). */
     public var hidden(default, null):Bool = false;
+
+    /**
+     * Seconds after the window stops being visible before the loop sleeps (see `SLEEP`).
+     * Below 0: never (default).
+     */
+    public var sleepDelay:Float = -1;
+
+    /** Whether the last call to `interval()` returned `SLEEP`. */
+    public var asleep(default, null):Bool = false;
+
+    /** Time the window was first seen not visible by `interval()`, -1 while visible. */
+    var hiddenStart:Float = -1;
 
     /** Time of the last activity, once `started` */
     var lastActivity:Float = 0;
@@ -58,10 +76,10 @@ class IdleThrottle {
 
     public function new() {}
 
-    /** Whether ticks can be throttled at all (`rate` above 0). */
+    /** Whether ticks can be throttled at all (`rate` above 0, or a `sleepDelay`). */
     public var enabled(get, never):Bool;
     inline function get_enabled():Bool {
-        return rate > 0;
+        return rate > 0 || sleepDelay >= 0;
     }
 
     /** Something made the app active: see `activityPending`. */
@@ -81,10 +99,17 @@ class IdleThrottle {
         }
     }
 
-    /** The window was shown or restored (`true`), or hidden or minimized (`false`). */
+    /**
+     * The window was shown, restored or exposed (`true`), or hidden, minimized or occluded
+     * (`false`).
+     */
     public function visibilityChanged(visible:Bool):Void {
         hidden = !visible;
-        if (visible) activityPending = true;
+        if (visible) {
+            activityPending = true;
+            hiddenStart = -1;
+            asleep = false;
+        }
     }
 
     /**
@@ -94,6 +119,18 @@ class IdleThrottle {
      * throttled (the next tick comes at the normal rate).
      */
     public function interval(now:Float, drawn:Bool, continuous:Bool):Float {
+
+        if (hidden && sleepDelay >= 0) {
+            if (hiddenStart < 0) hiddenStart = now;
+            if (now - hiddenStart >= sleepDelay) {
+                // Activity while asleep gave this tick: asleep again after it
+                asleep = true;
+                activityPending = false;
+                focusLost = false;
+                return SLEEP;
+            }
+        }
+        asleep = false;
 
         if (rate <= 0) {
             activityPending = false;
@@ -140,6 +177,9 @@ class IdleThrottle {
      */
     public static function deadline(base:Float, tickTime:Float, interval:Float, workDelay:Float):Float {
 
+        // Asleep: timers are frozen, only an event wakes the loop
+        if (interval == SLEEP) return SLEEP;
+
         var result = tickTime + interval;
         if (workDelay >= 0) {
             // A little after the work is due: the app compares its own clock to it
@@ -149,6 +189,12 @@ class IdleThrottle {
         return result > base ? result : base;
 
     }
+
+    /**
+     * Returned by `interval()` while asleep (`sleepDelay`): the loop waits for an event,
+     * without a timeout.
+     */
+    public static final SLEEP:Float = Math.POSITIVE_INFINITY;
 
     /** Seconds added to the time of the app's next timer, so that it is due when the tick comes */
     public static inline final WORK_MARGIN:Float = 0.001;

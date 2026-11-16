@@ -198,6 +198,9 @@ enum abstract WindowEventType(Int) from Int to Int {
     /** The window exited fullscreen */
     var EXIT_FULLSCREEN  = 16;
 
+    /** The window is fully covered by other windows, or on another space (not visible) */
+    var OCCLUDED         = 17;
+
     inline function toString() {
         return switch(this) {
             case UNKNOWN:          'UNKNOWN';
@@ -217,6 +220,7 @@ enum abstract WindowEventType(Int) from Int to Int {
             case CLOSE:            'CLOSE';
             case ENTER_FULLSCREEN: 'ENTER_FULLSCREEN';
             case EXIT_FULLSCREEN:  'EXIT_FULLSCREEN';
+            case OCCLUDED:         'OCCLUDED';
             case _:             '$this';
         }
     }
