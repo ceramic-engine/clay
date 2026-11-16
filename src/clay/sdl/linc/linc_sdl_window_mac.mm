@@ -300,6 +300,20 @@ namespace linc {
             }
         }
 
+        // Whether AppKit reports the window as visible right now
+        // (`occlusionState`): 1 visible, 0 occluded, minimized or on another
+        // space. For diagnostics: the app normally follows the occlusion
+        // notifications (SDL_EVENT_WINDOW_OCCLUDED and EXPOSED)
+        int windowOcclusionVisible(SDL_Window* window) {
+            @autoreleasepool {
+                NSWindow *nsWindow = clayCocoaWindow(window);
+                if (nsWindow == nil) {
+                    return -1;
+                }
+                return ([nsWindow occlusionState] & NSWindowOcclusionStateVisible) != 0 ? 1 : 0;
+            }
+        }
+
         // For tests: whether a press at (x, y), window coordinates from the
         // top in points, moves the window (1 or 0), and what decides: the
         // hit regions of an overlay title bar ("1 regions", "0 regions"), or

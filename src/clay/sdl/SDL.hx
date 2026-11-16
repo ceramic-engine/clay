@@ -637,6 +637,14 @@ class SDL {
     }
 
     /**
+     * Diagnostics: whether AppKit reports the window as visible right now
+     * (`occlusionState`): 1 visible, 0 not visible, -1 without a window.
+     */
+    extern inline public static function windowOcclusionVisible(window:SDLWindowPointer):Int {
+        return SDL_Extern.windowOcclusionVisible(window);
+    }
+
+    /**
      * Test support: whether a press at (`x`, `y`), window coordinates from
      * the top left corner in points, may move the window, as its content
      * view answers AppKit: `1 regions` or `0 regions` when the hit regions
@@ -1782,6 +1790,9 @@ class SDL {
 
     @:native('::linc::sdl::windowTitleBarDescribe')
     static function windowTitleBarDescribe(window:SDLWindowPointer):String;
+
+    @:native('::linc::sdl::windowOcclusionVisible')
+    static function windowOcclusionVisible(window:SDLWindowPointer):Int;
 
     @:native('::linc::sdl::windowTitleBarCanMoveAt')
     static function windowTitleBarCanMoveAt(window:SDLWindowPointer, x:Int, y:Int):String;

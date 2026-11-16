@@ -1209,6 +1209,21 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     /**
+     * Diagnostics: whether the system reports the window as visible right
+     * now (macOS `occlusionState`): 1 visible, 0 not visible, -1 unknown
+     * (other platforms). The loop itself follows the window events.
+     */
+    public function windowOcclusionVisible():Int {
+
+        #if (mac && !ios)
+        return window != null ? SDL.windowOcclusionVisible(window) : -1;
+        #else
+        return -1;
+        #end
+
+    }
+
+    /**
      * Test support: the state of the title bar read back from the system
      * (macOS, see `SDL.windowTitleBarDescribe`), an empty string elsewhere.
      */

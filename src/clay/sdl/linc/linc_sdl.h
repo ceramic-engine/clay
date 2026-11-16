@@ -87,6 +87,7 @@ namespace linc {
         ::String windowTitleBarCanMoveAt(SDL_Window* window, int x, int y);
         void windowHitRegionsChanged(SDL_Window* window);
         void setWindowDragsHandledByApp(bool handled);
+        int windowOcclusionVisible(SDL_Window* window);
 
         // Phase of the scroll events (macOS only: linc_sdl_scroll_mac.mm)
         bool installScrollPhaseMonitor();
