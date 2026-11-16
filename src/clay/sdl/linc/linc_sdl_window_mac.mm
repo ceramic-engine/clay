@@ -14,6 +14,8 @@
 
 #import <AppKit/AppKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
+#import <QuartzCore/QuartzCore.h>
 
 #ifndef HXCPP_H
 #include <hxcpp.h>
@@ -319,6 +321,56 @@ namespace linc {
         void windowHitRegionsChanged(SDL_Window* window) {
             @autoreleasepool {
                 clayUpdateMovable(clayCocoaWindow(window));
+            }
+        }
+
+        // For diagnostics (CLAY_DEBUG_RESIZE): the frame of the window, the
+        // bounds of its content view and, for each layer with a drawable
+        // size (the Metal layer ANGLE draws to), its bounds, scale, drawable
+        // size and gravity
+        ::String windowLayerDescribe(SDL_Window* window) {
+            @autoreleasepool {
+                NSWindow *nsWindow = clayCocoaWindow(window);
+                if (nsWindow == nil) {
+                    return ::String("");
+                }
+                NSMutableString *out = [NSMutableString string];
+                NSRect frame = [nsWindow frame];
+                NSView *content = [nsWindow contentView];
+                [out appendFormat:@"frame=%.0fx%.0f content=%.0fx%.0f", frame.size.width, frame.size.height,
+                    [content bounds].size.width, [content bounds].size.height];
+                NSMutableArray *stack = [NSMutableArray arrayWithObject:content];
+                while ([stack count] > 0) {
+                    NSView *view = [stack lastObject];
+                    [stack removeLastObject];
+                    CALayer *root = [view layer];
+                    NSMutableArray *layers = root != nil ? [NSMutableArray arrayWithObject:root] : [NSMutableArray array];
+                    while ([layers count] > 0) {
+                        CALayer *layer = [layers lastObject];
+                        [layers removeLastObject];
+                        if ([layer respondsToSelector:@selector(drawableSize)]) {
+                            CGSize drawable = ((CGSize (*)(id, SEL))objc_msgSend)(layer, @selector(drawableSize));
+                            [out appendFormat:@" layer=%.0fx%.0f@%.1f drawable=%.0fx%.0f gravity=%@",
+                                [layer bounds].size.width, [layer bounds].size.height, [layer contentsScale],
+                                drawable.width, drawable.height, [layer contentsGravity]];
+                        }
+                        for (CALayer *sub in [layer sublayers]) [layers addObject:sub];
+                    }
+                    for (NSView *sub in [view subviews]) [stack addObject:sub];
+                }
+                return ::String([out UTF8String]);
+            }
+        }
+
+        // Whether the window is in the fullscreen of a space (1) or not (0),
+        // as AppKit tells it (its style mask)
+        int windowIsInFullscreenSpace(SDL_Window* window) {
+            @autoreleasepool {
+                NSWindow *nsWindow = clayCocoaWindow(window);
+                if (nsWindow == nil) {
+                    return 0;
+                }
+                return ([nsWindow styleMask] & NSWindowStyleMaskFullScreen) != 0 ? 1 : 0;
             }
         }
 

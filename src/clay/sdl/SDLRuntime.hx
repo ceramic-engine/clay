@@ -197,6 +197,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
         gamepads = new haxe.ds.IntMap();
         joysticks = new haxe.ds.IntMap();
 
+        #if (mac && !ios)
+        final debug = Sys.getEnv('CLAY_DEBUG_RESIZE');
+        debugResize = debug != null && debug != '' && debug != '0';
+        #end
+
         initSDL();
         initCwd();
 
@@ -1148,6 +1153,51 @@ class SDLRuntime extends clay.base.BaseRuntime {
     var windowHidden:Bool = false;
 
     var showWindowAfterFrame:Bool = false;
+
+    #if (mac && !ios)
+    /**
+     * `CLAY_DEBUG_RESIZE` set: every window event, and each frame of the
+     * 1.5 seconds after one, is printed with the sizes of the window, of its
+     * pixels and of the Metal layer, to tell why a frame shows a former size.
+     */
+    var debugResize:Bool = false;
+
+    /** Frames are printed until this time (`Timestamp.now()`). */
+    var debugResizeUntil:Float = -1;
+
+    function debugResizeLog(what:String):Void {
+        SDL.getWindowSize(window, _sdlSize);
+        final points = _sdlSize.w + 'x' + _sdlSize.h;
+        SDL.getWindowSizeInPixels(window, _sdlSize);
+        final pixels = _sdlSize.w + 'x' + _sdlSize.h;
+        Sys.println('resize t=' + (Math.round((Timestamp.now() - timestampStart) * 10000) / 10) + ' ' + what
+            + ' window=' + points + ' pixels=' + pixels + ' metrics=' + windowW + 'x' + windowH + '@' + pixelDensity
+            + ' ' + SDL.windowLayerDescribe(window));
+    }
+
+    static function windowEventName(type:Int):String {
+        return switch type {
+            case 0x202: 'SHOWN';
+            case 0x203: 'HIDDEN';
+            case 0x204: 'EXPOSED';
+            case 0x205: 'MOVED';
+            case 0x206: 'RESIZED';
+            case 0x207: 'PIXEL_SIZE_CHANGED';
+            case 0x208: 'METAL_VIEW_RESIZED';
+            case 0x209: 'MINIMIZED';
+            case 0x20A: 'MAXIMIZED';
+            case 0x20B: 'RESTORED';
+            case 0x20E: 'FOCUS_GAINED';
+            case 0x20F: 'FOCUS_LOST';
+            case 0x213: 'DISPLAY_CHANGED';
+            case 0x214: 'DISPLAY_SCALE_CHANGED';
+            case 0x216: 'OCCLUDED';
+            case 0x217: 'ENTER_FULLSCREEN';
+            case 0x218: 'LEAVE_FULLSCREEN';
+            case _: 'event 0x' + StringTools.hex(type);
+        }
+    }
+    #end
 
     /**
      * Shows a window created hidden (`config.window.startsHidden`) right
@@ -2194,6 +2244,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 #end
             }
 
+            #if (mac && !ios)
+            if (debugResize && doUpdate && Timestamp.now() < debugResizeUntil) {
+                debugResizeLog('frame ' + (skipped ? 'skipped' : 'drawn') + (idle ? ' idle' : ''));
+            }
+            #end
+
             if (doUpdate) {
                 lastFrameTime = Timestamp.now();
                 #if clay_wait_drawable_first
@@ -2649,6 +2705,18 @@ class SDLRuntime extends clay.base.BaseRuntime {
         var data1 = e.windowData1;
         var data2 = e.windowData2;
 
+        #if (mac && !ios)
+        if (debugResize) {
+            final eventType:Int = e.type;
+            if (eventType >= SDL_EVENT_WINDOW_FIRST && eventType <= SDL_EVENT_WINDOW_LAST
+                && eventType != SDL.SDL_EVENT_WINDOW_MOUSE_ENTER && eventType != SDL.SDL_EVENT_WINDOW_MOUSE_LEAVE
+                && eventType != SDL.SDL_EVENT_WINDOW_HIT_TEST) {
+                debugResizeUntil = Timestamp.now() + 1.5;
+                debugResizeLog(windowEventName(eventType) + ' ' + data1 + ',' + data2);
+            }
+        }
+        #end
+
         var type:WindowEventType = UNKNOWN;
         switch e.type {
 
@@ -2795,6 +2863,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
         inLiveResizeFrame = true;
         try {
             updateWindowMetrics();
+            #if (mac && !ios)
+            if (debugResize) {
+                debugResizeUntil = Timestamp.now() + 1.5;
+                debugResizeLog('live resize frame');
+            }
+            #end
             var newTimestamp = timestamp();
             app.emitTick(newTimestamp);
             app.renderSkipped = false;

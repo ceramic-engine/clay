@@ -88,6 +88,8 @@ namespace linc {
         void windowHitRegionsChanged(SDL_Window* window);
         void setWindowDragsHandledByApp(bool handled);
         int windowOcclusionVisible(SDL_Window* window);
+        int windowIsInFullscreenSpace(SDL_Window* window);
+        ::String windowLayerDescribe(SDL_Window* window);
 
         // Phase of the scroll events (macOS only: linc_sdl_scroll_mac.mm)
         bool installScrollPhaseMonitor();

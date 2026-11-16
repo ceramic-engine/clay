@@ -947,9 +947,22 @@ class SDL {
         return false;
     }
 
+    /** For diagnostics: the window, its content view and its Metal layer (macOS). */
+    extern inline public static function windowLayerDescribe(window:SDLWindowPointer):String {
+        #if !ios
+        return SDL_Extern.windowLayerDescribe(window);
+        #else
+        return '';
+        #end
+    }
+
+    /** Whether the window is in the fullscreen of a space (macOS: the green button, ctrl-cmd-f). */
     extern inline public static function isWindowInFullscreenSpace(window:SDLWindowPointer):Bool {
-        // TODO
+        #if !ios
+        return SDL_Extern.windowIsInFullscreenSpace(window) == 1;
+        #else
         return false;
+        #end
     }
     #end
 
@@ -1808,6 +1821,12 @@ class SDL {
 
     @:native('::linc::sdl::windowOcclusionVisible')
     static function windowOcclusionVisible(window:SDLWindowPointer):Int;
+
+    @:native('::linc::sdl::windowIsInFullscreenSpace')
+    static function windowIsInFullscreenSpace(window:SDLWindowPointer):Int;
+
+    @:native('::linc::sdl::windowLayerDescribe')
+    static function windowLayerDescribe(window:SDLWindowPointer):String;
 
     @:native('::linc::sdl::windowTitleBarCanMoveAt')
     static function windowTitleBarCanMoveAt(window:SDLWindowPointer, x:Int, y:Int):String;
