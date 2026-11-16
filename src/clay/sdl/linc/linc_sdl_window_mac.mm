@@ -212,6 +212,18 @@ static void clayLayoutTitleBarButtons(NSWindow *nsWindow) {
     _clayTitleBarButtonsMoved = YES;
 }
 
+// The overlay title bar: the content under a transparent title bar without
+// its title. Applied when the style is set, and again after fullscreen
+static void clayApplyOverlayStyle(NSWindow *nsWindow) {
+    NSWindowStyleMask mask = [nsWindow styleMask];
+    BOOL titled = (mask & NSWindowStyleMaskTitled) != 0;
+    if (titled && (mask & NSWindowStyleMaskFullSizeContentView) == 0) {
+        [nsWindow setStyleMask:mask | NSWindowStyleMaskFullSizeContentView];
+    }
+    [nsWindow setTitlebarAppearsTransparent:YES];
+    [nsWindow setTitleVisibility:NSWindowTitleHidden];
+}
+
 static void clayObserveTitleBarWindow(NSWindow *nsWindow) {
     if (_clayTitleBarWindow == nsWindow && _clayTitleBarObservers != nil) {
         return;
@@ -248,6 +260,21 @@ static void clayObserveTitleBarWindow(NSWindow *nsWindow) {
             usingBlock:^(NSNotification *notification) {
                 NSWindow *target = _clayTitleBarWindow;
                 if (target != nil && _clayTitleBarStyle == 1) {
+                    if ([[notification name] isEqualToString:NSWindowDidExitFullScreenNotification]) {
+                        // SDL gives the window its windowed style again when
+                        // it leaves fullscreen (windowDidExitFullScreen:
+                        // SetWindowStyle(GetWindowWindowedStyle)), which drops
+                        // the full size content view: applied again once SDL
+                        // is done (the next turn of the main loop)
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            NSWindow *again = _clayTitleBarWindow;
+                            if (again != nil && _clayTitleBarStyle == 1) {
+                                clayApplyOverlayStyle(again);
+                                clayLayoutTitleBarButtons(again);
+                                clayUpdateMovable(again);
+                            }
+                        });
+                    }
                     clayLayoutTitleBarButtons(target);
                 }
             }];
@@ -270,13 +297,8 @@ namespace linc {
                 _clayTitleBarButtonsY = buttonsY;
 
                 NSWindowStyleMask mask = [nsWindow styleMask];
-                BOOL titled = (mask & NSWindowStyleMaskTitled) != 0;
                 if (_clayTitleBarStyle == 1) {
-                    if (titled && (mask & NSWindowStyleMaskFullSizeContentView) == 0) {
-                        [nsWindow setStyleMask:mask | NSWindowStyleMaskFullSizeContentView];
-                    }
-                    [nsWindow setTitlebarAppearsTransparent:YES];
-                    [nsWindow setTitleVisibility:NSWindowTitleHidden];
+                    clayApplyOverlayStyle(nsWindow);
                     clayObserveTitleBarWindow(nsWindow);
                     _claySdlWindow = window;
                     clayInstallMouseDown(nsWindow);

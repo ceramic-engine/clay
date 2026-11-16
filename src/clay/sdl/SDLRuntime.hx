@@ -2680,6 +2680,11 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 type = RESTORED;
                 checkFullscreenState(e);
 
+            case SDL.SDL_EVENT_WINDOW_ENTER_FULLSCREEN | SDL.SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+                // The fullscreen of a space (the green button, ctrl-cmd-f)
+                // comes with these only: without them the app was never told
+                checkFullscreenState(e);
+
             case SDL.SDL_EVENT_WINDOW_MOUSE_ENTER:
                 type = ENTER;
 
