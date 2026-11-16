@@ -526,15 +526,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.GL_SetAttribute(SDL.SDL_GL_ALPHA_SIZE, render.alphaBits);
         SDL.GL_SetAttribute(SDL.SDL_GL_DOUBLEBUFFER, 1);
 
-        if (render.depth > 0) {
-            Log.debug('SDL / GL / depth / ${render.depth}');
-            SDL.GL_SetAttribute(SDL.SDL_GL_DEPTH_SIZE, render.depth);
-        }
+        // Set even when 0: SDL's own default depth size is 16, so leaving the
+        // attribute alone would still give a depth buffer to a config asking none
+        Log.debug('SDL / GL / depth / ${render.depth}');
+        SDL.GL_SetAttribute(SDL.SDL_GL_DEPTH_SIZE, render.depth > 0 ? render.depth : 0);
 
-        if (render.stencil > 0) {
-            Log.debug('SDL / GL / stencil / ${render.stencil}');
-            SDL.GL_SetAttribute(SDL.SDL_GL_STENCIL_SIZE, render.stencil);
-        }
+        Log.debug('SDL / GL / stencil / ${render.stencil}');
+        SDL.GL_SetAttribute(SDL.SDL_GL_STENCIL_SIZE, render.stencil > 0 ? render.stencil : 0);
 
         if (render.antialiasing > 0) {
             Log.debug('SDL / GL / MSAA / ${render.antialiasing}');
