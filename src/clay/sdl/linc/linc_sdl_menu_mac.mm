@@ -321,6 +321,8 @@ static NSString *clayMenuKeyToNative(NSString *key) {
         map[@"space"] = @(0x20);
         map[@"backspace"] = @(0x7f);
         map[@"escape"] = @(0x1b);
+        map[@"tab"] = @(0x09);
+        map[@"enter"] = @(0x0d);
         map[@"up"] = @(NSUpArrowFunctionKey);
         map[@"down"] = @(NSDownArrowFunctionKey);
         map[@"left"] = @(NSLeftArrowFunctionKey);
@@ -484,6 +486,13 @@ namespace linc {
                     case 8: selector = @selector(hide:); break;
                     case 9: selector = @selector(hideOtherApplications:); break;
                     case 10: selector = @selector(unhideAllApplications:); break;
+                    // Minimize, Zoom, Full Screen: sent along the responder
+                    // chain to the key window, which does the work (AppKit
+                    // titles the full screen item Enter or Exit Full Screen
+                    // and adds no item of its own)
+                    case 11: selector = @selector(performMiniaturize:); break;
+                    case 12: selector = @selector(performZoom:); break;
+                    case 13: selector = @selector(toggleFullScreen:); break;
                     // Undo and redo: no native text view to act on, like GPUI
                     default: selector = @selector(clayMenuItem:); break;
                 }
@@ -499,6 +508,8 @@ namespace linc {
                 }
                 if (role >= 8 && role <= 10) {
                     [item setTarget:NSApp];
+                } else if (role >= 11 && role <= 13) {
+                    [item setTarget:nil];
                 } else if (!_clayMenuUseResponderChain) {
                     [item setTarget:_clayMenuHandler];
                 }
