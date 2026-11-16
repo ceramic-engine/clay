@@ -18,5 +18,11 @@ class SDLConfig {
      * through `SDL_HINT_MAC_SCROLL_MOMENTUM`. Read once, when SDL starts.
      */
     public var scrollMomentum:Bool = true;
+
+    /**
+     * macOS: deliver precise scrolling (trackpads, Magic Mouse) on the beat of the frames
+     * when the system sends it unevenly against them. See `clay.WheelResampler`.
+     */
+    public var wheelResampling:Bool = false;
     
 }

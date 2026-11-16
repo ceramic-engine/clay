@@ -2135,9 +2135,17 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 idleDeadline = idleBaseDeadline;
             }
 
+            #if (mac && !ios)
+            // A resampled scroll still has steps to give: the loop keeps going
+            if (wheelResampler != null && wheelResampler.active) app.throttle.markActive();
+            #end
+
             var newTimestamp = timestamp();
             doUpdate = (!idle || idleTickDue()) && app.shouldUpdate(newTimestamp);
             if (doUpdate) {
+                #if (mac && !ios)
+                if (wheelResampler != null) sampleWheel();
+                #end
                 app.emitTick(newTimestamp);
                 app.renderSkipped = false;
                 app.emitRender();
@@ -2343,6 +2351,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     }
                     if (whole && now - lastPreciseScrollTime > 0.5) {
                         app.input.emitMouseScroll(e.wheelX, -e.wheelY, 1, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), scrollPhase);
+                    }
+                    else if (resampleWheel(e, scrollPhase)) {
+                        // Comes out on the beat of the frames (see sampleWheel())
+                        return;
                     }
                     else {
                         app.input.emitMouseScroll(e.wheelX * 10.0, -e.wheelY * 10.0, 0, e.timestamp.toInt() / 1000.0, Std.int(e.windowID), scrollPhase);
@@ -2835,6 +2847,94 @@ class SDLRuntime extends clay.base.BaseRuntime {
     #end
 
     #if (mac && !ios)
+    /** Frame aligned smooth scrolling (`config.runtime.wheelResampling`), created on first use. */
+    var wheelResampler:clay.WheelResampler = null;
+
+    /** Phase given to the resampled steps: that of the last resampled event, as a movement. */
+    var wheelResamplePhase:Int = 0;
+
+    var wheelResampleWindowId:Int = 0;
+
+    /** Fractional remainder of the resampled `mouseWheel` deltas (see sampleWheel()). */
+    var wheelResampleAccX:Float = 0;
+
+    var wheelResampleAccY:Float = 0;
+
+    /** Seconds on the clock of the SDL event timestamps (`SDL_GetTicksNS`). */
+    static inline function sdlTicks():Float {
+        return untyped __cpp__('(double)SDL_GetTicksNS() / 1000000000.0');
+    }
+
+    /**
+     * Gives the pixel deltas of a precise scroll event (trackpad, Magic Mouse) to the
+     * resampler when `config.runtime.wheelResampling` is set. Returns `true` when the event
+     * is resampled: its deltas come out of `sampleWheel()` on the beat of the frames.
+     *
+     * macOS sends these events on a clock of its own, about one per frame: now and then a
+     * frame receives two and the next one none, so the content stops for a frame and then
+     * jumps twice as far. See `clay.WheelResampler` (automatic mode: nothing changes while
+     * the delivery stays even).
+     */
+    function resampleWheel(e:SDLEvent, phase:Int):Bool {
+
+        if (!app.config.runtime.wheelResampling && (wheelResampler == null || !wheelResampler.active))
+            return false;
+        if (wheelResampler == null)
+            wheelResampler = new clay.WheelResampler();
+
+        final arrival = sdlTicks();
+        var time:Float = untyped __cpp__('(double){0} / 1000000000.0', e.timestamp);
+        if (!(time <= arrival && time >= arrival - 1.0))
+            time = arrival;
+
+        if (!wheelResampler.add(time, arrival, e.wheelX * 10.0, -e.wheelY * 10.0))
+            return false;
+
+        wheelResamplePhase = switch phase {
+            case 1 | 2 | 8: 2; // gesture began or moved: a movement of the gesture
+            case 5 | 6: 6; // momentum began or moved: a movement of the momentum
+            case _: phase == 0 ? 0 : (phase == 3 || phase == 4 ? 2 : 6);
+        };
+        wheelResampleWindowId = Std.int(e.windowID);
+        return true;
+
+    }
+
+    /**
+     * Emits the resampled scroll step of this frame (see `resampleWheel()`), before the tick
+     * so that it is handled in this frame's update like the events that came directly.
+     */
+    function sampleWheel():Void {
+
+        if (!wheelResampler.sample(sdlTicks(), refreshPeriod()))
+            return;
+
+        final stepX = wheelResampler.stepX;
+        final stepY = wheelResampler.stepY;
+        if (skipMouseEvents)
+            return;
+
+        final ticks = sdlTicks() * 1000000.0;
+        app.input.emitMouseScroll(stepX, stepY, 0, ticks, wheelResampleWindowId, wheelResamplePhase);
+
+        // Same values as the direct events (wheelX * -5 with wheelX = deltaX / 10), the
+        // fractions carried to the next step instead of rounded away
+        wheelResampleAccX += -stepX * 0.5;
+        wheelResampleAccY += stepY * 0.5;
+        #if !clay_no_wheel_round
+        final wheelX = Math.round(wheelResampleAccX);
+        final wheelY = Math.round(wheelResampleAccY);
+        #else
+        final wheelX = wheelResampleAccX;
+        final wheelY = wheelResampleAccY;
+        #end
+        wheelResampleAccX -= wheelX;
+        wheelResampleAccY -= wheelY;
+        if (wheelX != 0 || wheelY != 0)
+            app.input.emitMouseWheel(wheelX, wheelY, ticks, wheelResampleWindowId);
+
+    }
+
     /**
      * Forwards the scroll events whose deltas are both zero, which SDL drops
      * (`SDL_SendMouseWheel`), as `mouseScroll` events of zero pixels with
