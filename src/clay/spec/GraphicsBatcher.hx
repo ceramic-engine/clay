@@ -346,6 +346,12 @@ interface GraphicsBatcher {
     function enableStencilTest():Void;
 
     /**
+     * Enables inverted stencil testing for subsequent draw operations.
+     * Only pixels outside of the stencil mask will be rendered.
+     */
+    function enableInverseStencilTest():Void;
+
+    /**
      * Disables stencil testing for subsequent draw operations.
      */
     function disableStencilTest():Void;

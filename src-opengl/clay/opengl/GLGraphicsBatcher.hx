@@ -1229,6 +1229,18 @@ class GLGraphicsBatcher implements clay.spec.GraphicsBatcher {
     }
 
     /**
+     * Enables inverted stencil testing for subsequent draw operations.
+     * Only pixels outside of the stencil mask (stencil value not 1) will be rendered.
+     */
+    public inline function enableInverseStencilTest():Void {
+        GL.stencilFunc(GL.NOTEQUAL, 1, 0xFF);
+        GL.stencilMask(0x00);
+        GL.colorMask(true, true, true, true);
+
+        GL.enable(GL.STENCIL_TEST);
+    }
+
+    /**
      * Disables stencil testing for subsequent draw operations.
      */
     public inline function disableStencilTest():Void {
