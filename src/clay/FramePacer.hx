@@ -225,6 +225,17 @@ class FramePacer {
     }
 
     /**
+     * Removes the first value. `Array<Float>.shift()` returns a `Null<Float>`, which
+     * allocates a boxed value on C++ even when the result is not used.
+     */
+    static inline function removeFirst(values:Array<Float>):Void {
+        var count = values.length;
+        for (i in 1...count)
+            values[i - 1] = values[i];
+        values.resize(count - 1);
+    }
+
+    /**
      * The wait for the drawable started at `waitStart` and returned at `waitEnd`.
      * Returns the time to sleep until before reading the input, or 0 for no pacing.
      */
@@ -242,7 +253,7 @@ class FramePacer {
             else if (blocked && interval > MIN_PERIOD && interval < MAX_PERIOD
                 && (nominalPeriod <= 0 || interval < 1.5 * nominalPeriod)) {
                 intervals.push(interval);
-                if (intervals.length > PERIOD_SAMPLES) intervals.shift();
+                if (intervals.length > PERIOD_SAMPLES) removeFirst(intervals);
                 if (intervals.length >= PERIOD_MIN_SAMPLES) period = median();
             }
         }
@@ -383,7 +394,7 @@ class FramePacer {
         widenUntil = now + MISS_WIDEN_TIME;
 
         missTimes.push(now);
-        while (missTimes.length > 0 && now - missTimes[0] > MISS_SPAN) missTimes.shift();
+        while (missTimes.length > 0 && now - missTimes[0] > MISS_SPAN) removeFirst(missTimes);
         if (missTimes.length >= MISS_LIMIT) {
             // Never let a miss streak persist: stop pacing and learn the period again
             // (the display may have changed its rate)
