@@ -565,6 +565,7 @@ class Clay {
             trueFullscreen: config.trueFullscreen,
             resizable: config.resizable,
             borderless: config.borderless,
+            borderlessShadow: config.borderlessShadow,
             x: config.x,
             y: config.y,
             width: config.width,

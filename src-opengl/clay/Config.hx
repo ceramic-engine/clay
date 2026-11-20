@@ -282,6 +282,10 @@ class WindowConfig {
     /** create as a borderless window, default: false */
     var borderless:Bool = false;
 
+    /** a borderless window keeps the shadow of the system and, from Windows 11, its rounded
+        corners and thin border (Windows only: ignored elsewhere). default: false */
+    var borderlessShadow:Bool = false;
+
     /** window x at creation. Leave this alone to use the OS default. */
     var x:Int = 0;
 

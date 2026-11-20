@@ -572,6 +572,15 @@ class SDL {
         SDL_Extern.setWindowHitRegions(window, regions);
     }
 
+    /**
+     * Thickness, in window coordinates, of the edges that resize the window
+     * while it is borderless and resizable (0: none). They come before the
+     * hit regions.
+     */
+    extern inline public static function setWindowResizeBorder(window:SDLWindowPointer, border:Float):Void {
+        SDL_Extern.setWindowResizeBorder(window, border);
+    }
+
     extern inline public static function raiseWindow(window:SDLWindowPointer):Void {
         SDL_Extern.raiseWindow(window);
     }
@@ -1015,6 +1024,14 @@ class SDL {
 
     extern inline public static function uninstallDpiChangeHandler():Void {
         SDL_Extern.uninstallDpiChangeHandler();
+    }
+
+    /**
+     * Windows only (false elsewhere): gives a borderless window the shadow
+     * of the system and, from Windows 11, its rounded corners and thin border.
+     */
+    extern inline public static function setWindowBorderlessShadow(window:SDLWindowPointer, shadow:Bool):Bool {
+        return SDL_Extern.setWindowBorderlessShadow(window, shadow);
     }
 
     extern inline public static function setDpiChangeHandlerBypass(bypass:Bool):Void {
@@ -1800,6 +1817,9 @@ class SDL {
     @:native('::linc::sdl::setWindowHitRegions')
     static function setWindowHitRegions(window:SDLWindowPointer, regions:Array<Float>):Void;
 
+    @:native('::linc::sdl::setWindowResizeBorder')
+    static function setWindowResizeBorder(window:SDLWindowPointer, border:cpp.Float32):Void;
+
     @:native('::linc::sdl::raiseWindow')
     static function raiseWindow(window:SDLWindowPointer):Void;
 
@@ -1979,6 +1999,9 @@ class SDL {
 
     @:native('::linc::sdl::uninstallDpiChangeHandler')
     static function uninstallDpiChangeHandler():Void;
+
+    @:native('::linc::sdl::setWindowBorderlessShadow')
+    static function setWindowBorderlessShadow(window:SDLWindowPointer, shadow:Bool):Bool;
 
     @:native('::linc::sdl::setDpiChangeHandlerBypass')
     static function setDpiChangeHandlerBypass(bypass:Bool):Void;

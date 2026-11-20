@@ -493,6 +493,12 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.installDpiChangeHandler(window);
         #end
 
+        #if windows
+        if (windowConfig.borderless && windowConfig.borderlessShadow) {
+            SDL.setWindowBorderlessShadow(window, true);
+        }
+        #end
+        applyWindowResizeBorder();
 
         var windowId:Int = SDL.getWindowID(window);
 
@@ -1373,6 +1379,24 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
     }
 
+    /** Thickness of the edges that resize a borderless resizable window, in logical units. */
+    static inline final RESIZE_BORDER:Float = 5;
+
+    /**
+     * A borderless window has no border of the system left to resize it
+     * from (Windows, Linux): while the window is borderless and resizable,
+     * its edges resize it, like the border did. macOS keeps resizing a
+     * borderless window by itself.
+     */
+    function applyWindowResizeBorder():Void {
+
+        #if (windows || linux)
+        final config = app.config.window;
+        SDL.setWindowResizeBorder(window, config.borderless && config.resizable ? RESIZE_BORDER * windowDesktopScale() : 0);
+        #end
+
+    }
+
     /** The hit regions as they were given (logical units), kept for a change of display scale. */
     var windowHitRegions:Array<Float> = [];
 
@@ -1770,6 +1794,13 @@ class SDLRuntime extends clay.base.BaseRuntime {
 
         app.config.window.borderless = borderless;
         SDL.setWindowBordered(window, !borderless);
+        #if windows
+        if (app.config.window.borderlessShadow) {
+            // A window with the border of the system keeps its frame as it is
+            SDL.setWindowBorderlessShadow(window, borderless);
+        }
+        #end
+        applyWindowResizeBorder();
         #if (mac && !ios)
         if (!borderless && app.config.window.titleBarStyle != 0) {
             // The title bar is created again by AppKit: style it again
@@ -2824,9 +2855,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                     // The minimum size is kept in logical units
                     applyWindowMinimumSize();
                 }
-                if (windowCoordsArePixels && windowHitRegions.length > 0) {
-                    // The hit regions are kept in logical units
-                    applyWindowHitRegions();
+                if (windowCoordsArePixels) {
+                    // The hit regions and the resize edges are kept in logical units
+                    if (windowHitRegions.length > 0) applyWindowHitRegions();
+                    applyWindowResizeBorder();
                 }
 
             case SDL.SDL_EVENT_WINDOW_DISPLAY_CHANGED:

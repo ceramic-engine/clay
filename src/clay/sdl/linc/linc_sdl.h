@@ -73,6 +73,8 @@ namespace linc {
         bool showWindowSystemMenu(SDL_Window* window, int x, int y);
         void setWindowHitRegions(SDL_Window* window, ::Array<Float> regions);
         int windowHitKindAt(SDL_Window* window, int x, int y);
+        // Thickness, in window coordinates, of the edges that resize a borderless resizable window (0: none)
+        void setWindowResizeBorder(SDL_Window* window, float border);
         void raiseWindow(SDL_Window* window);
 
         // Usable bounds (x, y, width, height) of the display the window is on
@@ -154,6 +156,9 @@ namespace linc {
         bool installDpiChangeHandler(SDL_Window* window);
         void uninstallDpiChangeHandler();
         void setDpiChangeHandlerBypass(bool bypass);
+
+        // Windows only (false elsewhere): the shadow and rounded corners of the system around a borderless window
+        bool setWindowBorderlessShadow(SDL_Window* window, bool shadow);
 
         // OpenGL
         bool GL_SetAttribute(int attr, int value);

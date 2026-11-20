@@ -184,7 +184,49 @@ namespace linc {
             return result;
         }
 
+        // Thickness of the edges that resize a borderless resizable window,
+        // in window coordinates (0: none). A borderless window has no border
+        // of the system left to resize it from.
+        static float windowResizeBorder = 0;
+
+        // The resize kind of the edge or corner of the window at `area`, or
+        // SDL_HITTEST_NORMAL away from them (and for a window that is not
+        // resizable, maximized or fullscreen)
+        static SDL_HitTestResult resizeBorderKindAt(SDL_Window* window, const SDL_Point* area) {
+            const float border = windowResizeBorder;
+            if (border <= 0) return SDL_HITTEST_NORMAL;
+            const SDL_WindowFlags flags = SDL_GetWindowFlags(window);
+            if ((flags & SDL_WINDOW_RESIZABLE) == 0 || (flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) != SDL_WINDOW_BORDERLESS) {
+                return SDL_HITTEST_NORMAL;
+            }
+            int w = 0, h = 0;
+            if (!SDL_GetWindowSize(window, &w, &h)) return SDL_HITTEST_NORMAL;
+            const bool left = area->x < border;
+            const bool right = area->x >= w - border;
+            const bool top = area->y < border;
+            const bool bottom = area->y >= h - border;
+            if (!left && !right && !top && !bottom) return SDL_HITTEST_NORMAL;
+            // Corners reach twice as far along the edges
+            const float corner = border * 2;
+            const bool nearLeft = area->x < corner;
+            const bool nearRight = area->x >= w - corner;
+            const bool nearTop = area->y < corner;
+            const bool nearBottom = area->y >= h - corner;
+            if (nearTop && nearLeft) return SDL_HITTEST_RESIZE_TOPLEFT;
+            if (nearTop && nearRight) return SDL_HITTEST_RESIZE_TOPRIGHT;
+            if (nearBottom && nearLeft) return SDL_HITTEST_RESIZE_BOTTOMLEFT;
+            if (nearBottom && nearRight) return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
+            if (top) return SDL_HITTEST_RESIZE_TOP;
+            if (bottom) return SDL_HITTEST_RESIZE_BOTTOM;
+            if (left) return SDL_HITTEST_RESIZE_LEFT;
+            return SDL_HITTEST_RESIZE_RIGHT;
+        }
+
         static SDL_HitTestResult SDLCALL hitTestCallback(SDL_Window* window, const SDL_Point* area, void* data) {
+            SDL_HitTestResult edge = resizeBorderKindAt(window, area);
+            if (edge != SDL_HITTEST_NORMAL) {
+                return edge;
+            }
             SDL_HitTestResult result = hitKindAt(area);
             if (result == SDL_HITTEST_DRAGGABLE && windowDragsHandledByApp) {
                 return SDL_HITTEST_NORMAL;
@@ -206,11 +248,22 @@ namespace linc {
             }
             bool empty = hitRegions.empty();
             SDL_UnlockMutex(hitRegionsMutex);
-            SDL_SetWindowHitTest(window, empty ? NULL : hitTestCallback, NULL);
+            SDL_SetWindowHitTest(window, empty && windowResizeBorder <= 0 ? NULL : hitTestCallback, NULL);
             #if defined(__APPLE__) && !TARGET_OS_IPHONE
             // The overlay title bar moves the window from the regions
             windowHitRegionsChanged(window);
             #endif
+        }
+
+        void setWindowResizeBorder(SDL_Window* window, float border) {
+            if (hitRegionsMutex == NULL) {
+                hitRegionsMutex = SDL_CreateMutex();
+            }
+            windowResizeBorder = border;
+            SDL_LockMutex(hitRegionsMutex);
+            bool empty = hitRegions.empty();
+            SDL_UnlockMutex(hitRegionsMutex);
+            SDL_SetWindowHitTest(window, empty && border <= 0 ? NULL : hitTestCallback, NULL);
         }
 
         // The kind of the hit region at a point in window coordinates, the
@@ -606,7 +659,35 @@ namespace linc {
             dpiBypass = bypass;
         }
 
+        typedef struct { int left, right, top, bottom; } ClayDwmMargins;
+        typedef HRESULT (WINAPI *DwmExtendFrameFunc)(HWND, const ClayDwmMargins*);
+
+        // SDL gives a borderless window an empty non-client area, so the
+        // window manager draws nothing around it. With its frame extended by
+        // one pixel into the client area (under the content, never seen),
+        // the window manager considers that the window has a frame again:
+        // it draws its shadow and, from Windows 11, rounds its corners and
+        // draws its thin border. A maximized or fullscreen window has none.
+        bool setWindowBorderlessShadow(SDL_Window* window, bool shadow) {
+            HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+            if (hwnd == NULL) return false;
+            HMODULE dwmapi = LoadLibraryW(L"dwmapi.dll");
+            if (dwmapi == NULL) return false;
+            DwmExtendFrameFunc extendFrame = (DwmExtendFrameFunc)GetProcAddress(dwmapi, "DwmExtendFrameIntoClientArea");
+            if (extendFrame == NULL) return false;
+            ClayDwmMargins margins = { 0, 0, 0, shadow ? 1 : 0 };
+            if (extendFrame(hwnd, &margins) != S_OK) return false;
+            // The frame is computed again
+            SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            return true;
+        }
+
         #else
+
+        bool setWindowBorderlessShadow(SDL_Window* window, bool shadow) {
+            return false;
+        }
+
 
         bool installDpiChangeHandler(SDL_Window* window) {
             return false;
