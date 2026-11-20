@@ -493,6 +493,7 @@ class SDLRuntime extends clay.base.BaseRuntime {
         SDL.installDpiChangeHandler(window);
         #end
 
+
         var windowId:Int = SDL.getWindowID(window);
 
         Log.debug('SDL / created window with id: $windowId');
@@ -1361,24 +1362,57 @@ class SDLRuntime extends clay.base.BaseRuntime {
     }
 
     /**
-     * Opens the system menu of the window at the given position, in window
-     * coordinates (where the platform has one: Windows, some Linux desktops).
+     * Opens the system menu of the window at the given position, in logical
+     * units of the window (the unit of its config's `width` and `height`),
+     * where the platform has one: Windows, some Linux desktops.
      */
     public function showWindowMenu(x:Float, y:Float):Void {
 
-        SDL.showWindowSystemMenu(window, Std.int(x), Std.int(y));
+        final scale = windowDesktopScale();
+        SDL.showWindowSystemMenu(window, Std.int(x * scale), Std.int(y * scale));
+
+    }
+
+    /** The hit regions as they were given (logical units), kept for a change of display scale. */
+    var windowHitRegions:Array<Float> = [];
+
+    /**
+     * Sets the regions of the window that move or resize it when dragged:
+     * a flat list of `x, y, width, height, kind` in logical units of the
+     * window (the unit of its config's `width` and `height`; kind: 0 normal,
+     * 1 draggable, 2 to 9 resize from the top left corner clockwise to the
+     * left edge), the last matching region wins.
+     */
+    public function setWindowHitRegions(regions:Array<Float>):Void {
+
+        windowHitRegions = regions != null ? regions.copy() : [];
+        applyWindowHitRegions();
 
     }
 
     /**
-     * Sets the regions of the window that move or resize it when dragged:
-     * a flat list of `x, y, width, height, kind` in window coordinates
-     * (kind: 0 normal, 1 draggable, 2 to 9 resize from the top left corner
-     * clockwise to the left edge), the last matching region wins.
+     * Gives SDL the hit regions in its window coordinates: points on macOS
+     * and Wayland, pixels on Windows and X11, where the logical units are
+     * multiplied by the display scale.
      */
-    public function setWindowHitRegions(regions:Array<Float>):Void {
+    function applyWindowHitRegions():Void {
 
-        SDL.setWindowHitRegions(window, regions);
+        final scale = windowDesktopScale();
+        if (scale == 1.0) {
+            SDL.setWindowHitRegions(window, windowHitRegions);
+            return;
+        }
+        final scaled:Array<Float> = [];
+        var i = 0;
+        while (i + 4 < windowHitRegions.length) {
+            scaled.push(windowHitRegions[i] * scale);
+            scaled.push(windowHitRegions[i + 1] * scale);
+            scaled.push(windowHitRegions[i + 2] * scale);
+            scaled.push(windowHitRegions[i + 3] * scale);
+            scaled.push(windowHitRegions[i + 4]);
+            i += 5;
+        }
+        SDL.setWindowHitRegions(window, scaled);
 
     }
 
@@ -2789,6 +2823,10 @@ class SDLRuntime extends clay.base.BaseRuntime {
                 if (windowCoordsArePixels && (windowMinW > 0 || windowMinH > 0)) {
                     // The minimum size is kept in logical units
                     applyWindowMinimumSize();
+                }
+                if (windowCoordsArePixels && windowHitRegions.length > 0) {
+                    // The hit regions are kept in logical units
+                    applyWindowHitRegions();
                 }
 
             case SDL.SDL_EVENT_WINDOW_DISPLAY_CHANGED:
