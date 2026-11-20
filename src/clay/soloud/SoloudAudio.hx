@@ -88,10 +88,10 @@ class SoloudAudio extends clay.base.BaseAudio {
             return;
         }
 
-        soloud.deinit();
-        soloud.destroy();
-        soloud = untyped __cpp__('NULL');
-
+        // The busses first: stopping or destroying a bus calls the SoLoud
+        // instance it plays on, which must still exist (destroyed first, the
+        // app crashed here when it quit after a sound was played, and the
+        // system took seconds to end the process)
         for (i in 0...bussesByIndex.length) {
             final soloudBus = bussesByIndex[i];
             if (soloudBus != null) {
@@ -100,6 +100,10 @@ class SoloudAudio extends clay.base.BaseAudio {
                 soloudBus.destroy();
             }
         }
+
+        soloud.deinit();
+        soloud.destroy();
+        soloud = untyped __cpp__('NULL');
 
         super.shutdown();
 
