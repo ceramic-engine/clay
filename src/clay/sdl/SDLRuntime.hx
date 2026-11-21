@@ -309,6 +309,16 @@ class SDLRuntime extends clay.base.BaseRuntime {
         // other macOS app (SDL drops the momentum events by default). SDL
         // reads the hint once, when it starts.
         SDL.setHint(SDL.SDL_HINT_MAC_SCROLL_MOMENTUM, app.config.runtime.scrollMomentum ? "1" : "0");
+
+        // Mouse buttons from the events of AppKit, not from GCMouse (the
+        // trackpad of a MacBook is one). With GCMouse, SDL reports every
+        // physical click while the app is active, whatever is under the
+        // cursor, at the last position the window saw: a click on the menu
+        // bar, then the click that closes the menu, became a double click
+        // on the title bar. SDL also ignored the clicks other software
+        // sends (remote control, accessibility, UI tests). Needs SDL 3.6:
+        // an older SDL does not know the hint and keeps using GCMouse.
+        SDL.setHint(SDL.SDL_HINT_MAC_USE_GCMOUSE, "0");
         #end
 
         // Init value pointers

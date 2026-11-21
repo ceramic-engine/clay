@@ -1688,6 +1688,7 @@ class SDL {
     @:native('LINC_SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK') public static inline var SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK:String = "SDL_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK";
     @:native('LINC_SDL_HINT_MAC_OPTION_AS_ALT') public static inline var SDL_HINT_MAC_OPTION_AS_ALT:String = "SDL_MAC_OPTION_AS_ALT";
     @:native('LINC_SDL_HINT_MAC_SCROLL_MOMENTUM') public static inline var SDL_HINT_MAC_SCROLL_MOMENTUM:String = "SDL_MAC_SCROLL_MOMENTUM";
+    @:native('LINC_SDL_HINT_MAC_USE_GCMOUSE') public static inline var SDL_HINT_MAC_USE_GCMOUSE:String = "SDL_MAC_USE_GCMOUSE";
 
     // Windows specific
     @:native('LINC_SDL_HINT_WINDOWS_CLOSE_ON_ALT_F4') public static inline var SDL_HINT_WINDOWS_CLOSE_ON_ALT_F4:String = "SDL_WINDOWS_CLOSE_ON_ALT_F4";
